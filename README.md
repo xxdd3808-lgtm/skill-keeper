@@ -30,13 +30,16 @@
 ### 报告 `report.py`
 
 - Markdown + 交互式 HTML(按分组折叠、红黄绿标色、客户端加载开销统计)
+- **处理建议**:每条体检问题与上游差异都翻译成 🟢建议更新 / 🟡待你确认 / ℹ️提示,并附操作按钮
+- **一键处理** `report.py --serve`(macOS 可直接双击 `启动技能报告.command`):本地起服务(仅 127.0.0.1 + 随机 token,防其他网页跨站调用),网页里直接 🔄更新 / 🔍看上游差异(页内红绿 diff) / 🗑️删除 / ✕忽略 / ♻️从备份恢复;所有动作先 tar 备份、成功后自动重扫重报,审计记入 `data/actions.log`。静态打开 report.html 时,按钮退化为复制等价命令
 - 与上次盘点自动 diff(新增 / 移除 / 来源变更)
-- 分组由 `data/groups.json` 配置,改完重跑即可
+- 分组由 `data/groups.json` 配置,改完重跑即可;不想看的黄灯可写进 `data/ignore.json` 忽略
 
 ### 更新检查 `check_updates.py`(只读)
 
 - GitHub 来源经 `gh api` 拉上游 SKILL.md 逐字比对;skills.sh 来源走 download API
-- 只比对不更新——`npx skills check` 发现更新会**直接更新**,想「只看不动」就用本脚本
+- 结果缓存到 `data/updates.json`,并**自动给出结论**:🟢建议更新 / 🛡️建议保留 / 🟡需人工研判 + 一句人话理由(依据:版本号、改动是否只碰说明信息、上游最后改动时间 vs 本地改动时间、改动规模)——不用自己读 diff
+- 只比对不更新——`npx skills check` 发现更新会**直接更新**,想「只看不动」就用本脚本;确认后在交互报告里一键更新
 
 ### 安全删除 `remove_skill.py`
 
@@ -65,6 +68,10 @@ cp groups.example.json groups.json
 cp self-built.example.txt self-built.txt
 cp known-sources.example.json known-sources.json
 
+# 可选:工作区级 skill 扫描、忽略规则(不需要可跳过)
+cp workspace-locations.example.txt workspace-locations.txt
+# ignore.json 格式见 SKILL.md「数据文件」表;没有它就不忽略任何问题
+
 # 首次盘点
 python3 ~/skill-keeper/scripts/scan.py
 python3 ~/skill-keeper/scripts/report.py && open ~/skill-keeper/data/report.html
@@ -92,15 +99,19 @@ skill-keeper/
 ├── SKILL.md                      # skill 定义(触发词、铁律、工作流)
 ├── scripts/
 │   ├── scan.py                   # 全位置扫描 → data/inventory.json(只读)
-│   ├── report.py                 # Markdown + 交互式 HTML 报告
-│   ├── check_updates.py          # 上游更新检查(只读)
+│   ├── report.py                 # Markdown + 交互式 HTML 报告(含处理建议与操作按钮)
+│   ├── serve.py                  # 本地交互服务:一键 更新/删除/忽略/恢复(127.0.0.1+token)
+│   ├── check_updates.py          # 上游更新检查(只读)→ data/updates.json
 │   ├── remove_skill.py           # 带备份的安全删除
 │   └── make_sample_report.py     # 把个人盘点脱敏成可分享的示例报告
 ├── data/
 │   ├── groups.example.json       # 分组配置模板(个人版已 gitignore)
 │   ├── self-built.example.txt    # 自建白名单模板
 │   ├── known-sources.example.json# 来源映射模板
+│   ├── ignore.json               # 忽略规则(个人配置,可选,已 gitignore)
 │   ├── inventory.json            # 盘点结果(运行时生成)
+│   ├── updates.json              # 更新检查缓存(运行时生成)
+│   ├── actions.log               # 一键操作审计(运行时生成)
 │   └── report.md / report.html   # 报告(运行时生成)
 ├── backups/                      # 删除/更新前的 tar 备份(自动创建)
 └── examples/report-sample.html   # 脱敏示例报告
@@ -113,6 +124,7 @@ skill-keeper/
 3. 自建白名单里的 skill 受保护,删除需 `--force`(仍会先备份)
 4. 不修改插件缓存(由插件系统管理)
 5. 一切操作后重跑 `scan.py`,保证盘点与实际一致
+6. 交互服务的按钮点击等同用户确认:服务只监听 127.0.0.1 并校验随机 token,动作仍需页面确认弹窗 + `confirm` 字段,全程留痕 `data/actions.log`
 
 ## 隐私说明
 

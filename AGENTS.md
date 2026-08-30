@@ -6,8 +6,10 @@
 
 ```bash
 python3 scripts/scan.py                    # 全位置扫描 → data/inventory.json(只读)
-python3 scripts/report.py                  # 生成 data/report.md + report.html
-python3 scripts/check_updates.py           # 与上游比对(只读,gh api / skills.sh API)
+python3 scripts/report.py                  # 生成 data/report.md + report.html(含处理建议)
+python3 scripts/report.py --serve          # 交互报告:网页一键 更新/删除/忽略/恢复(仅 127.0.0.1+token)
+./启动技能报告.command                      # macOS 双击可启动同一交互服务(自动开浏览器)
+python3 scripts/check_updates.py           # 与上游比对(只读,gh api / skills.sh API)→ 缓存 data/updates.json
 python3 scripts/remove_skill.py <目录名>    # 备份→删除→清锁文件
 python3 scripts/make_sample_report.py      # 个人盘点 → 脱敏示例报告
 ```
@@ -21,12 +23,12 @@ python3 scripts/make_sample_report.py      # 个人盘点 → 脱敏示例报告
 ## 目录与约定
 
 - 脚本用 `os.path.realpath(__file__)` 反推项目根,不依赖调用路径;项目实体可整体迁移,客户端发现靠符号链接(如 `~/.agents/skills/skill-keeper` → 项目根)。
-- `data/groups.json`、`data/self-built.txt`、`data/known-sources.json` 是用户个人配置(已 gitignore),扫描行为受它们影响;新用户从同名 `.example` 文件复制。
-- `data/inventory*.json`、`data/report.*`、`backups/` 是运行时产物,含个人数据,永远不入库。
+- `data/groups.json`、`data/self-built.txt`、`data/known-sources.json`、`data/ignore.json`、`data/workspace-locations.txt` 是用户个人配置(已 gitignore),扫描/报告行为受它们影响;新用户从同名 `.example` 文件复制(ignore.json 可选,无则不忽略任何问题)。
+- `data/inventory*.json`、`data/updates.json`、`data/report.*`、`data/actions.log`、`backups/` 是运行时产物,含个人数据,永远不入库。
 - 铁律:扫描/报告只读;删除/更新前强制 tar 备份到 `backups/`;自建白名单 skill 受保护(删除需 `--force`);不修改插件缓存;任何操作后重跑 `scan.py`。
 - 提交前自查:`git grep` 不得出现真实 skill 清单、个人路径或个人配置内容。
 
 ## 当前状态与下一步
 
-- v1.0.0 已发布;已在 macOS + ZCode / Claude Code / Codex CLI / Ego 验证。
-- 候选改进:更多客户端目录适配(增删 `scan.py` 的 `LOCATIONS`)、报告主题、按需增量扫描。
+- v1.1.0:报告带「处理建议」分区(🟢建议更新/🛡️建议保留/🟡待确认/提示 四级,自动研判给结论+人话理由,每条含功能/来源/客户端上下文),看差异为页内红绿 diff;`report.py --serve` 或双击 `启动技能报告.command` 本地一键执行(先备份、后重扫、token 鉴权,动作记入 data/actions.log);汇报必带报告 file:// 链接与交互入口;已在 macOS + ZCode / Claude Code / Codex CLI / Ego 验证。
+- 候选改进:更多客户端目录适配(家目录位置增删 `scan.py` 的 `LOCATIONS`;项目内工作区 skill 已由 `data/workspace-locations.txt` 配置驱动)、报告主题、按需增量扫描、更新建议信任分级。

@@ -3,11 +3,15 @@ data/inventory.json
 data/inventory-last.json
 data/report.md
 data/report.html
+data/updates.json
+data/actions.log
 
 # 个人配置(请从 .example 复制生成)
 data/groups.json
 data/self-built.txt
 data/known-sources.json
+data/ignore.json
+data/workspace-locations.txt
 
 # 备份(含完整 skill 内容)
 backups/

@@ -18,9 +18,29 @@ LOCATIONS = [
 ]
 PLUGIN_CACHE = f"{HOME}/.zcode/cli/plugins/cache"
 
+# 工作区级 skill 目录(项目内的 .claude/skills、.agents/skills 等),逐行配置在 data/workspace-locations.txt。
+# 这些 skill 不随客户端全局加载,只在进入该项目工作时被发现,客户端标注加"(工作区)"后缀。
+def _load_workspace_locations():
+    rows = []
+    p = os.path.join(DATA, "workspace-locations.txt")
+    if not os.path.exists(p):
+        return rows
+    for line in open(p, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        path = os.path.expanduser(line)
+        parts = os.path.normpath(path).split(os.sep)
+        client = "workspace-claude" if ".claude" in parts else "workspace-zcode"
+        rows.append((path, client, 6))
+    return rows
+
+WORKSPACE_LOCATIONS = _load_workspace_locations()
+
 CLIENTS_OF_LOCATION = {
     "zcode": ["zcode"], "shared": ["zcode"],
     "claude-code": ["claude-code"], "codex": ["codex"], "ego": ["ego"], "plugin": ["zcode"],
+    "workspace-zcode": ["zcode(工作区)"], "workspace-claude": ["claude-code(工作区)"],
 }
 # ZCode 会在这些位置间发现同名 skill 并全部列出(只加载优先级第一个) → 只有它们之间才存在"双份占上下文"
 ZCODE_DISCOVERY_CLIENTS = ("zcode", "shared", "plugin")
@@ -42,6 +62,9 @@ SELF_BUILT = set()
 _p = os.path.join(DATA, "self-built.txt")
 if os.path.exists(_p):
     SELF_BUILT = {l.strip() for l in open(_p, encoding="utf-8") if l.strip() and not l.startswith("#")}
+# 忽略规则:{skill名: [子串,…]},命中的健康问题不再计入红黄,单独记入 health.ignored 供报告展示
+IGNORE = {k: [str(x) for x in v] for k, v in load_json(os.path.join(DATA, "ignore.json"), {}).items()
+          if isinstance(v, list)}
 
 def collect_bins(obj, out):
     """递归找 frontmatter 里声明的依赖命令(metadata.*.requires.bins)"""
@@ -177,6 +200,13 @@ def scan_all():
             continue
         for d in sorted(os.listdir(loc_path)):
             instances.append(scan_instance(loc_path, d, client, prio, label))
+    # 工作区级 skill(配置在 data/workspace-locations.txt):项目内 .claude/skills、.agents/skills
+    for loc_path, client, prio in WORKSPACE_LOCATIONS:
+        label = loc_path.replace(HOME, "~")
+        if not os.path.isdir(loc_path):
+            continue
+        for d in sorted(os.listdir(loc_path)):
+            instances.append(scan_instance(loc_path, d, client, prio, label))
     # 插件缓存:~/.zcode/cli/plugins/cache/<market>/<plugin>/<ver>/skills/<name>/SKILL.md
     # 同一插件可能有多个历史版本缓存,只有最新版会被加载,旧版标注为可清理缓存
     def ver_key(v):
@@ -234,6 +264,10 @@ def aggregate(instances):
         srcs = {json.dumps(i.get("source"), ensure_ascii=False, sort_keys=True)
                 for i in insts if i.get("source") and not i.get("stale_cache")}
         issues = sorted({iss for i in insts for iss in i["health"]["issues"]})
+        ign_rules = IGNORE.get(name, [])
+        kept, dropped = [], []
+        for iss in issues:
+            (dropped if any(r in iss for r in ign_rules) else kept).append(iss)
         # 只有 ZCode 的多位置发现机制才会造成"双份进上下文";跨客户端符号链接是正常拓扑
         zcode_insts = [i for i in insts if i["client"] in ZCODE_DISCOVERY_CLIENTS and not i.get("stale_cache")]
         duplicated = len(zcode_insts) > 1
@@ -264,7 +298,7 @@ def aggregate(instances):
             "context_bytes": sum(i.get("context_bytes", 0) for i in insts),
             "instances": [{k: i.get(k) for k in ("dir", "location", "client", "is_symlink", "version", "real_path", "plugin_version", "stale_cache", "context_bytes")} for i in insts],
             "duplicated": duplicated,
-            "health": {"issues": issues},
+            "health": {"issues": kept, "ignored": dropped},
             "scanned_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         if len(srcs) > 1:
@@ -296,6 +330,7 @@ def main():
     yellow = [{"name": s["name"], "issues": [i for i in s["health"]["issues"] if i.startswith("🟡")]}
               for s in skills if any(i.startswith("🟡") for i in s["health"]["issues"])]
     dup = [s["name"] for s in skills if s["duplicated"]]
+    ignored_n = sum(len(s["health"].get("ignored", [])) for s in skills)
 
     if "--json" in sys.argv:
         # 机器可读输出;退出码:0=健康,1=有红色问题,2=用法错误
@@ -303,6 +338,7 @@ def main():
             "scanned_at": inv["scanned_at"], "total": inv["total"],
             "by_source": inv["by_source"],
             "duplicated": dup, "red": red, "yellow": yellow, "junk_count": len(junk),
+            "ignored_issues": ignored_n,
         }, ensure_ascii=False, indent=1))
         sys.exit(1 if red else 0)
 
@@ -317,6 +353,8 @@ def main():
     print(f"健康问题: {len(red)} 个红色 / {len(yellow)} 个黄色" +
           ("  🔴:" + "、".join(r["name"] for r in red) if red else "") +
           ("  🟡:" + "、".join(y["name"] for y in yellow) if yellow else ""))
+    if ignored_n:
+        print(f"已忽略问题: {ignored_n} 条(规则在 data/ignore.json,详情见报告)")
     print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 1.0.0
+version: 1.1.0
 ---
 
 # skill-keeper · 本地 Skill 管家
@@ -25,8 +25,12 @@ version: 1.0.0
 | `data/inventory.json` | 最新盘点结果(每 skill 一条记录,含分组) |
 | `data/inventory-last.json` | 上一次盘点(scan.py 自动轮转),供 diff |
 | `data/known-sources.json` | 已核实的上游来源映射(dir → repo + 路径),发现新来源时补充进来 |
+| `data/updates.json` | check_updates.py 的结果缓存(本地/上游版本对比 + 建议状态),report.py 读它生成「建议更新/待确认」 |
+| `data/ignore.json` | 忽略规则(skill名 → 问题子串列表),命中的问题不计入红黄,报告单独标注;可选,无则不忽略 |
+| `data/actions.log` | 交互服务(serve)每次 更新/删除/忽略/恢复 的审计记录 |
 | `data/self-built.txt` | 自建 skill 白名单(受保护清单),一行一个目录名 |
 | `data/groups.json` | 分组配置(组名 → 目录名列表);用户想调整分组就改它,改完重扫 |
+| `data/workspace-locations.txt` | 工作区级 skill 目录清单(项目内的 `.claude/skills`、`.agents/skills`,每行一个);这些 skill 仅在进入该项目工作时被客户端发现,不占全局启动上下文,配套客户端标注"(工作区)" |
 
 ## 自动化接口(定时巡检/被其他工具消费)
 
@@ -65,7 +69,9 @@ python3 ~/skill-keeper/scripts/report.py
 - `data/report.md` 纯文本版
 - **`data/report.html` 交互式网页版**(按分组折叠、红黄绿标色,可直接让用户用浏览器打开)——给用户看报告时优先给这个
 
-内容:总表(Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康)、各客户端加载开销、ZCode 重复加载、插件旧缓存、非 skill 杂质、体检问题、与上次盘点 diff。
+内容:总表(Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康 | 操作)、**处理建议**(把体检问题与上游差异翻译成 🟢建议更新 / 🛡️建议保留 / 🟡待你确认 / ℹ️提示 四级,每条自带一句人话结论+理由与 功能/来源/客户端 上下文及操作按钮,想看细节可页内展开红绿 diff)、各客户端加载开销、常驻上下文 Top 榜、ZCode 重复加载、插件旧缓存、非 skill 杂质、备份恢复区、与上次盘点 diff。
+
+**一键处理(要动手时用)**:`python3 ~/skill-keeper/scripts/report.py --serve`(macOS 也可双击项目根的 `启动技能报告.command`)→ 自动开浏览器,报告里直接点 🔄更新 / 🔍看差异(页内红绿 diff,含来源与客户端上下文) / 🗑️删除 / ✕忽略 / ♻️恢复备份。安全边界:只绑 127.0.0.1 + 随机 token(防其他网页跨站调用);所有动作先 tar 备份、成功后自动重扫重报;更新/删除/恢复需页面确认弹窗(confirm);自建 skill 删除仍走 CLI `--force`;动作记入 `data/actions.log`。**静态打开 report.html 时按钮退化为复制等价命令**。
 
 ### 3. 更新检查(只读)
 
@@ -73,7 +79,7 @@ python3 ~/skill-keeper/scripts/report.py
 python3 ~/skill-keeper/scripts/check_updates.py
 ```
 
-对有 GitHub 来源的 skill 拉上游 SKILL.md 与本地比对;skills.sh 来源经 download API 比对。锁内 skill 也可用 `npx -y skills check`(注意:该命令发现更新会**直接更新**,只做检查时用本脚本)。输出「可更新」清单,报给用户确认。
+对有 GitHub 来源的 skill 拉上游 SKILL.md 与本地比对;skills.sh 来源经 download API 比对。结果缓存到 `data/updates.json`,含**本地/上游版本对比**、状态(`upstream-newer` / `content-diff` / `local-ahead`)与**自动研判结论** `verdict`(🟢update 建议更新 / 🛡️keep 建议保留 / 🟡manual 需人工研判)+ 一句人话理由 `reason`。研判依据:版本号 → 改动是否只碰说明区 → 上游最后改动时间 vs 本地文件改动时间 → 改动规模;**汇报时直接给结论,不让用户读 diff**。锁内 skill 也可用 `npx -y skills check`(注意:该命令发现更新会**直接更新**,只做检查时用本脚本)。输出「可更新」清单,报给用户确认。
 
 ### 4. 执行动作(需用户确认)
 
@@ -87,7 +93,9 @@ python3 ~/skill-keeper/scripts/check_updates.py
 
 ### 5. 汇报
 
-给用户:操作结果 + 剩余总数 + 新发现的问题;**给用户看详情时优先打开 `data/report.html`**(网页版,按分组折叠)。
+给用户:操作结果 + 剩余总数 + 新发现的问题。**汇报正文必须带两个可点的入口**,别让用户去文件夹里翻:
+- **HTML 报告**:贴完整 `file:///Users/<用户名>/skill-keeper/data/report.html` 链接(file:// 里不能写 `~`),或直接 `open ~/skill-keeper/data/report.html` 当场弹出浏览器;
+- **一键操作入口**:后台起 `python3 ~/skill-keeper/scripts/report.py --serve`,把打印出的带 token 完整 URL 原样贴进对话,用户点开就是能直接点按钮的报告;并提示 macOS 可随时双击 `~/skill-keeper/启动技能报告.command` 再开。
 
 ## 分组维护
 
@@ -106,5 +114,5 @@ python3 ~/skill-keeper/scripts/check_updates.py
 ## 客户端加载规则(已按官方文档核实)
 
 - ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`。
-- Claude Code 读 `~/.claude/skills`(现为指向 .agents 的符号链接);Codex CLI 读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
+- Claude Code 读 `~/.claude/skills`(目录本体真实,条目为逐项指向 `~/.agents/skills` 的符号链接);Codex CLI 读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
 - 每个 skill 常驻上下文的是 name+description;SKILL.md 全文在触发时才加载。
