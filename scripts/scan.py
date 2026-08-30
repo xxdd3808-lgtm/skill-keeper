@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """skill-keeper 扫描器:全位置扫描本地 skill → data/inventory.json(只读,不改任何 skill)"""
-import json, os, re, shutil, subprocess, sys, time
+import hashlib, json, os, re, shutil, subprocess, sys, time
 
 HOME = os.path.expanduser("~")
 # 项目真实目录:从脚本自身位置反推,经符号链接调用也能定位(项目文件夹可整体迁移)
@@ -65,6 +65,9 @@ if os.path.exists(_p):
 # 忽略规则:{skill名: [子串,…]},命中的健康问题不再计入红黄,单独记入 health.ignored 供报告展示
 IGNORE = {k: [str(x) for x in v] for k, v in load_json(os.path.join(DATA, "ignore.json"), {}).items()
           if isinstance(v, list)}
+# 安检台账(data/vetted.json):{skill目录名: {verdict: safe|warning|danger, note, vetted_at, sk_hash}}
+# sk_hash 是安检时的内容指纹;扫描发现指纹变了,就把旧结论降级为"需复检"。
+VETTED = load_json(os.path.join(DATA, "vetted.json"), {})
 
 def collect_bins(obj, out):
     """递归找 frontmatter 里声明的依赖命令(metadata.*.requires.bins)"""
@@ -108,6 +111,16 @@ def parse_frontmatter(text):
         else:
             out[cur_key] = val.strip('"').strip("'")
     return out, True
+
+def sk_signature(real_path):
+    """skill 内容指纹:SKILL.md 的 sha256 前 16 位 + 文件数。安检记账用,指纹变了就该复检。"""
+    sk = os.path.join(real_path, "SKILL.md")
+    try:
+        h = hashlib.sha256(open(sk, "rb").read()).hexdigest()[:16]
+    except OSError:
+        h = "none"
+    n = sum(len(fs) for _, _, fs in os.walk(real_path))
+    return f"{h}:{n}"
 
 def first_sentence(desc, limit=60):
     if not desc:
@@ -166,6 +179,7 @@ def scan_instance(loc_path, d, client, priority, location_label):
             except OSError:
                 pass
             inst["files"] += 1
+    inst["sk_hash"] = sk_signature(real)
     inst["mtime"] = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(sk)))
     fm, ok = parse_frontmatter(open(sk, encoding="utf-8", errors="ignore").read(8000))
     inst["yaml_ok"] = ok
@@ -287,6 +301,22 @@ def aggregate(instances):
                     issues.append(f"🟡 链接目标缺 SKILL.md: {i['location']}/{i['dir']}")
                 elif open(i_sk, encoding="utf-8", errors="ignore").read() != master_md:
                     issues.append(f"🟡 链接漂移: {i['location']}/{i['dir']} 的内容与主库不一致")
+        # 安检状态:自建/插件/随应用自带免检;第三方查台账,内容指纹变了降级为需复检
+        ent_inst = next((x for x in insts if x.get("real_path") and not x.get("is_symlink") and not x.get("stale_cache")), None)
+        if (loaded.get("source") or {}).get("type") in ("self-built", "plugin", "builtin-app") or not ent_inst:
+            vetting = {"status": "exempt"}
+        else:
+            rec = VETTED.get(ent_inst["dir"]) or {}
+            if not rec:
+                vetting = {"status": "unvetted"}
+            elif rec.get("sk_hash") != ent_inst.get("sk_hash"):
+                vetting = {"status": "changed", "vetted_at": rec.get("vetted_at"), "note": rec.get("note")}
+            else:
+                vetting = {"status": rec.get("verdict", "unvetted"), "vetted_at": rec.get("vetted_at"), "note": rec.get("note")}
+        if vetting["status"] == "warning":
+            kept.append(f"🟡 安检存疑({vetting.get('vetted_at') or '?'}): {(vetting.get('note') or '')[:80]}")
+        elif vetting["status"] == "danger":
+            kept.append(f"🔴 安检判危({vetting.get('vetted_at') or '?'}): {(vetting.get('note') or '')[:80]}")
         entry = {
             "name": name,
             "function": loaded.get("function", ""),
@@ -296,8 +326,9 @@ def aggregate(instances):
             "clients": clients,
             "trigger": loaded.get("trigger", "auto"),
             "context_bytes": sum(i.get("context_bytes", 0) for i in insts),
-            "instances": [{k: i.get(k) for k in ("dir", "location", "client", "is_symlink", "version", "real_path", "plugin_version", "stale_cache", "context_bytes")} for i in insts],
+            "instances": [{k: i.get(k) for k in ("dir", "location", "client", "is_symlink", "version", "real_path", "plugin_version", "stale_cache", "context_bytes", "sk_hash")} for i in insts],
             "duplicated": duplicated,
+            "vetting": vetting,
             "health": {"issues": kept, "ignored": dropped},
             "scanned_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -331,6 +362,7 @@ def main():
               for s in skills if any(i.startswith("🟡") for i in s["health"]["issues"])]
     dup = [s["name"] for s in skills if s["duplicated"]]
     ignored_n = sum(len(s["health"].get("ignored", [])) for s in skills)
+    need_vet = [s["name"] for s in skills if (s.get("vetting") or {}).get("status") in ("unvetted", "changed")]
 
     if "--json" in sys.argv:
         # 机器可读输出;退出码:0=健康,1=有红色问题,2=用法错误
@@ -338,7 +370,7 @@ def main():
             "scanned_at": inv["scanned_at"], "total": inv["total"],
             "by_source": inv["by_source"],
             "duplicated": dup, "red": red, "yellow": yellow, "junk_count": len(junk),
-            "ignored_issues": ignored_n,
+            "ignored_issues": ignored_n, "need_vet": need_vet,
         }, ensure_ascii=False, indent=1))
         sys.exit(1 if red else 0)
 
@@ -355,6 +387,8 @@ def main():
           ("  🟡:" + "、".join(y["name"] for y in yellow) if yellow else ""))
     if ignored_n:
         print(f"已忽略问题: {ignored_n} 条(规则在 data/ignore.json,详情见报告)")
+    if need_vet:
+        print(f"待安检: {len(need_vet)} 个第三方 skill 未安检或内容已变(清单在报告处理建议区)")
     print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
 
 if __name__ == "__main__":

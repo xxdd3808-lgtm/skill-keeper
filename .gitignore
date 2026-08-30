@@ -5,6 +5,7 @@ data/report.md
 data/report.html
 data/updates.json
 data/actions.log
+data/vetted.json
 
 # 个人配置(请从 .example 复制生成)
 data/groups.json

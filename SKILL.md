@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 1.1.0
+version: 1.2.0
 ---
 
 # skill-keeper · 本地 Skill 管家
@@ -27,7 +27,8 @@ version: 1.1.0
 | `data/known-sources.json` | 已核实的上游来源映射(dir → repo + 路径),发现新来源时补充进来 |
 | `data/updates.json` | check_updates.py 的结果缓存(本地/上游版本对比 + 建议状态),report.py 读它生成「建议更新/待确认」 |
 | `data/ignore.json` | 忽略规则(skill名 → 问题子串列表),命中的问题不计入红黄,报告单独标注;可选,无则不忽略 |
-| `data/actions.log` | 交互服务(serve)每次 更新/删除/忽略/恢复 的审计记录 |
+| `data/actions.log` | 交互服务(serve)每次 更新/删除/忽略/恢复/安检记账 的审计记录 |
+| `data/vetted.json` | 安检台账(skill-vetter 结论):verdict/note/vetted_at/内容指纹;指纹变了旧结论自动降级为「需复检」 |
 | `data/self-built.txt` | 自建 skill 白名单(受保护清单),一行一个目录名 |
 | `data/groups.json` | 分组配置(组名 → 目录名列表);用户想调整分组就改它,改完重扫 |
 | `data/workspace-locations.txt` | 工作区级 skill 目录清单(项目内的 `.claude/skills`、`.agents/skills`,每行一个);这些 skill 仅在进入该项目工作时被客户端发现,不占全局启动上下文,配套客户端标注"(工作区)" |
@@ -69,7 +70,7 @@ python3 ~/skill-keeper/scripts/report.py
 - `data/report.md` 纯文本版
 - **`data/report.html` 交互式网页版**(按分组折叠、红黄绿标色,可直接让用户用浏览器打开)——给用户看报告时优先给这个
 
-内容:总表(Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康 | 操作)、**处理建议**(把体检问题与上游差异翻译成 🟢建议更新 / 🛡️建议保留 / 🟡待你确认 / ℹ️提示 四级,每条自带一句人话结论+理由与 功能/来源/客户端 上下文及操作按钮,想看细节可页内展开红绿 diff)、各客户端加载开销、常驻上下文 Top 榜、ZCode 重复加载、插件旧缓存、非 skill 杂质、备份恢复区、与上次盘点 diff。
+内容:总表(Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康 | 操作)、**处理建议**(把体检问题与上游差异翻译成 🟢建议更新 / 🛡️建议保留 / 🔍待安检 / 🟡待你确认 / 🔵可自动处理 / ℹ️提示 六级,每条自带一句人话结论+理由与 功能/来源/客户端 上下文及操作按钮,想看细节可页内展开红绿 diff)、各客户端加载开销、常驻上下文 Top 榜、ZCode 重复加载、插件旧缓存、非 skill 杂质、备份恢复区、与上次盘点 diff。
 
 **一键处理(要动手时用)**:`python3 ~/skill-keeper/scripts/report.py --serve`(macOS 也可双击项目根的 `启动技能报告.command`)→ 自动开浏览器,报告里直接点 🔄更新 / 🔍看差异(页内红绿 diff,含来源与客户端上下文) / 🗑️删除 / ✕忽略 / ♻️恢复备份。安全边界:只绑 127.0.0.1 + 随机 token(防其他网页跨站调用);所有动作先 tar 备份、成功后自动重扫重报;更新/删除/恢复需页面确认弹窗(confirm);自建 skill 删除仍走 CLI `--force`;动作记入 `data/actions.log`。**静态打开 report.html 时按钮退化为复制等价命令**。
 
@@ -91,7 +92,13 @@ python3 ~/skill-keeper/scripts/check_updates.py
   自动:备份 → 从所有位置(~/.agents、~/.zcode、~/.claude、~/.codex、ego)删除 → 清理 `~/.agents/.skill-lock.json` 条目。
 - **修复**(YAML、符号链接):按报告里的具体指引手工修,修完重扫。
 
-### 5. 汇报
+### 5. 安全安检(体检自动做,复检靠指纹)
+
+**安检是体检的固定步骤,不是附加项**:只要处理建议区出现「🔍 待安检」(第三方来源(GitHub/skills.sh/SkillHub/来源不明)的 skill 没审过,或安检后内容变过——一键更新后通常触发),本次体检就必须逐个审完,不用等用户点名。
+安检动作 = 按 `skill-vetter` 的四步清单(元数据真伪 → 权限范围 → 危险内容红旗 → 仿冒名)由 AI 逐个审查,产出结论:`safe`(安全)/ `warning`(存疑,说清疑点)/ `danger`(判危,建议删除)。
+结论直接记账:交互服务 `POST /api/vet_record`,或直接写 `data/vetted.json`(key=目录名,记当前内容指纹);warning/danger 要向用户说清疑点。自建/插件/随应用自带免检。**复检时机全自动**:内容指纹变了旧结论自动降级「需复检」,不用人工记着;warning/danger 结论常驻红黄体检区,直到复检翻案。
+
+### 6. 汇报
 
 给用户:操作结果 + 剩余总数 + 新发现的问题。**汇报正文必须带两个可点的入口**,别让用户去文件夹里翻:
 - **HTML 报告**:贴完整 `file:///Users/<用户名>/skill-keeper/data/report.html` 链接(file:// 里不能写 `~`),或直接 `open ~/skill-keeper/data/report.html` 当场弹出浏览器;

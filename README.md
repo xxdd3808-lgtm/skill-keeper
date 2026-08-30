@@ -41,6 +41,12 @@
 - 结果缓存到 `data/updates.json`,并**自动给出结论**:🟢建议更新 / 🛡️建议保留 / 🟡需人工研判 + 一句人话理由(依据:版本号、改动是否只碰说明信息、上游最后改动时间 vs 本地改动时间、改动规模)——不用自己读 diff
 - 只比对不更新——`npx skills check` 发现更新会**直接更新**,想「只看不动」就用本脚本;确认后在交互报告里一键更新
 
+### 安全安检(接入 skill-vetter)
+
+- 第三方来源的 skill 没审过、或安检后内容变过时,报告「处理建议」区自动亮 🔍 待安检
+- 安检由 AI 按 `skill-vetter` 清单执行(元数据真伪 / 权限范围 / 危险内容 / 仿冒名),结论 SAFE/WARNING/DANGER 记入 `data/vetted.json`
+- 内容指纹变了旧结论自动降级「需复检」;自建 / 插件 / 随应用自带免检
+
 ### 安全删除 `remove_skill.py`
 
 - 备份(tar 整目录)→ 从所有位置删除 → 清理 skills 锁文件条目,一步完成
@@ -112,6 +118,7 @@ skill-keeper/
 │   ├── inventory.json            # 盘点结果(运行时生成)
 │   ├── updates.json              # 更新检查缓存(运行时生成)
 │   ├── actions.log               # 一键操作审计(运行时生成)
+│   ├── vetted.json               # 安检台账(运行时生成)
 │   └── report.md / report.html   # 报告(运行时生成)
 ├── backups/                      # 删除/更新前的 tar 备份(自动创建)
 └── examples/report-sample.html   # 脱敏示例报告

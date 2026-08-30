@@ -20,7 +20,7 @@ SOURCE_LABEL = {
     "registry-modelscope": "魔搭", "registry-openharmony": "鸿蒙", "skillhub": "SkillHub",
     "builtin-app": "随应用自带", "self-built": "自建", "plugin": "ZCode 插件", "unknown": "❓不明",
 }
-LEVEL_LABEL = {"update": "🟢 建议更新", "keep": "🛡️ 建议保留", "confirm": "🟡 待你确认", "info": "ℹ️ 提示", "auto": "🔵 可自动处理"}
+LEVEL_LABEL = {"update": "🟢 建议更新", "keep": "🛡️ 建议保留", "vet": "🔍 待安检", "confirm": "🟡 待你确认", "info": "ℹ️ 提示", "auto": "🔵 可自动处理"}
 
 
 def _load(p):
@@ -70,6 +70,13 @@ def suggestions_of(s, upd, ign):
     """把体检问题 + 上游差异翻译成处理建议。
     → [{level, text, act, payload, ignore_key}]  act∈ update|diff|None"""
     out = []
+    vt = s.get("vetting") or {}
+    if vt.get("status") == "unvetted":
+        out.append({"level": "vet", "text": "第三方来源,还没做过安全安检——说「安检 " + s["name"] + "」,我按 skill-vetter 清单审一遍后记账",
+                    "act": None, "payload": None, "ignore_key": f"vet:{s['name']}"})
+    elif vt.get("status") == "changed":
+        out.append({"level": "vet", "text": f"内容在安检({vt.get('vetted_at') or '?'})之后变过,旧结论过期,建议复检(说「复检 {s['name']}」)",
+                    "act": None, "payload": None, "ignore_key": f"vet:{s['name']}"})
     u = (upd or {}).get(s["name"])
     if u:
         d = entity_dir(s)
@@ -159,7 +166,7 @@ def build(inv, last, ctx):
             x["name"] = s["name"]
             x.update(meta)
             sugg.append(x)
-    order = {"update": 0, "keep": 1, "auto": 2, "confirm": 3, "info": 4}
+    order = {"update": 0, "keep": 1, "vet": 2, "auto": 3, "confirm": 4, "info": 5}
     sugg.sort(key=lambda x: (order.get(x["level"], 9), x["name"].lower()))
     ignored_n = sum(len(s["health"].get("ignored", [])) for s in inv["skills"])
     return red, yellow, dup, groups, stale, diff, sugg, ignored_n
@@ -215,7 +222,11 @@ def render_md(inv, last, ctx=None):
     L.append("| Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康 |")
     L.append("|---|---|---|---|---|---|---|")
     for s in inv["skills"]:
-        L.append(f"| **{s['name']}** | {s.get('group','—')} | {s['function'] or '—'} | {fmt_source(s['source'])} | {'、'.join(s['clients'])} | {s['trigger']} | {'<br>'.join(s['health']['issues']) if s['health']['issues'] else '✅'} |")
+        vtt = (s.get("vetting") or {})
+        vtmd = {"safe": f"🛡️已安检{(vtt.get('vetted_at') or '')[5:]}", "changed": "🛡️需复检",
+                "unvetted": "🛡️未安检", "warning": "🛡️安检存疑", "danger": "🔴安检判危"}.get(vtt.get("status"), "")
+        health_md = "<br>".join([*s["health"]["issues"], vtmd]) if (s["health"]["issues"] or vtmd) else "✅"
+        L.append(f"| **{s['name']}** | {s.get('group','—')} | {s['function'] or '—'} | {fmt_source(s['source'])} | {'、'.join(s['clients'])} | {s['trigger']} | {health_md} |")
     L.append("\n## 二、加载分析(谁启动时加载了什么)\n")
     L.append("> 每个 skill 常驻上下文的是「名称+描述」,SKILL.md 全文在触发时才读。")
     for c, st in client_stats(inv).items():
@@ -320,6 +331,7 @@ def render_html(inv, last, ctx=None):
     esc = _html.escape
     n_upd = sum(1 for x in sugg if x["level"] == "update")
     n_keep = sum(1 for x in sugg if x["level"] == "keep")
+    n_vet = sum(1 for x in sugg if x["level"] == "vet")
     n_cfm = sum(1 for x in sugg if x["level"] == "confirm")
     chips = [f'<span class="chip">共 {inv["total"]} 个</span>']
     chips += [f'<span class="chip">{esc(k)} {v}</span>' for k, v in sorted(inv["by_source"].items(), key=lambda x: -x[1])]
@@ -327,6 +339,7 @@ def render_html(inv, last, ctx=None):
     chips.append(f'<span class="chip {"chip-yellow" if yellow else "chip-green"}">🟡 黄色 {len(yellow)}</span>')
     chips.append(f'<span class="chip {"chip-green" if n_upd else ""}">🟢 建议更新 {n_upd}</span>')
     chips.append(f'<span class="chip">🛡️ 建议保留 {n_keep}</span>')
+    chips.append(f'<span class="chip {"chip-yellow" if n_vet else "chip-green"}">🔍 待安检 {n_vet}</span>')
     chips.append(f'<span class="chip">🟡 待确认 {n_cfm}</span>')
 
     client_cards = "".join(
@@ -348,7 +361,7 @@ def render_html(inv, last, ctx=None):
                         f'<td>{esc(x["src"])}</td><td>{esc(x["clients"])}</td>'
                         f'<td>{esc(x["text"])}</td><td>{sugg_actions_html(x)}</td></tr>')
         ignored_note = (f'<p class="mut">另有 {ignored_n} 条问题已按 data/ignore.json 规则忽略。</p>' if ignored_n else "")
-        sugg_sec = (f'<details open><summary><b>🎯 处理建议</b><span class="cnt">建议更新 {n_upd} · 建议保留 {n_keep} · 待确认 {n_cfm} · 提示 {len(sugg)-n_upd-n_keep-n_cfm}</span></summary>'
+        sugg_sec = (f'<details open><summary><b>🎯 处理建议</b><span class="cnt">建议更新 {n_upd} · 建议保留 {n_keep} · 待安检 {n_vet} · 待确认 {n_cfm} · 提示 {len(sugg)-n_upd-n_keep-n_vet-n_cfm}</span></summary>'
                     f'<table><tr><th>Skill</th><th>功能</th><th>来源</th><th>客户端</th><th>结论与理由</th><th>操作</th></tr>{"".join(rows)}</table>{ignored_note}</details>')
     else:
         sugg_sec = '<details open><summary><b>🎯 处理建议</b><span class="cnt">全部健康,无待处理事项 ✅</span></summary></details>'
@@ -359,7 +372,19 @@ def render_html(inv, last, ctx=None):
         rows = []
         for s in sorted(groups[g], key=lambda x: x["name"].lower()):
             hl = ' class="row-red"' if s["name"] in red_names else (' class="row-yellow"' if any(i["name"] == s["name"] for i in yellow) else "")
-            iss = "".join(f'<span class="badge">{esc(i)}</span>' for i in s["health"]["issues"]) or '<span class="badge badge-green">✅</span>'
+            badges = [f'<span class="badge">{esc(i)}</span>' for i in s["health"]["issues"]]
+            vts = (s.get("vetting") or {})
+            if vts.get("status") == "safe":
+                badges.append(f'<span class="badge badge-green">🛡️ 已安检 {esc((vts.get("vetted_at") or "")[5:])}</span>')
+            elif vts.get("status") == "changed":
+                badges.append('<span class="badge">🛡️ 需复检</span>')
+            elif vts.get("status") == "unvetted":
+                badges.append('<span class="badge">🛡️ 未安检</span>')
+            elif vts.get("status") == "warning":
+                badges.append('<span class="badge badge-yellow">🛡️ 安检存疑</span>')
+            elif vts.get("status") == "danger":
+                badges.append('<span class="badge badge-red">🔴 安检判危</span>')
+            iss = "".join(badges) or '<span class="badge badge-green">✅</span>'
             rows.append(
                 f'<tr{hl}><td><b>{esc(s["name"])}</b></td><td>{esc(s["function"] or "—")}</td>'
                 f'<td>{esc(fmt_source(s["source"]))}</td><td>{esc("、".join(s["clients"]))}</td>'
@@ -415,6 +440,8 @@ tr.sep td{{background:#f8fafc;font-weight:700;color:#475569;font-size:13px}}
 .row-red{{background:#fef2f2}} .row-yellow{{background:#fefce8}}
 .badge{{display:inline-block;font-size:12px;background:#f1f5f9;border-radius:6px;padding:2px 8px;margin:1px}}
 .badge-green{{background:#dcfce7;color:#15803d}}
+.badge-yellow{{background:#fef9c3;color:#a16207}}
+.badge-red{{background:#fee2e2;color:#b91c1c}}
 .body{{padding:8px 4px;color:#374151;font-size:14px}} code{{background:#f1f5f9;padding:1px 6px;border-radius:6px}}
 .mut{{color:#9ca3af;font-size:12px}}
 .btn{{display:inline-block;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:3px 10px;margin:1px 2px;font-size:12.5px;cursor:pointer;white-space:nowrap}}

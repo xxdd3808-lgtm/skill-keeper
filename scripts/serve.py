@@ -19,6 +19,7 @@ LOCATIONS = [f"{HOME}/.agents/skills", f"{HOME}/.zcode/skills", f"{HOME}/.claude
 TOKEN = secrets.token_urlsafe(24)
 sys.path.insert(0, os.path.join(BASE, "scripts"))
 from check_updates import gh_raw, skills_sh_skillmd
+from scan import sk_signature
 
 
 def log(action, detail):
@@ -101,6 +102,18 @@ def upstream_dir_path(path):
     return os.path.dirname(p) if p.endswith("SKILL.md") else p
 
 
+def drop_stale_update(name):
+    """更新成功后清掉 updates.json 里该 skill 的旧差异记录,免得报告显示过期的「建议更新」。
+    下次跑 check_updates 时按更新后的内容重新评估。"""
+    p = os.path.join(DATA, "updates.json")
+    try:
+        u = json.load(open(p, encoding="utf-8"))
+        u["differs"] = [x for x in u.get("differs", []) if x.get("name") != name]
+        json.dump(u, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    except Exception:
+        pass
+
+
 def do_update(d):
     hit = find_skill(d)
     if not hit:
@@ -147,6 +160,7 @@ def do_update(d):
     except Exception as e:
         return False, f"更新失败(已先备份 {os.path.basename(bak)},原内容未动): {e}"
     ok, err = run_scan_report()
+    drop_stale_update(s["name"])  # s 是更新前抓的,名字即使变了也能清掉旧记录
     log("update", {"dir": d, "backup": os.path.basename(bak), "ok": ok})
     return True, msg + (";已重扫并刷新报告" if ok else f";⚠️ 重扫失败请手动跑 scan.py: {err}")
 
@@ -206,6 +220,32 @@ def do_ignore(name, match, remove):
     run_scan_report()
     log("ignore", {"name": name, "match": match, "remove": bool(remove)})
     return True, ("已取消忽略并刷新报告" if remove else "已忽略并刷新报告(规则写入 data/ignore.json)")
+
+
+def do_vet_record(d, verdict, note, confirm):
+    """安检记账:把按 skill-vetter 清单审出的结论写进 data/vetted.json,记当前内容指纹。"""
+    if not confirm:
+        return False, "缺少 confirm(防误触)"
+    if verdict not in ("safe", "warning", "danger"):
+        return False, "verdict 必须是 safe|warning|danger"
+    hit = find_skill(d)
+    if not hit:
+        return False, f"找不到 skill: {d}"
+    _, i = hit
+    if not i.get("real_path") or not os.path.exists(os.path.join(i["real_path"], "SKILL.md")):
+        return False, f"找不到 {d} 的本地实体"
+    p = os.path.join(DATA, "vetted.json")
+    try:
+        cur = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+    except Exception:
+        cur = {}
+    cur[d] = {"verdict": verdict, "note": (note or "")[:200],
+              "vetted_at": time.strftime("%Y-%m-%d"), "sk_hash": sk_signature(i["real_path"])}
+    json.dump(cur, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    run_scan_report()
+    log("vet_record", {"dir": d, "verdict": verdict})
+    label = {"safe": "🛡️ 安全", "warning": "⚠️ 存疑", "danger": "☠️ 判危"}[verdict]
+    return True, f"已记账:{d} → {label};已重扫并刷新报告"
 
 
 def do_diff(d):
@@ -291,6 +331,9 @@ class Handler(BaseHTTPRequestHandler):
                 ok, msg = do_restore(body.get("backup", ""), bool(body.get("confirm")))
             elif u.path == "/api/ignore":
                 ok, msg = do_ignore(body.get("name", ""), body.get("match", ""), bool(body.get("remove")))
+            elif u.path == "/api/vet_record":
+                ok, msg = do_vet_record(body.get("dir", ""), body.get("verdict", ""),
+                                        body.get("note", ""), bool(body.get("confirm")))
             elif u.path == "/api/rescan":
                 ok, err = run_scan_report()
                 msg = "已重扫并刷新报告" if ok else f"重扫失败: {err}"
