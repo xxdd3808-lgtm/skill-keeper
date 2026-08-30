@@ -1,0 +1,5 @@
+# 自建 skill 白名单:一行一个本地目录名
+# 白名单内的 skill 删除时需要 --force(remove_skill.py),受保护
+# 示例:
+my-first-skill
+my-stock-monitor

@@ -1,0 +1,17 @@
+# 运行时产物(含个人 skill 清单,勿提交)
+data/inventory.json
+data/inventory-last.json
+data/report.md
+data/report.html
+
+# 个人配置(请从 .example 复制生成)
+data/groups.json
+data/self-built.txt
+data/known-sources.json
+
+# 备份(含完整 skill 内容)
+backups/
+
+# 系统文件
+__pycache__/
+.DS_Store

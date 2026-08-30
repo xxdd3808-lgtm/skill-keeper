@@ -1,0 +1,6 @@
+{
+  "_comment": "已核实的上游来源。key=本地目录名。type: github|skills.sh|registry-volces|registry-modelscope|registry-openharmony|skillhub|builtin-app|self-built|unknown。path=上游仓库内 SKILL.md 相对路径(供 check_updates.py 比对)。发现新来源时补充进来。",
+  "pdf":          {"type": "github", "repo": "anthropics/skills", "path": "skills/pdf/SKILL.md"},
+  "find-skills":  {"type": "skills.sh", "repo": "vercel-labs/agent-skills", "path": null},
+  "some-builtin": {"type": "builtin-app", "repo": null, "path": null, "note": "随应用自带,不建议手动动"}
+}
