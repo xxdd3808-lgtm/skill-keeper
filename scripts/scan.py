@@ -317,7 +317,7 @@ def main():
     print(f"健康问题: {len(red)} 个红色 / {len(yellow)} 个黄色" +
           ("  🔴:" + "、".join(r["name"] for r in red) if red else "") +
           ("  🟡:" + "、".join(y["name"] for y in yellow) if yellow else ""))
-    print("详细报告: python3 ~/.agents/skills/skill-keeper/scripts/report.py")
+    print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
 
 if __name__ == "__main__":
     main()
