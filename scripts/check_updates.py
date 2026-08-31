@@ -1,45 +1,34 @@
 #!/usr/bin/env python3
-"""skill-keeper 更新检查(只读):对比本地与上游 SKILL.md,不做任何修改。
-结果(含本地/上游版本对比与建议状态)缓存到 data/updates.json,供 report.py 生成「处理建议」。
-status: upstream-newer=上游有新版,建议更新 | content-diff=版本未变但内容有差异,可能本地定制,待确认
-        | local-ahead=本地版本更高,保留本地。"""
-import difflib, json, os, re, subprocess, sys, time, urllib.parse, urllib.request
+"""skill-keeper v2 更新检查(只读):本地完整树 vs 固定 commit 的完整候选树。
+
+与 v1 的区别:
+- 不再无条件打开 .skill-lock.json;来源只认 classify_provenance 的证据;
+- 比较的是完整目录树哈希(不是单个 SKILL.md);
+- 输出客观状态:有候选更新 / 需审查 / 疑似本地定制 / 无法核实——
+  不再有"改动少所以放心更新"这类结论,更新必须走 plan/apply + 安检。
+CLI:
+  python3 scripts/check_updates.py [--inventory inventory.json] [--output updates.json] [--json]
+  --inventory/--output 可完全绕开项目运行时数据(测试、其他 Agent)。
+"""
+import argparse, json, os, re, sys, tempfile, time
+from pathlib import Path
 
 BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-DATA = os.path.join(BASE, "data")
-HOME = os.path.expanduser("~")
-sys.path.insert(0, os.path.join(BASE, "scripts"))
-from scan import parse_frontmatter
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
+
+from scripts.core.fingerprint import tree_hash, tree_manifest          # noqa: E402
+from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_runner  # noqa: E402
+from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
+from scripts.core.provenance import classify_provenance                # noqa: E402
+from scripts.scan import parse_frontmatter                              # noqa: E402
 
 STATUS_LABEL = {
-    "upstream-newer": "上游有新版,建议更新",
-    "content-diff": "版本未变但内容有差异,可能本地定制,待确认",
-    "local-ahead": "本地版本更高,保留本地",
+    "candidate-update": "有候选更新(先审查,再 plan/apply)",
+    "needs-review": "与上游内容有差异,需审查",
+    "local-custom": "疑似本地定制,建议保留本地",
+    "unverifiable": "无法核实(缺来源/缺工具/网络失败)",
 }
-VERDICT_LABEL = {"update": "🟢 建议更新", "keep": "🛡️ 建议保留", "manual": "🟡 需人工研判"}
-
-
-def gh_raw(repo, path):
-    """经 gh api 取上游文件原文;失败返回 None"""
-    r = subprocess.run(["gh", "api", f"repos/{repo}/contents/{urllib.parse.quote(path)}",
-                        "--header", "Accept: application/vnd.github.raw"],
-                       capture_output=True, text=True, timeout=30)
-    return r.stdout if r.returncode == 0 else None
-
-
-def skills_sh_skillmd(repo, slug):
-    """经 skills.sh download API 取上游 SKILL.md"""
-    try:
-        owner, r = repo.split("/")
-        url = f"https://skills.sh/api/download/{owner}/{r}/{slug}"
-        req = urllib.request.Request(url, headers={"User-Agent": "skill-keeper"})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            for f in json.loads(resp.read().decode()).get("files", []):
-                if f["path"] == "SKILL.md":
-                    return f.get("contents") or ""
-    except Exception:
-        return None
-    return None
 
 
 def fm_version(text):
@@ -51,137 +40,177 @@ def ver_tuple(v):
     return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.]", str(v).lstrip("vV")))
 
 
-def gh_last_commit_date(repo, path):
-    """上游文件最后一次被改动的时间(YYYY-MM-DD);取不到返回 None"""
-    r = subprocess.run(["gh", "api", f"repos/{repo}/commits?path={urllib.parse.quote(path)}&per_page=1"],
-                       capture_output=True, text=True, timeout=30)
+def build_receipts(inventory):
+    """客户端自带身份证据:来自 inventory 位置/实例的 builtin、plugin-cache 标记。"""
+    receipts = {}
+    for inst in inventory.get("instances", []):
+        if inst.get("kind") in ("builtin", "plugin-cache"):
+            receipts[str(inst.get("instance_id"))] = {"type": inst["kind"],
+                                                      "repo": inst.get("plugin_name"),
+                                                      "client": inst.get("client")}
+    return receipts
+
+
+def load_user_config(data_dir):
+    data_dir = Path(data_dir)
+    known, _ = load_json_checked(data_dir / "known-sources.json", {})
+    known = known if isinstance(known, dict) else {}
+    self_built = set()
     try:
-        return json.loads(r.stdout)[0]["commit"]["committer"]["date"][:10]
-    except Exception:
-        return None
+        text = (data_dir / "self-built.txt").read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            self_built.add(line)
+    merged = {k: (v if isinstance(v, dict) else {"type": "unknown"}) for k, v in known.items()}
+    for name in self_built:
+        merged[name] = {"type": "self-built"}
+    return merged
 
 
-def diff_anatomy(local, upstream):
-    """统计差异规模,并判断改动是否只落在 frontmatter 说明区(没碰正文)。
-    → (总变更行数, 是否仅说明区, 改到的键名列表)"""
-    a, b = local.splitlines(), upstream.splitlines()
-    m = re.match(r"^---\s*\n(.*?)\n---", local, re.S)
-    fm_end = len(m.group(0).splitlines()) if m else 0
-    changed, keys, meta_only = 0, set(), True
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
-        if tag == "equal":
+def diff_summary(local_manifest, candidate_manifest):
+    a = {e["path"]: e for e in local_manifest}
+    b = {e["path"]: e for e in candidate_manifest}
+    modified = sorted(p for p in set(a) & set(b)
+                      if any(a[p].get(k) != b[p].get(k) for k in ("sha256", "type", "mode", "target")))
+    return {"added": sorted(set(b) - set(a)),
+            "removed": sorted(set(a) - set(b)),
+            "modified": modified}
+
+
+def _pick_instance(inventory, logical):
+    """一个逻辑 skill 的代表实例:优先可变、非符号链接、有完整指纹的实体。"""
+    by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
+    cands = [by_id[i] for i in logical.get("instance_ids", []) if i in by_id]
+    cands = [i for i in cands if i.get("tree_hash") and i.get("real_path")] or cands
+    cands.sort(key=lambda i: (not i.get("mutable"), i.get("is_symlink", False), i["instance_id"]))
+    return cands[0] if cands else None
+
+
+def check(inventory, data_dir, output_path, gh_runner=None):
+    """产出 v2 updates 结构(不落盘);网络只在本地内容可核实时才会发起。"""
+    gh_runner = gh_runner or gh_cli_runner()
+    known_sources = load_user_config(data_dir)
+    receipts = build_receipts(inventory)
+    reputation_path = Path(output_path).parent / "reputation.json"
+
+    differs, up_to_date, skipped = [], [], []
+    for logical in inventory.get("logical_skills", []):
+        name = logical.get("name") or "?"
+        inst = _pick_instance(inventory, logical)
+        if not inst:
+            skipped.append({"name": name, "reason": "没有可核实的本地实例"})
             continue
-        lines = a[i1:i2] + b[j1:j2]
-        changed += len(lines)
-        if i1 >= fm_end:
-            meta_only = False
-        for l in lines:
-            km = re.match(r"^([A-Za-z_-]{2,})\s*:", l.strip())
-            if km:
-                keys.add(km.group(1))
-    return changed, meta_only, sorted(keys)
-
-
-def judge(status, lv, uv, meta_only, keys, changed, repo, path, src_type, local_sk):
-    """把差异翻译成给非程序员的结论:update=建议更新 keep=建议保留 manual=机器判不了。
-    依据:版本号 → 是否只碰说明区 → 上游最后改动时间 vs 本地文件改动时间 → 改动规模。"""
-    if status == "local-ahead":
-        return "keep", "本地版本比上游还新,保留本地即可"
-    if status == "upstream-newer":
-        return "update", f"上游发布了新版 v{uv}(本地 v{lv}),建议更新"
-    if meta_only:
-        ks = "、".join(keys[:4]) if keys else "说明信息"
-        return "update", f"上游只改了{ks}这类说明信息,正文没变,更新无风险"
-    up_date = gh_last_commit_date(repo, path) if (src_type == "github" and path) else None
-    loc_date = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(local_sk))) \
-        if local_sk and os.path.exists(local_sk) else None
-    if up_date and loc_date:
-        if up_date > loc_date:
-            return "update", f"上游 {up_date} 改过这个文件,你本地版本停在 {loc_date}——上游比你新,建议更新"
-        return "keep", f"上游自 {up_date} 就没再动过,差异是你本地的定制,建议保留、不要覆盖"
-    if changed <= 5:
-        return "update", f"上游只改了 {changed} 行,像小修小补,可放心更新(会先自动备份,可一键恢复)"
-    return "manual", f"上游改了 {changed} 行但版本号没变,机器判断不了谁对谁错——先保留,需要时让我人工看差异"
+        source = classify_provenance(inst, receipts, known_sources)
+        if source["class"] == "protected":
+            reason = {"self-built": "自建,不从上游更新"}.get(source["type"],
+                                                   "客户端自带/插件管理(" + source["type"] + "),不可更新")
+            skipped.append({"name": name, "reason": reason})
+            continue
+        repo = source.get("repo") or (source.get("candidate_source") or {}).get("repo")
+        path = source.get("path") or (source.get("candidate_source") or {}).get("path")
+        if not repo:
+            skipped.append({"name": name, "reason": "来源不明,没有可对比的上游(补 known-sources.json 或让我搜索候选)"})
+            continue
+        # 先核本地:本地不存在/算不出指纹,就不发任何网络请求
+        try:
+            local_hash = tree_hash(inst["real_path"])
+            local_manifest = tree_manifest(inst["real_path"])
+        except (NotADirectoryError, OSError):
+            skipped.append({"name": name, "reason": "本地内容缺失,无法核实"})
+            continue
+        if not path:
+            skipped.append({"name": name, "reason": "来源缺路径,无法定位上游目录"})
+            continue
+        source_dir = path[:-len("/SKILL.md")] if path.endswith("/SKILL.md") else path
+        snap = cached_repo_snapshot(repo, reputation_path, gh_runner)
+        commit_sha = snap.get("commit_sha")
+        if not snap.get("ok") and not commit_sha:
+            skipped.append({"name": name,
+                            "reason": "上游仓库数据{}({})".format(
+                                "已过期,本次无法刷新" if snap.get("stale") else "拉取失败",
+                                snap.get("error") or repo)})
+            continue
+        if not commit_sha:
+            skipped.append({"name": name, "reason": "无法确定上游 commit,拒绝猜测"})
+            continue
+        with tempfile.TemporaryDirectory(prefix="sk-candidate-") as td:
+            fetched = fetch_skill_tree(repo, source_dir, commit_sha, Path(td), gh_runner)
+            if not fetched.get("ok"):
+                skipped.append({"name": name, "reason": "候选树拉取失败({})".format(fetched.get("error"))})
+                continue
+            candidate_hash = fetched["tree_hash"]
+            candidate_manifest = tree_manifest(Path(td))
+            try:
+                candidate_version = fm_version(open(Path(td) / "SKILL.md", encoding="utf-8", errors="ignore").read())
+            except OSError:
+                candidate_version = ""
+        if candidate_hash == local_hash:
+            up_to_date.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
+                               "commit_sha": commit_sha})
+            continue
+        lv, cv = str(logical.get("version") or ""), candidate_version
+        if lv and cv and ver_tuple(cv) > ver_tuple(lv):
+            status = "candidate-update"
+        elif lv and cv and ver_tuple(cv) < ver_tuple(lv):
+            status = "local-custom"
+        else:
+            status = "needs-review"
+        note = "" if status != "local-custom" else "本地版本更高,保留本地"
+        differs.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
+                        "commit_sha": commit_sha, "candidate_hash": candidate_hash,
+                        "local_hash": local_hash, "local_version": lv, "candidate_version": cv,
+                        "status": status, "note": note,
+                        "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
+                        "checked_at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    return {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "differs": differs, "up_to_date": up_to_date, "skipped": skipped}
 
 
 def main():
-    inv = json.load(open(os.path.join(DATA, "inventory.json"), encoding="utf-8"))
-    lock = json.load(open(os.path.join(HOME, ".agents/.skill-lock.json"), encoding="utf-8")).get("skills", {})
-    ok, diff, skip = [], [], []
-    for s in inv["skills"]:
-        name, src = s["name"], s["source"]
-        repo, path, t = src.get("repo"), src.get("path"), src.get("type")
-        if t == "plugin" or t in ("self-built", "builtin-app", "unknown", "skillhub") or not repo:
-            reason = {"plugin": "插件管理", "self-built": "自建", "builtin-app": "随应用自带",
-                      "unknown": "来源不明", "skillhub": "SkillHub 来源无比对接口"}.get(t, "无上游可比")
-            skip.append((name, reason))
-            continue
-        # 本地内容(取优先级最高的非缓存实例)
-        local, local_sk = None, None
-        for i in sorted(s["instances"], key=lambda x: x.get("priority", 9) if "priority" in x else 9):
-            rp = i.get("real_path")
-            if rp and not i.get("stale_cache"):
-                sk = os.path.join(rp, "SKILL.md")
-                if os.path.exists(sk):
-                    local = open(sk, encoding="utf-8", errors="ignore").read()
-                    local_sk = sk
-                    break
-        if local is None:
-            skip.append((name, "本地文件缺失"))
-            continue
-        upstream = None
-        slug = None
-        if path:
-            upstream = gh_raw(repo, path)
-        if upstream is None and t == "skills.sh" and "/" in repo:
-            rp = next((i["real_path"] for i in s["instances"] if i.get("real_path")), None)
-            meta = os.path.join(rp, "_meta.json") if rp else None
-            slug = (json.load(open(meta)).get("slug") if meta and os.path.exists(meta) else None) or name
-            upstream = skills_sh_skillmd(repo, slug)
-        if upstream is None:
-            skip.append((name, f"上游拉取失败({repo})"))
-            continue
-        if upstream.strip() == local.strip():
-            ok.append(name)
-            continue
-        lv, uv = fm_version(local), fm_version(upstream)
-        if lv and uv and ver_tuple(uv) > ver_tuple(lv):
-            status = "upstream-newer"
-        elif lv and uv and ver_tuple(uv) < ver_tuple(lv):
-            status = "local-ahead"
-        else:
-            status = "content-diff"
-        changed, meta_only, keys = diff_anatomy(local, upstream)
-        verdict, reason = judge(status, lv, uv, meta_only, keys, changed, repo, path, t, local_sk)
-        diff.append({"name": name, "repo": repo, "type": t, "slug": slug,
-                     "local_version": lv, "upstream_version": uv, "status": status,
-                     "verdict": verdict, "reason": reason,
-                     "changed_lines": changed, "meta_only": meta_only})
-    # 缓存给 report.py 生成处理建议
-    json.dump({"checked_at": time.strftime("%Y-%m-%d %H:%M:%S"), "differs": diff, "up_to_date": ok},
-              open(os.path.join(DATA, "updates.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    ap = argparse.ArgumentParser(description="与上游比对完整内容树(只读)")
+    ap.add_argument("--inventory", default=None, help="inventory v2 JSON 路径(默认 <data>/inventory.json)")
+    ap.add_argument("--output", default=None, help="结果缓存路径(默认 <data>/updates.json)")
+    ap.add_argument("--data-dir", default=os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    ap.add_argument("--json", action="store_true", help="机器可读输出;退出码 0=无差异 1=有差异")
+    args = ap.parse_args()
 
-    if "--json" in sys.argv:
-        # 机器可读输出;退出码:0=全部一致,1=有差异
-        print(json.dumps({"checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                          "up_to_date": ok, "differs": diff,
-                          "skipped": [{"name": n, "reason": w} for n, w in skip]},
-                         ensure_ascii=False, indent=1))
-        sys.exit(1 if diff else 0)
-    print(f"✅ 与上游一致 {len(ok)} 个")
-    if diff:
-        print(f"🔴 与上游有差异 {len(diff)} 个,结论如下:")
-        for d in diff:
-            print(f"   - {d['name']} ← {d['repo']}  [{VERDICT_LABEL[d['verdict']]}]  {d['reason']}")
-    if skip:
-        print(f"⏭️ 跳过 {len(skip)} 个:")
-        for n, why in skip:
-            print(f"   - {n}({why})")
-    if diff:
-        print("\n提示:确认要更新时,skills.sh 来源用 `npx -y skills add <owner/repo>@<slug> -g -y`,GitHub 来源用 gh api 拉取覆盖,操作前先备份。"
-              "\n或用交互报告一键处理:python3 scripts/report.py --serve")
-    # 结果已写入 data/updates.json(供 report.py 生成处理建议)
-    sys.exit(1 if diff else 0)
+    data_dir = Path(args.data_dir)
+    inventory_path = Path(args.inventory) if args.inventory else data_dir / "inventory.json"
+    output_path = Path(args.output) if args.output else data_dir / "updates.json"
+
+    inv, issues = load_json_checked(inventory_path, {})
+    if issues or not isinstance(inv, dict) or not inv.get("instances"):
+        result = {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                  "differs": [], "up_to_date": [], "skipped": [{"name": "-",
+                  "reason": "inventory 缺失或为空({})".format(issues[0]["code"] if issues else "empty")}],
+                  "operational_ok": issues == []}
+        atomic_write_json(output_path, result)
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=1))
+            sys.exit(0)
+        print("⏭️ inventory 缺失或为空,先跑 scan.py")
+        sys.exit(0)
+
+    result = check(inv, data_dir, output_path)
+    result["operational_ok"] = True
+    atomic_write_json(output_path, result)
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=1))
+        sys.exit(1 if result["differs"] else 0)
+    print(f"✅ 与上游一致 {len(result['up_to_date'])} 个")
+    if result["differs"]:
+        print(f"🟡 有差异 {len(result['differs'])} 个(更新必须先审查再 plan/apply):")
+        for d in result["differs"]:
+            print("   - {name} ← {repo} [{status}] {note}".format(**{**d, "status": STATUS_LABEL.get(d["status"], d["status"])}))
+    if result["skipped"]:
+        print(f"⏭️ 跳过 {len(result['skipped'])} 个:")
+        for s in result["skipped"]:
+            print(f"   - {s['name']}({s['reason']})")
+    sys.exit(1 if result["differs"] else 0)
 
 
 if __name__ == "__main__":
