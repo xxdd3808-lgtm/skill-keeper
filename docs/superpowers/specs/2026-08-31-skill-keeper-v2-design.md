@@ -6,7 +6,7 @@
 
 skill-keeper v2 要用普通人能理解的方式回答五个问题：
 
-1. 本机所有客户端到底装了哪些 Skill，分别从哪里加载。
+1. 本机所有客户端到底装了哪些 Skill，分别从哪里加载；首批覆盖 ZCode、Codex、Accio Work、WorkBuddy（用户称 Workbody）、Claude Code、Claude Code Haha、Cindy、Ego 和共享/工作区位置。
 2. 哪些是用户自建、客户端自带或插件自带，哪些是真正需要审视的第三方 Skill。
 3. 第三方 Skill 在 GitHub 或安装市场上是否有可核实来源，维护和受欢迎程度如何。
 4. 它与现有 Skill、客户端自带能力是否重复，是否有更好的替代品，是否值得保留。
@@ -18,7 +18,8 @@ v2 作为一次完整版本交付。内部可以按依赖顺序开发和测试�
 
 - 不根据 GitHub 星数、更新时间或单一分数自动删除 Skill。
 - 不声称 GitHub 星数等于真实使用人数。只有安装市场明确提供下载量时才展示真实下载量；其他情况统一标为“热度参考”。
-- 不修改 ZCode、Codex、Accio Work 等客户端管理的插件缓存。
+- 不修改 ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Claude Code Haha、Cindy 等客户端管理的插件缓存。
+- 不读取、保存或输出客户端设置文件中的 API Key、认证令牌、Cookie 或其他 secret；客户端探测只读取判断位置、启用状态和来源所必需的非敏感字段。
 - 不自动删除任何 Skill。报告只给建议，所有删除、更新和恢复仍需用户明确确认。
 - 不在 Python 脚本里内置模型密钥或偷偷调用模型 API。确定性脚本负责收集证据和筛选候选，大模型在 Skill 工作流中完成语义判断并把结果记账。
 - 不把第三方 Skill 自己声明的名称、homepage 或目录前缀直接当作可信来源证明。
@@ -67,7 +68,11 @@ v2 作为一次完整版本交付。内部可以按依赖顺序开发和测试�
 2. ZCode：用户 Skill 和 ZCode 插件缓存。
 3. Codex：个人/系统 Skill、Codex 插件缓存及其 manifest。
 4. Accio Work：动态发现 `~/.accio/accounts/*/skills`、插件目录和相应安装/官方清单，不硬编码账号编号。
-5. Claude Code、Ego 及 `data/workspace-locations.txt` 中的工作区位置。
+5. WorkBuddy（用户称 Workbody）：探测 `~/.workbuddy/skills`、已安装 connector Skill、插件缓存和启用清单。`connectors-marketplace`、`skills-marketplace` 和插件 marketplace 只是商品目录，除非安装/启用清单证明正在使用，否则不得计入已安装总数。
+6. Claude Code：探测 `~/.claude/skills`、已安装插件和插件缓存，区分用户 Skill、官方插件、第三方插件和未启用 marketplace 内容。
+7. Claude Code Haha：探测 Haha 启动器和 `~/.claude/cc-haha` 的非敏感配置；若它复用 Claude Code/共享 Skill，只增加客户端使用关系，不重复生成物理实例或上下文占用。
+8. Cindy：动态发现 `~/Library/Application Support/Cindy/*/skills`、Codex home、插件目录和投影边界；系统/插件投影为只读实例，同一实体按真实路径和 manifest 去重。
+9. Ego 及 `data/workspace-locations.txt` 中的工作区位置。
 
 每个适配器返回统一的 `Location` 记录：
 
@@ -79,6 +84,9 @@ location_id, client, path, kind, mutable, discovery_evidence
 - `mutable=false` 的位置只扫描，不提供删除或更新按钮。
 - 客户端自带身份必须来自路径加 manifest/回执/官方缓存的组合证据，禁止依靠 `autoglm-` 等名称前缀。
 - Accio Work 的 `official`、安装来源和远端条目从本地官方缓存/安装注册表交叉验证；无法证明官方的本地 Skill 仍按第三方处理。
+- WorkBuddy、Claude Code 和 Cindy 的 marketplace 目录只用于来源核实，不代表已经安装；必须由启用状态、安装注册表、插件 cache 或实际加载位置证明。
+- Haha 这类包装客户端与底层客户端的关系要建成加载拓扑，避免把同一目录误报成重复安装。
+- 所有配置读取使用字段白名单；错误信息、inventory 和测试快照均不得包含 env、token、key、cookie、authorization 等字段的值。
 
 ## 5. 稳定身份和完整内容指纹
 
@@ -255,7 +263,9 @@ status, error, rollback_status
 - 辅助脚本内容改变会使安全和价值审查同时过期。
 - 重复加载、链接漂移和 ignore 正确进入健康报告。
 - 缺少 PyYAML、GitHub CLI、lock 文件、网络或损坏配置时给出明确降级结果，不崩溃、不误判。
-- ZCode、Codex、Accio Work、共享库、工作区和插件缓存均由 fixture 验证发现和分类。
+- ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Claude Code Haha、Cindy、共享库、工作区和插件缓存均由 fixture 验证发现和分类。
+- WorkBuddy marketplace 未安装内容不进入 inventory；Haha 复用 Claude Code 时只增加客户端关系；Cindy 投影副本按真实实体去重。
+- 含虚构 token/key 的客户端配置 fixture 经过扫描、错误和报告链路后，输出中不得出现 secret 值。
 - GitHub 搜索候选不能因名称相同自动确认为来源。
 - 星数低、来源未知、停止维护等单一因素不能直接产生“建议删除”。
 - 高置信替代、独特能力、删除损失和置信度完整进入审查记录和报告。
@@ -271,7 +281,7 @@ status, error, rollback_status
 1. 本设计中的扫描、价值审查和安全变更能力均已实现，不留下旧危险入口。
 2. 自动测试覆盖所有高风险边界并全部通过。
 3. 用户现有 Skill、个人配置和客户端插件缓存未被修改。
-4. 真实环境报告能识别 ZCode、Codex 和 Accio Work 自带内容，并对其余第三方 Skill 给出有证据的价值审查队列。
+4. 真实环境报告能识别 ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Claude Code Haha 和 Cindy 自带/复用内容，并对其余第三方 Skill 给出有证据的价值审查队列。
 5. 删除、更新、备份、恢复使用同一安全引擎和审计记录。
 6. README、SKILL.md、AGENTS.md、示例报告和实际行为一致。
 7. 最终交付提供普通人版说明：改了什么、如何使用、每种建议代表什么、如何恢复。
