@@ -58,12 +58,17 @@ def normalize_reviews(existing_reviews):
     return out
 
 
-def build_review_queue(inventory, reputation=None, existing_reviews=None):
-    """为每个第三方逻辑 skill 生成审查条目;受保护类不进入队列,只作替代候选。"""
+def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy_vetting=None):
+    """为每个第三方逻辑 skill 生成审查条目;受保护类不进入队列,只作替代候选。
+
+    legacy_vetting: v1 安检台账({目录名: {previous_verdict, vetted_at, note}}),
+    按新指纹规则一律显示为 needs-recheck,历史结论保留可见但不当作"已安检"。
+    """
     inventory = inventory or {}
     status = _status_map(inventory)
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     reviews = normalize_reviews(existing_reviews)
+    legacy = legacy_vetting if isinstance(legacy_vetting, dict) else {}
     items = []
     for logical in inventory.get("logical_skills", []):
         lg_id = logical.get("logical_id")
@@ -78,8 +83,11 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None):
             review_status = "current" if prev.get("skill_tree_hash") == rep.get("tree_hash") \
                 else "needs-recheck"
         safety = (prev or {}).get("safety")
+        legacy_rec = legacy.get(str(rep.get("directory_name"))) or legacy.get(iid)
+        if safety is None and legacy_rec:
+            safety = "needs-recheck"
         if review_status in ("unvetted", "needs-recheck"):
-            safety = safety if review_status == "needs-recheck" else None
+            safety = safety if review_status == "needs-recheck" else safety
         items.append({
             "instance_id": iid,
             "logical_id": lg_id,
@@ -99,6 +107,11 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None):
             "provenance": st["source"],
             "repo_snapshot": _repo_snapshot(reputation, st["source"]),
             "safety_status": safety or ("needs-recheck" if review_status == "needs-recheck" else "unvetted"),
+            "legacy_vetting": {
+                "previous_verdict": legacy_rec.get("previous_verdict"),
+                "vetted_at": legacy_rec.get("vetted_at"),
+                "note": "v1 安检结论已按完整树指纹规则降级,复检后才算已安检",
+            } if legacy_rec else None,
             "similar_candidates": _similar_for(inventory, lg_id),
             "alternative_candidates": [x["instance_id"] for x in
                                        alternative_candidates(inventory, lg_id)],

@@ -54,6 +54,8 @@ class ReportV2Tests(unittest.TestCase):
                        capture_output=True, text=True, cwd=str(REPO_ROOT), check=True)
         h2 = hashlib.sha256(out1.read_bytes()).hexdigest()
         self.assertEqual(h1, h2, "两次生成的示例报告必须逐字节一致")
+        self.assertNotIn("/Users/", out1.read_text(encoding="utf-8"),
+                         "示例报告不得包含个人绝对路径")
 
     def test_sample_fixture_has_no_personal_data(self):
         text = FIXTURE.read_text(encoding="utf-8")

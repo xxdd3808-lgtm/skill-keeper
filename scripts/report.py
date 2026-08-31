@@ -92,19 +92,31 @@ def build_view(inv, last, ctx):
         cls, why = classify_instance(inst, self_built)
         (protected if cls == "protected" else third_party).append((inst, why))
     # 逻辑 skill 去重计数(报告按逻辑 skill 展示,实例明细在表里)
-    seen_lg, protected_names, tp_ids = set(), [], []
+    seen_lg, protected_names, third_names, tp_ids = set(), [], [], []
     for inst, why in protected:
         lg = _logical_of(inv, inst)
-        if lg and lg["name"] not in seen_lg:
-            seen_lg.add(lg["name"])
+        if lg and lg.get("logical_id") not in seen_lg:
+            seen_lg.add(lg.get("logical_id"))
             protected_names.append(lg["name"])
     for inst, why in third_party:
         if inst.get("is_skill", True):
+            lg = _logical_of(inv, inst)
+            if lg and lg.get("logical_id") not in seen_lg:
+                seen_lg.add(lg.get("logical_id"))
+                third_names.append(lg["name"])
             tp_ids.append(inst)
 
     verdict_rows = {g: [] for g in VERDICT_GROUPS}
     unreviewed = []
-    for inst in tp_ids:
+    inst_by_name = {}
+    for inst, _why in third_party:
+        if not inst.get("is_skill", True):
+            continue
+        lg = _logical_of(inv, inst)
+        key = lg.get("name") if lg else inst.get("instance_id")
+        inst_by_name.setdefault(key, inst)
+    for name in third_names:
+        inst = inst_by_name.get(name) or next(iter(inst_by_name.values()))
         iid = inst.get("instance_id")
         rec = reviews.get(iid)
         stale = bool(rec and rec.get("skill_tree_hash") not in (None, inst.get("tree_hash")))
@@ -120,7 +132,7 @@ def build_view(inv, last, ctx):
         findings_by_skill.setdefault(f.get("skill"), []).append(f)
 
     counts = {"total": inv.get("total", len(inv.get("logical_skills", []))),
-              "protected": len(protected_names), "third_party": len(tp_ids),
+              "protected": len(protected_names), "third_party": len(third_names),
               "unreviewed": len(unreviewed)}
     for g in VERDICT_GROUPS:
         counts[g] = len(verdict_rows[g])
@@ -186,8 +198,8 @@ def _repo_card(view, inst):
 
 
 def _safe_plan_cmd(iid):
-    return shlex.join([sys.executable,
-                       os.path.join(BASE, "scripts", "remove_skill.py"),
+    """静态报告里可复制的安全命令:可移植路径 + 只含 instance_id,绝不含目录名或绝对个人路径。"""
+    return shlex.join(["python3", "~/skill-keeper/scripts/remove_skill.py",
                        "plan", "--instance-id", str(iid),
                        "--reason", "报告建议,请补充或修改理由"])
 
@@ -242,6 +254,7 @@ def review_card_html(view, row, group):
             esc(rec.get("reviewer_model") or "?")))
     else:
         h.append('<p class="mut">尚未审查:加入大模型审查队列(value_review.py queue)后逐项审。</p>')
+        h.append('<p>删除后可能失去:—(尚未审查,先审查再决定)</p>')
     h.append('<p class="mut">{}</p>'.format(esc(_repo_card(view, inst))))
     h.append('<div>{}</div>'.format(btn("🗑️ 删除(两阶段)", "remove",
                                         {"id": iid, "name": name, "cmd": _safe_plan_cmd(iid)},

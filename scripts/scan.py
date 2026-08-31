@@ -59,21 +59,15 @@ def collect_bins(obj, out):
 
 
 def parse_frontmatter(text):
-    """返回 (dict, ok)。确定性简版解析器,保证核心字段(name/description/version)
-    与 PyYAML 是否安装无关;PyYAML 存在时也只用于它自身可解析性。"""
+    """返回 (dict, ok)。只用项目自带确定性解析器提取核心字段(name/description/version、
+    requires.bins),保证结果与 PyYAML 是否安装、能否解析完全无关;YAML 合法性由
+    yaml_validate 单独标注。"""
     if not text.startswith("---"):
         return {}, False
     m = re.search(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
     if not m:
         return {}, False
     fm_text = m.group(1)
-    try:
-        import yaml  # 可选依赖:只影响 yaml_ok 展示,不影响核心字段提取
-        return (yaml.safe_load(fm_text) or {}), True
-    except ImportError:
-        pass
-    except Exception:
-        return {}, False
     out, cur_key = {}, None
     for line in fm_text.splitlines():
         if re.match(r"^\s", line) and cur_key:
@@ -85,9 +79,33 @@ def parse_frontmatter(text):
         cur_key, val = mm.group(1), mm.group(2).strip()
         if val in (">", ">-", "|", "|-"):
             out[cur_key] = ""
+        elif val.startswith("[") and val.endswith("]"):
+            try:
+                import ast
+                out[cur_key] = ast.literal_eval(val)
+            except (ValueError, SyntaxError):
+                out[cur_key] = val.strip('"').strip("'")
         else:
             out[cur_key] = val.strip('"').strip("'")
     return out, True
+
+
+def yaml_validate(text):
+    """YAML 合法性单独判定:True/False;PyYAML 缺席返回 None(不缺信息就不下结论)。"""
+    if not text.startswith("---"):
+        return None
+    m = re.search(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
+    if not m:
+        return False
+    try:
+        import yaml
+    except ImportError:
+        return None
+    try:
+        yaml.safe_load(m.group(1))
+        return True
+    except Exception:
+        return False
 
 
 def first_sentence(desc, limit=60):
@@ -211,7 +229,8 @@ def _scan_entry(location, root: Path, entry: Path, home):
     except OSError:
         text = ""
     fm, ok = parse_frontmatter(text)
-    base["yaml_ok"] = bool(ok)
+    yaml_state = yaml_validate(text)
+    base["yaml_ok"] = None if yaml_state is None else bool(yaml_state)
     fm_name = str(fm.get("name") or "").strip()
     desc = str(fm.get("description") or "")
     base["logical_name"] = fm_name or dir_name
@@ -230,6 +249,9 @@ def _scan_entry(location, root: Path, entry: Path, home):
     if not desc:
         findings.append(_finding("frontmatter-missing-description", "red", base,
                                  "frontmatter 缺 description"))
+    if yaml_state is False:
+        findings.append(_finding("yaml-validation", "yellow", base,
+                                 "PyYAML 无法解析 frontmatter(核心字段已按简版解析器提取,客户端可能容忍)"))
     if "已归档" in text[:2000]:
         findings.append(_finding("archived-shell", "red", base, "仍是瘦身触发壳(标记已归档)"))
     missing = sorted({b for b in bins if b and not shutil.which(b)})
@@ -396,6 +418,11 @@ def _summary_rows(inv):
 
 def main():
     argv = sys.argv[1:]
+    if "--help" in argv or "-h" in argv:
+        print(__doc__)
+        print("用法: scan.py [--json]  (--json: 机器可读输出,退出码 0=健康 1=有红色问题)")
+        print("环境变量: SKILL_KEEPER_DATA 可覆盖数据目录(测试/多环境)")
+        sys.exit(0)
     home = Path(os.path.expanduser("~"))
     ddir = data_dir()
     try:

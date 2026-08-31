@@ -13,7 +13,21 @@ from .provenance import classify_provenance
 WEIGHTS = {"name": 0.4, "description": 0.3, "body": 0.15, "trigger": 0.05, "bins": 0.05, "source_path": 0.05}
 
 # 关键词重叠判定用的停用词(候选去噪;不影响相似度计算)
-STOPWORDS = {"skill", "skills", "demo", "sample", "test", "the", "and", "for", "with", "tool", "tools"}
+STOPWORDS = {
+    "skill", "skills", "demo", "sample", "test", "testing", "tool", "tools",
+    "the", "and", "for", "with", "tool", "from", "into", "this", "that", "your",
+    "you", "are", "not", "but", "its", "it's", "can", "will", "should", "must",
+    "all", "any", "each", "use", "used", "uses", "using", "user", "users",
+    "when", "then", "than", "else", "also", "only", "more", "one", "two",
+    "before", "after", "between", "within", "without", "over", "under",
+    "their", "there", "here", "what", "which", "who", "how", "why", "was",
+    "were", "has", "have", "had", "does", "does", "done", "make", "made",
+    "name", "description", "version", "metadata", "frontmatter", "license",
+    "file", "files", "data", "value", "values", "text", "list", "lists",
+    "return", "returns", "new", "add", "added", "set", "get", "run", "runs",
+    "based", "via", "per", "out", "non", "may", "must", "need", "needs",
+    "into", "onto", "such", "same", "other", "others", "some", "both",
+}
 CJK_STOP = {"演示", "示例", "来源", "声称", "未知", "工具", "能力", "自带", "完全", "第三方", "一个", "使用", "可以"}
 
 _LATIN = re.compile(r"[a-z0-9]{2,}")
@@ -114,7 +128,7 @@ def _content_tokens(logical, inst_by_id):
         sk = os_path_join(inst.get("real_path"), "SKILL.md")
         if sk:
             try:
-                body_t |= tokens(read_head(sk))
+                body_t |= tokens(strip_frontmatter(read_head(sk)))
             except OSError:
                 continue
     return name_t, desc_t, body_t
@@ -130,6 +144,17 @@ def os_path_join(base, name):
 def read_head(path, limit=8000):
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         return f.read(limit)
+
+
+def strip_frontmatter(text):
+    """去掉 SKILL.md 的 frontmatter 块,正文词元不把 name/description 等键名算进去。"""
+    if not text.startswith("---"):
+        return text
+    end = text.find("\n---", 3)
+    if end < 0:
+        return text
+    rest = text[end + 4:]
+    return rest.lstrip("\n")
 
 
 def pair_breakdown(a, b, tok_a, tok_b):
@@ -177,29 +202,52 @@ def candidate_pairs(inventory, min_similarity=0.32):
     return rows
 
 
-def alternative_candidates(inventory, target_logical_id, min_similarity=0.15):
-    """可能与目标重叠的其他逻辑 skill(含受保护类):关键词重叠或相似度达标,带理由。"""
+def alternative_candidates(inventory, target_logical_id, min_similarity=0.32):
+    """可能与目标重叠的其他逻辑 skill(含受保护类):有区分度的关键词重叠或相似度达标。
+
+    区分度 = 共享词元的文档频率 ≤ 35%(常见的通用词如"支持/自动/api"不算重叠),
+    保证这一层真的在缩小范围。
+    """
     logicals = inventory.get("logical_skills", [])
+    if not logicals:
+        return []
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     status = logical_status_map(inventory)
+    tok_map = {}
+    for lg in logicals:
+        tok_map[lg.get("logical_id")] = _content_tokens(
+            {**lg, "instance_ids": lg.get("instance_ids", [])}, inst_by_id)
+    total = len(logicals)
+    # 文档频率只统计 name/description 词元:正文词元天然嘈杂,只参与相似度打分
+    df = {}
+    for name_t, desc_t, _body_t in tok_map.values():
+        for tok in set().union(name_t, desc_t):
+            df[tok] = df.get(tok, 0) + 1
+    max_df = max(2, int(total * 0.15))
+    rare_df = max(2, int(total * 0.05))
+
     target = next((lg for lg in logicals if lg.get("logical_id") == target_logical_id), None)
     if target is None:
         return []
-    t_tok = _content_tokens({**target, "instance_ids": target.get("instance_ids", [])}, inst_by_id)
-    t_all = set().union(*t_tok)
+    t_name, t_desc, t_body = tok_map[target.get("logical_id")]
+    t_all = t_name | t_desc
+    t_body = t_body
     out = []
     for lg in logicals:
         if lg.get("logical_id") == target_logical_id:
             continue
-        l_tok = _content_tokens({**lg, "instance_ids": lg.get("instance_ids", [])}, inst_by_id)
-        l_all = set().union(*l_tok)
-        breakdown = pair_breakdown(target, lg, t_tok, l_tok)
+        l_name, l_desc, l_body = tok_map[lg.get("logical_id")]
+        l_all = l_name | l_desc
+        breakdown = pair_breakdown(target, lg, tok_map[target.get("logical_id")], tok_map[lg.get("logical_id")])
         score = pair_score(breakdown)
-        shared = significant_overlap(t_all, l_all)
-        if score >= min_similarity or shared:
+        shared = [t for t in significant_overlap(t_all, l_all) if df.get(t, 0) <= max_df]
+        rare = [t for t in shared if df.get(t, 0) <= rare_df]
+        # 单个普通共享词不算替代信号;要:≥2 个有区分度词元,或 1 个极稀有词元,或相似度达标
+        if score >= min_similarity or len(shared) >= 2 or rare:
             reasons = []
             if shared:
-                reasons.append("keyword-overlap:" + ",".join(shared[:4]))
+                detail = ",".join("{}(df{})".format(t, df.get(t, 0)) for t in (rare or shared)[:3])
+                reasons.append("keyword-overlap:" + detail)
             reasons.append("similarity:" + str(score))
             st = status.get(lg.get("logical_id"), {})
             out.append({"logical_id": lg.get("logical_id"), "name": lg.get("name"),

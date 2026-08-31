@@ -35,6 +35,38 @@ def _load_reviews(path):
     return {"schema_version": 2, "reviews": []}
 
 
+def _legacy_vetting(data_dir):
+    """读取 v1 安检台账迁移结果(或直接读 vetted.json),供队列显示 needs-recheck 历史。"""
+    import time as _time
+    from scripts.core.io import atomic_write_json as _awj
+    from scripts.core.migrations import migrate_runtime_state
+    v2, _ = load_json_checked(data_dir / "vetted-v2.json", {})
+    records = v2.get("records") if isinstance(v2, dict) else None
+    if not isinstance(records, dict):
+        legacy, _ = load_json_checked(data_dir / "vetted.json", {})
+        if isinstance(legacy, dict) and legacy:
+            # 只生成迁移视图,不改动 v1 原件
+            records = {}
+            for name, rec in legacy.items():
+                if name.startswith("_") or not isinstance(rec, dict):
+                    continue
+                records[str(name)] = {"status": "needs-recheck",
+                                      "previous_verdict": rec.get("verdict"),
+                                      "vetted_at": rec.get("vetted_at"),
+                                      "note": rec.get("note")}
+            try:
+                atomic_dir = data_dir
+                atomic_dir.mkdir(parents=True, exist_ok=True)
+                _awj(atomic_dir / "vetted-v2.json", {
+                    "schema_version": 2, "records": records,
+                    "generated_at": _time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "note": "v1 安检结论已按 v2 完整树指纹规则降级为 needs-recheck;重新安检后以新结论为准",
+                })
+            except OSError:
+                pass
+    return records or {}
+
+
 def cmd_queue(args):
     data_dir = default_data_dir()
     inventory_path = Path(args.inventory) if args.inventory else data_dir / "inventory.json"
@@ -46,7 +78,8 @@ def cmd_queue(args):
     reputation, _ = load_json_checked(output_path.parent / "reputation.json", {})
     reviews_store = _load_reviews(data_dir / "value-reviews.json")
     queue = build_review_queue(inv, reputation if isinstance(reputation, dict) else {},
-                               reviews_store["reviews"])
+                               reviews_store["reviews"],
+                               legacy_vetting=_legacy_vetting(data_dir))
     queue["generated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     atomic_write_json(output_path, queue)
     if args.json:

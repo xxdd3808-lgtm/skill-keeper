@@ -124,7 +124,7 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
 ### 7. 汇报
 
 给用户:操作结果 + 剩余总数 + 新发现的问题。**汇报正文必须带两个可点的入口**,别让用户去文件夹里翻:
-- **HTML 报告**:贴完整 `file:///Users/<用户名>/skill-keeper/data/report.html` 链接(file:// 里不能写 `~`),或直接 `open ~/skill-keeper/data/report.html` 当场弹出浏览器;
+- **HTML 报告**:贴 `data/report.html` 的完整 file:// 链接(file:// 里不能写 `~`,用户名段按本机实际路径拼上),或直接 `open ~/skill-keeper/data/report.html` 当场弹出浏览器;
 - **一键操作入口**:后台起 `python3 ~/skill-keeper/scripts/report.py --serve`,把打印出的带 token 完整 URL 原样贴进对话,用户点开就是能直接点按钮的报告;并提示 macOS 可随时双击 `~/skill-keeper/启动技能报告.command` 再开。
 
 ## 分组维护
