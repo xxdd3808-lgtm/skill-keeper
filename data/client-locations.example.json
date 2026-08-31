@@ -1,0 +1,12 @@
+{
+  "_comment": "可选:登记适配器未内置的客户端 skill 目录。复制为 data/client-locations.json 后生效。字段白名单:location_id(唯一ID,字母数字._-)、client(客户端名)、path(绝对路径,支持 ~)、kind(user|workspace|builtin|plugin-cache)、mutable(布尔;false 的位置只扫描、不提供删除/更新)。不再使用的条目直接删除即可。",
+  "locations": [
+    {
+      "location_id": "my-client-skills",
+      "client": "my-client",
+      "path": "~/.my-client/skills",
+      "kind": "user",
+      "mutable": true
+    }
+  ]
+}
