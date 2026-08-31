@@ -150,17 +150,18 @@ def _safe_member_name(name: str) -> bool:
 
 def verify_backup(archive_path):
     """逐成员校验归档;任何异常立即抛 BackupError,绝不解包到磁盘。"""
+    import zlib
     p = Path(archive_path)
     if not p.is_file():
         raise BackupError("备份不存在: " + p.name)
     try:
         t = tarfile.open(str(p), "r:gz")
-    except (tarfile.TarError, OSError) as e:
+    except (tarfile.TarError, OSError, zlib.error, EOFError) as e:
         raise BackupError("无法打开备份: " + type(e).__name__)
     seen = set()
     payload = {}
     manifest = None
-    with t:
+    try:
         for m in t:
             name = m.name
             if name in seen:
@@ -189,6 +190,10 @@ def verify_backup(archive_path):
             if not name.startswith(PAYLOAD_PREFIX):
                 raise BackupError("manifest 外成员: " + name)
             payload[name] = hashlib.sha256(content).hexdigest()
+    except BackupError:
+        raise
+    except (tarfile.TarError, OSError, zlib.error, EOFError) as e:
+        raise BackupError("归档读取失败(" + type(e).__name__ + ")")
 
     if not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA:
         raise BackupError("manifest 缺失或 schema 不受支持")
