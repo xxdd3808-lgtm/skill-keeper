@@ -1,214 +1,282 @@
 #!/usr/bin/env python3
-"""skill-keeper 交互服务:报告里的 更新/删除/忽略/恢复 按钮在本地直接执行。
+"""skill-keeper v2 交互服务:两阶段 plan/apply API,加固的本地 Web 边界。
+
 安全边界:
-- 只绑 127.0.0.1,页面 URL 带随机 token,API 全部校验(防其他网页对 localhost 跨站调用);
-- 所有变更动作先 tar 备份到 backups/,成功后自动重扫 scan.py + 重报 report.py;
-- 自建白名单 skill 删除仍受保护(需 CLI --force);插件缓存 skill 拒绝操作;
-- 更新/删除/恢复需请求体带 confirm:true(对应页面上的确认弹窗);
-- 每次动作追加记录到 data/actions.log。
-用法: report.py --serve [--port N] [--no-open](或直接 python3 scripts/serve.py)"""
-import difflib, json, os, re, secrets, shutil, subprocess, sys, tarfile, time, urllib.parse, webbrowser
+- 只绑 127.0.0.1;所有 API 需要随机 token(常量时间比较);POST 校验 Origin;
+- 请求体上限 64 KiB;confirm 必须是 JSON 布尔 true,字符串 "false" 一律拒绝;
+- 所有响应带 nosniff/no-referrer/DENY/Permissions-Policy;HTML 另带白名单式 CSP
+  (内联脚本用运行时计算的 SHA-256 hash,不用 unsafe-eval);
+- 所有变更动作都走统一变更引擎:计划不可变、执行要 digest 确认、先备份、失败回滚、
+  成功失败都写审计;进程内锁 + 文件锁双重防并发;
+- 不把异常 repr、绝对用户路径或客户端配置内容返回浏览器。
+
+用法: report.py --serve [--port N] [--no-open](或直接 python3 scripts/serve.py)
+"""
+import hashlib
+import json
+import os
+import re
+import secrets
+import shlex
+import subprocess
+import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-DATA = os.path.join(BASE, "data")
-BACKUPS = os.path.join(BASE, "backups")
-HOME = os.path.expanduser("~")
-LOCATIONS = [f"{HOME}/.agents/skills", f"{HOME}/.zcode/skills", f"{HOME}/.claude/skills",
-             f"{HOME}/.codex/skills", f"{HOME}/.local/share/ego/ego-skills"]
-TOKEN = secrets.token_urlsafe(24)
-sys.path.insert(0, os.path.join(BASE, "scripts"))
-from check_updates import gh_raw, skills_sh_skillmd
-from scan import sk_signature
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
+
+from scripts.core.audit import append_audit, read_audit           # noqa: E402
+from scripts.core.changes import (ChangeContext, ChangeError, LockBusy,  # noqa: E402
+                                  apply_plan, create_remove_plan,
+                                  create_restore_plan, create_update_plan)
+from scripts.core.io import atomic_write_json, load_json_checked   # noqa: E402
+
+MAX_BODY = 64 * 1024
+SERVER_VERSION = "skill-keeper/2.0"
 
 
-def log(action, detail):
-    with open(os.path.join(DATA, "actions.log"), "a", encoding="utf-8") as f:
-        f.write(json.dumps({"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "action": action, **detail},
-                           ensure_ascii=False) + "\n")
+class ServiceContext:
+    """服务的运行环境:数据目录、引擎上下文、进程内互斥锁。"""
 
+    def __init__(self, data_dir, home=None, backup_dir=None):
+        self.data_dir = Path(data_dir)
+        self.home = Path(home) if home else Path(os.path.expanduser("~"))
+        base = Path(BASE)
+        self.backup_dir = (Path(backup_dir) if backup_dir else
+                           (base / "backups" if self.data_dir == base / "data"
+                            else self.data_dir / "backups"))
+        self.engine = ChangeContext(
+            data_dir=self.data_dir,
+            plans_dir=self.data_dir / "change-plans",
+            backup_dir=self.backup_dir,
+            audit_path=self.data_dir / "audit-v2.jsonl",
+            lock_path=self.data_dir / ".change.lock",
+            load_inventory=self._load_inventory)
+        self.process_lock = threading.Lock()
 
-def inventory():
-    return json.load(open(os.path.join(DATA, "inventory.json"), encoding="utf-8"))
-
-
-def valid_dir(d):
-    return bool(d) and bool(re.fullmatch(r"[A-Za-z0-9._-]+", d))
-
-
-def find_skill(d):
-    if not valid_dir(d):
-        return None
-    for s in inventory()["skills"]:
-        for i in s["instances"]:
-            if i["dir"] == d and i.get("real_path") and not i.get("stale_cache"):
-                return s, i
-    return None
-
-
-def self_built_names():
-    p = os.path.join(DATA, "self-built.txt")
-    return {l.strip() for l in open(p, encoding="utf-8") if l.strip() and not l.startswith("#")} if os.path.exists(p) else set()
+    def _load_inventory(self):
+        inv, issues = load_json_checked(self.data_dir / "inventory.json", {})
+        if issues or not isinstance(inv, dict) or not inv.get("instances"):
+            raise ChangeError("inventory 缺失或为空,先重跑扫描")
+        return inv
 
 
 def run_scan_report():
     r1 = subprocess.run([sys.executable, os.path.join(BASE, "scripts", "scan.py")],
-                        capture_output=True, text=True, timeout=120)
+                        capture_output=True, text=True, timeout=180)
     r2 = subprocess.run([sys.executable, os.path.join(BASE, "scripts", "report.py")],
-                        capture_output=True, text=True, timeout=120)
-    return r1.returncode == 0 and r2.returncode == 0, (r1.stderr + r2.stderr).strip()[-300:]
+                        capture_output=True, text=True, timeout=180)
+    return r1.returncode == 0 and r2.returncode == 0
 
 
-def backup_tar(d, tag):
-    """把 d 在所有位置的存在打成 tar;返回备份文件路径(不删除任何东西)"""
-    os.makedirs(BACKUPS, exist_ok=True)
-    bak = os.path.join(BACKUPS, f"{tag}-{d}-{time.strftime('%Y%m%d-%H%M%S')}.tar.gz")
-    with tarfile.open(bak, "w:gz") as t:
-        for loc in LOCATIONS:
-            p = os.path.join(loc, d)
-            if os.path.lexists(p):
-                t.add(os.path.realpath(p) if os.path.islink(p) else p, arcname=d, recursive=True)
-    return bak
+def _plan_public(row):
+    """计划对浏览器可见的最小信息(不含路径细节)。"""
+    return {"ok": True, "plan_id": row.get("plan_id"), "digest": row.get("digest"),
+            "action": row.get("action"), "summary": row.get("summary"),
+            "expires_at": row.get("expires_at"), "targets": list(row.get("target_ids", []))}
 
 
-def gh_download_dir(repo, repo_path, dest):
-    """递归拉取 GitHub 上 repo_path 目录下所有文件,写入 dest。返回文件数。"""
-    def list_dir(path):
-        r = subprocess.run(["gh", "api", f"repos/{repo}/contents/{urllib.parse.quote(path)}"],
-                           capture_output=True, text=True, timeout=60)
-        if r.returncode != 0:
-            raise RuntimeError(f"gh api 列目录失败: {(r.stderr or '').strip()[:200]}")
-        return json.loads(r.stdout)
-
-    n = 0
-    for item in list_dir(repo_path):
-        if item.get("type") == "file":
-            content = gh_raw(repo, item["path"])
-            if content is None:
-                raise RuntimeError(f"拉取失败: {item['path']}")
-            local = os.path.join(dest, os.path.relpath(item["path"], repo_path))
-            os.makedirs(os.path.dirname(local), exist_ok=True)
-            with open(local, "w", encoding="utf-8") as f:
-                f.write(content)
-            n += 1
-        elif item.get("type") == "dir":
-            n += gh_download_dir(repo, item["path"], dest)
-    return n
-
-
-def upstream_dir_path(path):
-    """known-sources 里的 path 指向 SKILL.md;更新时取其所在目录"""
-    p = path or ""
-    return os.path.dirname(p) if p.endswith("SKILL.md") else p
-
-
-def drop_stale_update(name):
-    """更新成功后清掉 updates.json 里该 skill 的旧差异记录,免得报告显示过期的「建议更新」。
-    下次跑 check_updates 时按更新后的内容重新评估。"""
-    p = os.path.join(DATA, "updates.json")
-    try:
-        u = json.load(open(p, encoding="utf-8"))
-        u["differs"] = [x for x in u.get("differs", []) if x.get("name") != name]
-        json.dump(u, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    except Exception:
-        pass
-
-
-def do_update(d):
-    hit = find_skill(d)
-    if not hit:
-        return False, f"找不到 skill: {d}"
-    s, _ = hit
-    src = s["source"]
-    if src.get("type") == "plugin":
-        return False, "插件 skill 由插件系统管理,不能在这里更新"
-    if d in self_built_names():
-        return False, "自建 skill 不从上游更新"
-    repo, path = src.get("repo"), src.get("path")
-    ent = next((x for x in s["instances"] if x.get("real_path") and not x.get("is_symlink") and not x.get("stale_cache")), None)
-    if not ent:
-        return False, f"找不到 {d} 的本地实体(可能只有符号链接实例)"
-    real = ent["real_path"]
-    bak = backup_tar(d, "update")
-    try:
-        if src.get("type") == "github" and repo and path:
-            tmp = real + ".upstream-tmp"
-            if os.path.lexists(tmp):
-                shutil.rmtree(tmp)
-            os.makedirs(tmp)
-            n = gh_download_dir(repo, upstream_dir_path(path), tmp)
-            for x in os.listdir(real):
-                p = os.path.join(real, x)
-                if os.path.isdir(p) and not os.path.islink(p):
-                    shutil.rmtree(p)
-                else:
-                    os.remove(p)
-            for x in os.listdir(tmp):
-                shutil.move(os.path.join(tmp, x), os.path.join(real, x))
-            os.rmdir(tmp)
-            msg = f"已从 {repo} 更新 {d}({n} 个文件);备份: {os.path.basename(bak)}"
-        elif src.get("type") == "skills.sh" and repo and "/" in repo:
-            meta = os.path.join(real, "_meta.json")
-            slug = (json.load(open(meta, encoding="utf-8")).get("slug") if os.path.exists(meta) else None) or d
-            r = subprocess.run(["npx", "-y", "skills", "add", f"{repo}@{slug}", "-g", "-y"],
-                               capture_output=True, text=True, timeout=300)
-            if r.returncode != 0:
-                raise RuntimeError((r.stderr or r.stdout or "").strip()[:300] or "skills add 失败")
-            msg = f"已通过 skills.sh 更新 {d};备份: {os.path.basename(bak)}"
+def _handle_plan(ctx, body):
+    action = str(body.get("action") or "").strip()
+    with ctx.process_lock:
+        if action == "remove":
+            plan = create_remove_plan(body.get("instance_ids") or [], ctx._load_inventory(),
+                                      str(body.get("reason") or ""), ctx.engine.plans_dir)
+        elif action == "restore":
+            backup_id = str(body.get("backup_id") or "")
+            if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", backup_id):
+                raise ChangeError("backup_id 格式不合法")
+            plan = create_restore_plan(backup_id, ctx.backup_dir, ctx.engine.plans_dir)
+        elif action == "update":
+            plan = _plan_update_from_updates(ctx, body)
         else:
-            return False, f"该 skill(来源 {src.get('type')})没有可用的更新通道,请手动处理"
-    except Exception as e:
-        return False, f"更新失败(已先备份 {os.path.basename(bak)},原内容未动): {e}"
-    ok, err = run_scan_report()
-    drop_stale_update(s["name"])  # s 是更新前抓的,名字即使变了也能清掉旧记录
-    log("update", {"dir": d, "backup": os.path.basename(bak), "ok": ok})
-    return True, msg + (";已重扫并刷新报告" if ok else f";⚠️ 重扫失败请手动跑 scan.py: {err}")
+            raise ChangeError("action 必须是 remove|restore|update")
+    row = _plan_public(plan.to_dict())
+    row["apply_hint"] = shlex.join([sys.executable, os.path.join(BASE, "scripts", "remove_skill.py"),
+                                    "apply", row["plan_id"], "--digest", row["digest"], "--confirm"]) \
+        if action == "remove" else None
+    return row
 
 
-def do_remove(d, confirm):
-    if not valid_dir(d):
-        return False, f"非法目录名: {d}"
-    if not confirm:
-        return False, "缺少 confirm(防误触)"
-    args = [sys.executable, os.path.join(BASE, "scripts", "remove_skill.py"), d]
-    r = subprocess.run(args, capture_output=True, text=True, timeout=120)
-    out = (r.stdout or r.stderr).strip()
-    if r.returncode != 0:
-        return False, out or "删除失败"
-    ok, err = run_scan_report()
-    log("remove", {"dir": d, "ok": ok})
-    return True, out.splitlines()[-1] if out else "已删除" + (";已重扫并刷新报告" if ok else f";⚠️ 重扫失败: {err}")
+def _plan_update_from_updates(ctx, body):
+    """从 check_updates 的 staging 结果生成更新计划(候选必须已 staged 且 hash 一致)。"""
+    iid = str(body.get("instance_id") or "")
+    updates, _ = load_json_checked(ctx.data_dir / "updates.json", {})
+    hit = None
+    for d in (updates or {}).get("differs", []) if isinstance(updates, dict) else []:
+        if d.get("instance_id") == iid and d.get("staging_path"):
+            hit = d
+            break
+    if not hit:
+        raise ChangeError("该实例没有已暂存的候选更新(先跑 check_updates)")
+    snapshot = {"instance_id": iid, "staging_path": hit["staging_path"],
+                "candidate_hash": hit.get("candidate_hash"), "repo": hit.get("repo"),
+                "source": "github", "source_dir": "skills/" + str(hit.get("name")),
+                "commit_sha": hit.get("commit_sha")}
+    return create_update_plan(iid, snapshot, ctx._load_inventory(), ctx.engine.plans_dir)
 
 
-def do_restore(bak_name, confirm):
-    if not confirm:
-        return False, "缺少 confirm(防误触)"
-    if not bak_name or not re.fullmatch(r"[A-Za-z0-9._-]+\.tar\.gz", bak_name):
-        return False, f"非法备份名: {bak_name}"
-    p = os.path.join(BACKUPS, bak_name)
-    if not os.path.exists(p):
-        return False, "备份不存在"
-    dest = os.path.join(HOME, ".agents", "skills")
-    with tarfile.open(p) as t:
-        for m in t.getmembers():
-            if m.name.startswith("/") or ".." in m.name.split("/"):
-                return False, "备份含不安全路径,拒绝恢复"
-        t.extractall(dest)
-    ok, err = run_scan_report()
-    log("restore", {"backup": bak_name, "ok": ok})
-    return True, f"已从 {bak_name} 恢复到 ~/.agents/skills;已重扫并刷新报告" if ok else f"已恢复,但重扫失败: {err}"
+def _handle_apply(ctx, body):
+    plan_id = str(body.get("plan_id") or "")
+    digest = str(body.get("digest") or "")
+    with ctx.process_lock:
+        result = apply_plan(plan_id, digest, body.get("confirm"), ctx.engine)
+    return {"ok": True, "message": "已执行: " + result.get("action", ""),
+            "backup": os.path.basename(str(result.get("backup_path") or "")),
+            "plan_id": plan_id}
 
 
-def do_ignore(name, match, remove):
+def _build_handler(ctx, token):
+    origin_ok = "http://127.0.0.1:%d" % 0  # 占位,真正端口在请求时取 self.server.server_port
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = SERVER_VERSION
+
+        # ---------- 基础设施 ----------
+        def _send(self, code, body, ctype="application/json; charset=utf-8", html=None):
+            data = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+            if html is not None:
+                self.send_header("Content-Security-Policy", _csp_for(html))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _auth(self, q):
+            given = q.get("t", [""])[0]
+            return secrets.compare_digest(str(given), token)
+
+        def _check_origin(self):
+            origin = self.headers.get("Origin")
+            if not origin:
+                return True
+            return origin == "http://127.0.0.1:%d" % self.server.server_port
+
+        def _body(self):
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise _BadRequest("Content-Length 不合法")
+            if n > MAX_BODY:
+                raise _TooLarge()
+            raw = self.rfile.read(n) if n else b"{}"
+            try:
+                value = json.loads(raw or b"{}")
+            except ValueError:
+                raise _BadRequest("请求体不是合法 JSON")
+            if not isinstance(value, dict):
+                raise _BadRequest("请求体必须是 JSON 对象")
+            return value
+
+        def log_message(self, *a):
+            pass
+
+        # ---------- GET ----------
+        def do_GET(self):
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            if u.path in ("/", "/report"):
+                if not self._auth(q):
+                    return self._send(403, {"ok": False, "error": "token 缺失或不正确"})
+                try:
+                    html = (ctx.data_dir / "report.html").read_bytes()
+                except OSError:
+                    return self._send(404, {"ok": False, "error": "report.html 不存在,先跑 report.py"})
+                return self._send(200, html, "text/html; charset=utf-8", html=html)
+            if not self._auth(q):
+                return self._send(403, {"ok": False, "error": "token 缺失或不正确"})
+            m = re.fullmatch(r"/api/plan/([A-Za-z0-9._-]{1,80})", u.path)
+            if m:
+                path = ctx.engine.plans_dir / (m.group(1) + ".json")
+                row, issues = load_json_checked(path, {})
+                if issues or not isinstance(row, dict):
+                    return self._send(404, {"ok": False, "error": "计划不存在"})
+                return self._send(200, _plan_public(row))
+            if u.path == "/api/audit":
+                rows = read_audit(ctx.engine.audit_path)[-20:]
+                return self._send(200, {"ok": True, "events": rows})
+            self._send(404, {"ok": False, "error": "not found"})
+
+        # ---------- POST ----------
+        def do_POST(self):
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            if not self._auth(q):
+                return self._send(403, {"ok": False, "error": "token 缺失或不正确"})
+            if not self._check_origin():
+                return self._send(403, {"ok": False, "error": "Origin 不合法"})
+            try:
+                body = self._body()
+            except _TooLarge:
+                return self._send(413, {"ok": False, "error": "请求体超过 64 KiB 上限"})
+            except _BadRequest as e:
+                return self._send(400, {"ok": False, "error": str(e)})
+            try:
+                if u.path == "/api/plan":
+                    return self._send(200, _handle_plan(ctx, body))
+                if u.path == "/api/apply":
+                    if body.get("confirm") is not True:
+                        raise ChangeError("缺少明确确认:confirm 必须是布尔 true")
+                    return self._send(200, _handle_apply(ctx, body))
+                if u.path == "/api/restore-plan":
+                    body = dict(body)
+                    body["action"] = "restore"
+                    return self._send(200, _handle_plan(ctx, body))
+                if u.path == "/api/rescan":
+                    with ctx.process_lock:
+                        ok = run_scan_report()
+                    if ok:
+                        return self._send(200, {"ok": True, "message": "已重扫并刷新报告"})
+                    return self._send(500, {"ok": False, "error": "重扫失败,请手动跑 scan.py"})
+                if u.path == "/api/ignore":
+                    return self._send(200, _handle_ignore(ctx, body))
+                return self._send(404, {"ok": False, "error": "not found"})
+            except LockBusy as e:
+                append_audit({"action": "web-rejected", "reason": str(e)[:120],
+                              "status": "failed", "error": str(e)[:200]},
+                             ctx.engine.audit_path)
+                return self._send(409, {"ok": False, "error": str(e)})
+            except ChangeError as e:
+                append_audit({"action": "web-rejected", "reason": str(e)[:120],
+                              "status": "failed", "error": str(e)[:200]},
+                             ctx.engine.audit_path)
+                return self._send(400, {"ok": False, "error": str(e)})
+            except Exception:
+                return self._send(400, {"ok": False, "error": "执行失败,请查看本地审计日志"})
+
+    return Handler
+
+
+class _TooLarge(Exception):
+    pass
+
+
+class _BadRequest(Exception):
+    pass
+
+
+def _handle_ignore(ctx, body):
+    """忽略规则管理(写入 data/ignore.json,属用户配置,不是 skill 变更)。"""
+    if body.get("confirm") is not True:
+        raise ChangeError("缺少明确确认")
+    name = str(body.get("name") or "")
+    match = str(body.get("match") or "")
+    remove = body.get("remove") is True
     if not name or not match:
-        return False, "缺少 name 或 match"
-    p = os.path.join(DATA, "ignore.json")
-    cur = {}
-    if os.path.exists(p):
-        try:
-            cur = json.load(open(p, encoding="utf-8"))
-        except Exception:
-            cur = {}
+        raise ChangeError("缺少 name 或 match")
+    path = ctx.data_dir / "ignore.json"
+    cur, _ = load_json_checked(path, {})
+    cur = cur if isinstance(cur, dict) else {}
     rules = [r for r in (cur.get(name) or []) if r != match]
     if not remove:
         rules.append(match)
@@ -216,148 +284,44 @@ def do_ignore(name, match, remove):
         cur[name] = rules
     else:
         cur.pop(name, None)
-    json.dump(cur, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    atomic_write_json(path, cur)
     run_scan_report()
-    log("ignore", {"name": name, "match": match, "remove": bool(remove)})
-    return True, ("已取消忽略并刷新报告" if remove else "已忽略并刷新报告(规则写入 data/ignore.json)")
+    return {"ok": True, "message": "已更新忽略规则并刷新报告"}
 
 
-def do_vet_record(d, verdict, note, confirm):
-    """安检记账:把按 skill-vetter 清单审出的结论写进 data/vetted.json,记当前内容指纹。"""
-    if not confirm:
-        return False, "缺少 confirm(防误触)"
-    if verdict not in ("safe", "warning", "danger"):
-        return False, "verdict 必须是 safe|warning|danger"
-    hit = find_skill(d)
-    if not hit:
-        return False, f"找不到 skill: {d}"
-    _, i = hit
-    if not i.get("real_path") or not os.path.exists(os.path.join(i["real_path"], "SKILL.md")):
-        return False, f"找不到 {d} 的本地实体"
-    p = os.path.join(DATA, "vetted.json")
-    try:
-        cur = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
-    except Exception:
-        cur = {}
-    cur[d] = {"verdict": verdict, "note": (note or "")[:200],
-              "vetted_at": time.strftime("%Y-%m-%d"), "sk_hash": sk_signature(i["real_path"])}
-    json.dump(cur, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    run_scan_report()
-    log("vet_record", {"dir": d, "verdict": verdict})
-    label = {"safe": "🛡️ 安全", "warning": "⚠️ 存疑", "danger": "☠️ 判危"}[verdict]
-    return True, f"已记账:{d} → {label};已重扫并刷新报告"
+def _csp_for(html: bytes) -> str:
+    """为报告页计算白名单式 CSP:内联脚本按内容 hash 放行,不用 unsafe-eval。"""
+    text = html.decode("utf-8", errors="ignore")
+    script_srcs = ["'self'"]
+    for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", text, re.S):
+        digest = hashlib.sha256(m.group(1).encode("utf-8")).hexdigest()
+        script_srcs.append("'sha256-{}'".format(digest))
+    return ("default-src 'self'; connect-src 'self'; img-src 'self'; "
+            "script-src {}; style-src 'self' 'unsafe-inline'; "
+            "form-action 'self'; base-uri 'none'".format(" ".join(script_srcs)))
 
 
-def do_diff(d):
-    hit = find_skill(d)
-    if not hit:
-        return False, f"找不到 skill: {d}"
-    s, i = hit
-    src = s["source"]
-    repo, path = src.get("repo"), src.get("path")
-    sk = os.path.join(i["real_path"], "SKILL.md")
-    local = open(sk, encoding="utf-8", errors="ignore").read() if os.path.exists(sk) else ""
-    upstream = gh_raw(repo, path) if path else None
-    if upstream is None and src.get("type") == "skills.sh" and repo and "/" in repo:
-        meta = os.path.join(i["real_path"], "_meta.json")
-        slug = (json.load(open(meta, encoding="utf-8")).get("slug") if os.path.exists(meta) else None) or d
-        upstream = skills_sh_skillmd(repo, slug)
-    if upstream is None:
-        return False, f"拉取上游失败({repo})"
-    diff = "".join(difflib.unified_diff(local.splitlines(keepends=True), upstream.splitlines(keepends=True),
-                                        fromfile=f"本地 {d}/SKILL.md", tofile=f"上游 {repo}"))
-    return True, diff if diff.strip() else "本地与上游内容一致(仅空白差异)"
-
-
-def jdump(ok, message):
-    return json.dumps({"ok": bool(ok), "message": message}, ensure_ascii=False)
-
-
-class Handler(BaseHTTPRequestHandler):
-    server_version = "skill-keeper/1.1"
-
-    def _auth(self, q):
-        return q.get("t", [""])[0] == TOKEN
-
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
-        data = body.encode("utf-8") if isinstance(body, str) else body
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(data)
-
-    def _body(self):
-        n = int(self.headers.get("Content-Length") or 0)
-        return json.loads(self.rfile.read(n) or b"{}")
-
-    def do_GET(self):
-        u = urllib.parse.urlparse(self.path)
-        q = urllib.parse.parse_qs(u.query)
-        if not self._auth(q):
-            return self._send(403, jdump(False, "token 缺失或不正确"))
-        if u.path in ("/", "/report"):
-            try:
-                with open(os.path.join(DATA, "report.html"), "rb") as f:
-                    return self._send(200, f.read(), "text/html; charset=utf-8")
-            except FileNotFoundError:
-                return self._send(500, jdump(False, "report.html 不存在,请先跑 report.py"))
-        if u.path == "/api/diff":
-            d = q.get("dir", [""])[0]
-            ok, msg = do_diff(d)
-            if not ok:
-                return self._send(400, jdump(False, msg))
-            if "raw" in q:  # 纯文本版(调试/管道用);页面默认走 JSON
-                return self._send(200, msg, "text/plain; charset=utf-8")
-            return self._send(200, json.dumps({"ok": True, "diff": msg}, ensure_ascii=False))
-        self._send(404, jdump(False, "not found"))
-
-    def do_POST(self):
-        u = urllib.parse.urlparse(self.path)
-        q = urllib.parse.parse_qs(u.query)
-        if not self._auth(q):
-            return self._send(403, jdump(False, "token 缺失或不正确"))
-        try:
-            body = self._body()
-        except Exception:
-            return self._send(400, jdump(False, "请求体不是合法 JSON"))
-        try:
-            if u.path == "/api/remove":
-                ok, msg = do_remove(body.get("dir", ""), bool(body.get("confirm")))
-            elif u.path == "/api/update":
-                ok, msg = do_update(body.get("dir", "")) if body.get("confirm") else (False, "缺少 confirm(防误触)")
-            elif u.path == "/api/restore":
-                ok, msg = do_restore(body.get("backup", ""), bool(body.get("confirm")))
-            elif u.path == "/api/ignore":
-                ok, msg = do_ignore(body.get("name", ""), body.get("match", ""), bool(body.get("remove")))
-            elif u.path == "/api/vet_record":
-                ok, msg = do_vet_record(body.get("dir", ""), body.get("verdict", ""),
-                                        body.get("note", ""), bool(body.get("confirm")))
-            elif u.path == "/api/rescan":
-                ok, err = run_scan_report()
-                msg = "已重扫并刷新报告" if ok else f"重扫失败: {err}"
-            else:
-                return self._send(404, jdump(False, "not found"))
-        except Exception as e:
-            return self._send(500, jdump(False, f"执行异常: {e}"))
-        self._send(200 if ok else 400, jdump(ok, msg))
-
-    def log_message(self, *a):
-        pass  # 静默访问日志(actions.log 记录变更)
+def create_server(data_dir, home=None, port=0, backup_dir=None):
+    ctx = ServiceContext(data_dir, home=home, backup_dir=backup_dir)
+    token = secrets.token_urlsafe(24)
+    handler = _build_handler(ctx, token)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    return httpd, token, ctx
 
 
 def main():
     argv = sys.argv[1:]
     port = int(argv[argv.index("--port") + 1]) if "--port" in argv else 0
-    ok, err = run_scan_report()
+    data_dir = os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data")
+    ok = run_scan_report()
     if not ok:
-        print(f"⚠️ 启动前重扫失败: {err}", file=sys.stderr)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    url = f"http://127.0.0.1:{httpd.server_port}/?t={TOKEN}"
-    print(f"✅ skill-keeper 交互报告:{url}", flush=True)
-    print("   仅本机可访问;Ctrl+C 退出;所有操作先备份、后自动重扫重报,动作记录在 data/actions.log", flush=True)
+        print("⚠️ 启动前重扫失败,报告可能不是最新", file=sys.stderr)
+    httpd, token, _ctx = create_server(data_dir, port=port)
+    url = "http://127.0.0.1:{}/?t={}".format(httpd.server_port, token)
+    print("✅ skill-keeper 交互报告(v2 plan/apply):" + url, flush=True)
+    print("   仅本机可访问;所有变更动作走 计划→确认→备份→执行→验证 流程;Ctrl+C 退出", flush=True)
     if "--no-open" not in argv:
+        import webbrowser
         webbrowser.open(url)
     try:
         httpd.serve_forever()

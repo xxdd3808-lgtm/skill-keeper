@@ -33,6 +33,10 @@ class ChangeError(Exception):
     """变更流程被拒绝或失败;消息面向普通人。"""
 
 
+class LockBusy(ChangeError):
+    """互斥锁被占用:另一个变更正在进行。"""
+
+
 @dataclass
 class ChangeContext:
     """一次变更的环境:目录、锁、审计与 inventory 提供者(全部可注入,测试友好)。"""
@@ -119,6 +123,33 @@ def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir) ->
         summary="更新 {} 到固定候选 {}(来源 {}@{});旧版本自动保留回滚,应用前必须安检".format(
             str(inst.get("logical_name") or inst.get("directory_name")),
             candidate_hash[:12], repo, str(snap.get("commit_sha") or "fixed-candidate")),
+        digest="", created_at=now, expires_at=expires)
+    row = plan.to_dict()
+    row["digest"] = plan_digest(row)
+    plan = ChangePlan.from_dict(row)
+    write_plan(plan, plans_dir)
+    return plan
+
+
+def create_restore_plan(backup_id, backup_dir, plans_dir) -> ChangePlan:
+    """生成恢复计划:先校验备份可用,precondition 绑定 backup_id 与归档绝对路径;冲突不覆盖。"""
+    from .backup import BackupError, verify_backup
+    path = _find_backup(backup_dir, backup_id)
+    try:
+        info = verify_backup(path)
+    except BackupError as e:
+        raise ChangeError("备份校验失败,拒绝生成恢复计划: " + str(e))
+    manifest = info.get("manifest") or {}
+    iids = sorted(str(e.get("instance_id")) for e in manifest.get("entries", []))
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    expires = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + PLAN_TTL_SECONDS))
+    plan_id = "plan-" + time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(4)
+    plan = ChangePlan(
+        plan_id=plan_id, action="restore", target_ids=tuple(iids),
+        preconditions=(("backup_id", str(backup_id)),
+                       ("backup_path", os.path.abspath(str(path)))),
+        summary="从备份 {} 恢复 {} 个实体(目标已存在则冲突失败,不覆盖)".format(
+            str(backup_id), len(iids)),
         digest="", created_at=now, expires_at=expires)
     row = plan.to_dict()
     row["digest"] = plan_digest(row)
@@ -292,7 +323,7 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
     try:
         lock.acquire()
     except (BlockingIOError, OSError):
-        raise ChangeError("另一个 skill-keeper 变更正在进行,请稍后再试")
+        raise LockBusy("另一个 skill-keeper 变更正在进行,请稍后再试")
     audit_event = {
         "action": str(row.get("action")), "target_ids": list(row.get("target_ids", [])),
         "plan_id": str(row.get("plan_id")), "reason": str(row.get("summary", "")),
@@ -300,6 +331,15 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         "backup_id": None,
     }
     try:
+        if row.get("action") == "restore":
+            # 恢复的目标通常不存在,不做存在性前置校验;备份本身就是 precondition
+            plan = ChangePlan.from_dict(row)
+            _execute_restore(row, inventory, context)
+            audit_event["status"] = "success"
+            audit_event["resulting_hash"] = str(dict(row.get("preconditions", [])).get("backup_id"))
+            append_audit(audit_event, context.audit_path)
+            return {"ok": True, "action": "restore", "backup_id": audit_event["resulting_hash"],
+                    "plan_id": row.get("plan_id")}
         _check_preconditions(row, inventory)
         by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
         targets = [by_id[i] for i in row.get("target_ids", [])]
@@ -376,6 +416,19 @@ def _execute_remove(row, targets, context):
         ok = all(not os.path.lexists(i["path"]) for i in targets)
     if not ok:
         raise ChangeError("删除后验证失败,自动回滚")
+
+
+def _execute_restore(row, inventory, context):
+    """按计划恢复备份:目标已存在则冲突失败;恢复后逐实体校验摘要。"""
+    from .backup import restore_backup
+    pre = dict(row.get("preconditions", []))
+    backup_path = str(pre.get("backup_path") or "")
+    if not os.path.isfile(backup_path):
+        raise ChangeError("备份归档不存在,恢复中止")
+    result = restore_backup(backup_path, inventory.get("locations", []), conflict="fail")
+    if context.verify_after_apply is not None and not context.verify_after_apply():
+        raise ChangeError("恢复后验证失败")
+    return result
 
 
 def _execute_update(row, targets, backup, context, candidate_hash):
