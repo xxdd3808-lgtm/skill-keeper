@@ -6,6 +6,14 @@ data/report.html
 data/updates.json
 data/actions.log
 data/vetted.json
+data/reputation.json
+data/review-queue.json
+data/value-reviews.json
+data/change-plans/
+data/staging/
+data/.change.lock
+data/audit-v2.jsonl
+data/migrations/
 
 # 个人配置(请从 .example 复制生成)
 data/groups.json
