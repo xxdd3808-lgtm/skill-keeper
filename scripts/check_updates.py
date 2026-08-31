@@ -10,7 +10,7 @@ CLI:
   python3 scripts/check_updates.py [--inventory inventory.json] [--output updates.json] [--json]
   --inventory/--output 可完全绕开项目运行时数据(测试、其他 Agent)。
 """
-import argparse, json, os, re, sys, tempfile, time
+import argparse, json, os, re, secrets, shutil, sys, tempfile, time
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -22,6 +22,27 @@ from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_r
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance                # noqa: E402
 from scripts.scan import parse_frontmatter                              # noqa: E402
+
+
+def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):
+    """把固定 commit 的完整候选树放入 staging(按内容哈希命名,天然不可变)。
+
+    返回 {ok, candidate_hash, staging_path, files};失败时清理临时目录并返回 {ok: False}。
+    """
+    staging_root = Path(staging_root)
+    staging_root.mkdir(parents=True, exist_ok=True)
+    tmp = staging_root / ("tmp-" + secrets.token_hex(4))
+    result = fetch_skill_tree(repo, source_dir, commit_sha, tmp, gh_runner)
+    if not result.get("ok"):
+        shutil.rmtree(tmp, ignore_errors=True)
+        return result
+    final = staging_root / ("cand-" + result["tree_hash"][:12])
+    if final.is_dir():
+        shutil.rmtree(tmp, ignore_errors=True)  # 相同候选已存在(内容同哈希)
+    else:
+        os.replace(tmp, final)
+    return {"ok": True, "candidate_hash": result["tree_hash"], "staging_path": str(final),
+            "files": result["files"], "commit_sha": commit_sha}
 
 STATUS_LABEL = {
     "candidate-update": "有候选更新(先审查,再 plan/apply)",
@@ -136,20 +157,23 @@ def check(inventory, data_dir, output_path, gh_runner=None):
         if not commit_sha:
             skipped.append({"name": name, "reason": "无法确定上游 commit,拒绝猜测"})
             continue
-        with tempfile.TemporaryDirectory(prefix="sk-candidate-") as td:
-            fetched = fetch_skill_tree(repo, source_dir, commit_sha, Path(td), gh_runner)
-            if not fetched.get("ok"):
-                skipped.append({"name": name, "reason": "候选树拉取失败({})".format(fetched.get("error"))})
-                continue
-            candidate_hash = fetched["tree_hash"]
-            candidate_manifest = tree_manifest(Path(td))
-            try:
-                candidate_version = fm_version(open(Path(td) / "SKILL.md", encoding="utf-8", errors="ignore").read())
-            except OSError:
-                candidate_version = ""
+        staging_root = reputation_path.parent / "staging"
+        staged = stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner)
+        if not staged.get("ok"):
+            skipped.append({"name": name, "reason": "候选树拉取失败({})".format(staged.get("error"))})
+            continue
+        staging_path = Path(staged["staging_path"])
+        candidate_hash = staged["candidate_hash"]
+        candidate_manifest = tree_manifest(staging_path)
+        try:
+            candidate_version = fm_version(open(staging_path / "SKILL.md", encoding="utf-8",
+                                                errors="ignore").read())
+        except OSError:
+            candidate_version = ""
         if candidate_hash == local_hash:
             up_to_date.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
                                "commit_sha": commit_sha})
+            shutil.rmtree(staging_path, ignore_errors=True)  # 已一致,候选无需保留
             continue
         lv, cv = str(logical.get("version") or ""), candidate_version
         if lv and cv and ver_tuple(cv) > ver_tuple(lv):
@@ -161,6 +185,7 @@ def check(inventory, data_dir, output_path, gh_runner=None):
         note = "" if status != "local-custom" else "本地版本更高,保留本地"
         differs.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
                         "commit_sha": commit_sha, "candidate_hash": candidate_hash,
+                        "staging_path": str(staging_path),
                         "local_hash": local_hash, "local_version": lv, "candidate_version": cv,
                         "status": status, "note": note,
                         "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
