@@ -1,5 +1,7 @@
 # 工作区级 skill 目录扫描配置(复制为 workspace-locations.txt 后生效)
-# 每行一个目录:项目内的 .claude/skills、.agents/skills 等。
+# 每行一个目录:项目内的 .claude/skills、.agents/skills 等,支持 ~ 与 # 注释。
 # 客户端归属按路径自动推断:含 .claude → claude-code(工作区),否则 → zcode(工作区)。
+# 这些 skill 只在进入对应项目工作时被客户端发现,不占全局启动上下文。
+# 另有 data/client-locations.json 可登记适配器未内置的客户端全局目录(带 mutable 开关)。
 # 例:
 # ~/projects/my-proj/.claude/skills

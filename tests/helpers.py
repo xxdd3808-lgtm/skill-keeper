@@ -12,13 +12,13 @@ from pathlib import Path
 FAKE_SECRET = "FAKE-SECRET-000"
 
 
-def write_skill(root, name, description="demo skill", version="1.0.0", body=""):
-    """在 root 下创建 name/SKILL.md,返回 skill 目录。"""
+def write_skill(root, name, description="demo skill", version="1.0.0", body="", fm_name=None):
+    """在 root 下创建 name/SKILL.md,返回 skill 目录;fm_name 可让 frontmatter 名与目录名不同。"""
     d = Path(root) / name
     d.mkdir(parents=True, exist_ok=True)
     (d / "SKILL.md").write_text(
         "---\nname: {}\ndescription: {}\nversion: {}\n---\n\n# {}\n\n{}\n".format(
-            name, description, version, name, body),
+            fm_name or name, description, version, name, body),
         encoding="utf-8")
     return d
 

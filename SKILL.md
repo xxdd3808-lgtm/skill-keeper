@@ -1,22 +1,23 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 1.2.0
+version: 2.0.0
 ---
 
-# skill-keeper · 本地 Skill 管家
+# skill-keeper · 本地 Skill 管家(v2)
 
-管理 `~/.agents`、`~/.zcode`、`~/.claude`、`~/.codex`、`~/.local/share/ego` 及 ZCode 插件缓存里的全部 skill。
+管理 ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Claude Code Haha、Cindy、Ego 及共享/工作区位置里的全部 skill(含各客户端插件缓存,只读)。v2 核心变化:**所有第三方 Skill 都有可解释的价值审查**(保留/优先保留另一个/观察/建议删除/需要人工确认),**所有变更都走不可变计划(plan)→ 确认(digest)→ 备份 → 执行 → 验证 → 审计** 的闭环,系统永不自动删除。
 
 > 项目文件夹(实体)在 `~/skill-keeper/`;`~/.agents/skills/skill-keeper` 是指向它的符号链接,只为了让各客户端发现本 skill。下面的命令一律用 `~/skill-keeper` 路径,脚本内部会自行定位,不依赖调用路径。
 
 ## 铁律
 
-1. **扫描和报告是只读的**,直接执行;**删除/更新/修复必须先给用户看清单,确认后再动手**。
-2. **任何删除/更新前强制备份**:tar 整个 skill 目录到项目文件夹的 `backups/`(即 `~/skill-keeper/backups/removed-<目录名>-<YYYYMMDD-HHmmss>.tar.gz`,remove_skill.py 自动做)。
-3. **自建 skill 受保护**:删除自建白名单(`data/self-built.txt`)里的 skill 时,先向用户特别确认。
-4. 不修改插件缓存里的 skill(它们由插件系统管理)。
-5. 一切操作后重跑 `scan.py` 刷新 `data/inventory.json`,保证盘点与实际一致。
+1. **扫描、报告、更新检查、审查队列都是只读的**;**删除/更新/恢复必须先 plan、再由用户确认 digest 后 apply**,任意目录名/路径一律不是合法目标。
+2. **任何删除/更新前强制创建并验证备份**(带 manifest 的新格式,含位置、链接、权限与完整树摘要,存 `backups/`);验证失败自动回滚;恢复走两阶段计划,冲突不覆盖。
+3. **自建 skill 与客户端自带/插件内容受保护**:不进入第三方价值审查;自建白名单(`data/self-built.txt`)之外的名称前缀、frontmatter 自述都不能换取免检。
+4. 不修改任何客户端插件缓存与客户端管理的目录;客户端配置只按字段白名单读取,token/key/cookie/env 一律不碰。
+5. 一切操作后重跑 `scan.py` 刷新 `data/inventory.json`;所有动作(成功/失败/回滚)记入 `data/audit-v2.jsonl`。
+6. **GitHub 星数是仓库热度,不等于该 Skill 的真实使用人数**;热度、维护、来源任何单一因素都不能自动触发删除;系统永不自动删除。
 
 ## 数据文件
 
@@ -27,8 +28,13 @@ version: 1.2.0
 | `data/known-sources.json` | 已核实的上游来源映射(dir → repo + 路径),发现新来源时补充进来 |
 | `data/updates.json` | check_updates.py 的结果缓存(本地/上游版本对比 + 建议状态),report.py 读它生成「建议更新/待确认」 |
 | `data/ignore.json` | 忽略规则(skill名 → 问题子串列表),命中的问题不计入红黄,报告单独标注;可选,无则不忽略 |
-| `data/actions.log` | 交互服务(serve)每次 更新/删除/忽略/恢复/安检记账 的审计记录 |
-| `data/vetted.json` | 安检台账(skill-vetter 结论):verdict/note/vetted_at/内容指纹;指纹变了旧结论自动降级为「需复检」 |
+| `data/audit-v2.jsonl` | 统一审计日志:plan/apply 每次成功、失败、回滚都追加记录 |
+| `data/review-queue.json` | 第三方价值审查队列(value_review.py queue 生成) |
+| `data/value-reviews.json` | 大模型价值审查结论台账(verdict/理由/替代/损失/证据/置信度/内容指纹) |
+| `data/reputation.json` | GitHub 仓库证据缓存(stars/forks/归档/推送时间;失败保留旧缓存并标 stale) |
+| `data/change-plans/` | 不可变变更计划(plan/digest,30 分钟过期,只读文件) |
+| `data/staging/` | 固定候选更新暂存(按内容哈希命名,安检通过后才能应用) |
+| `data/vetted.json` | (v1 遗留)安检台账;迁移后降级 needs-recheck,新安检结论记入 value-reviews.json 的 safety 字段 |
 | `data/self-built.txt` | 自建 skill 白名单(受保护清单),一行一个目录名 |
 | `data/groups.json` | 分组配置(组名 → 目录名列表);用户想调整分组就改它,改完重扫 |
 | `data/workspace-locations.txt` | 工作区级 skill 目录清单(项目内的 `.claude/skills`、`.agents/skills`,每行一个);这些 skill 仅在进入该项目工作时被客户端发现,不占全局启动上下文,配套客户端标注"(工作区)" |
@@ -85,9 +91,9 @@ python3 ~/skill-keeper/scripts/report.py
 - `data/report.md` 纯文本版
 - **`data/report.html` 交互式网页版**(按分组折叠、红黄绿标色,可直接让用户用浏览器打开)——给用户看报告时优先给这个
 
-内容:总表(Skill | 分组 | 功能 | 来源 | 配套客户端 | 触发 | 健康 | 操作)、**处理建议**(把体检问题与上游差异翻译成 🟢建议更新 / 🛡️建议保留 / 🔍待安检 / 🟡待你确认 / 🔵可自动处理 / ℹ️提示 六级,每条自带一句人话结论+理由与 功能/来源/客户端 上下文及操作按钮,想看细节可页内展开红绿 diff)、各客户端加载开销、常驻上下文 Top 榜、ZCode 重复加载、插件旧缓存、非 skill 杂质、备份恢复区、与上次盘点 diff。
+内容:顶部先给结论(受保护类数量、第三方待审、💚建议保留 / 🔁优先保留另一个 / 👀观察 / 🗑️建议删除 / ❓需要人工确认 五组各多少、未审查多少);**受保护类**(客户端自带/自建,不进入清理建议);**第三方价值审查卡片**(每张含:结论与理由、主要依据、更值得保留的替代、独特能力、删除后可能失去什么、置信度、审查时间与模型、仓库热度口径提示、安检状态、候选更新状态;过期结论显著标注);安装实例明细;备份恢复区(两阶段,冲突不覆盖);与上次盘点 diff。
 
-**一键处理(要动手时用)**:`python3 ~/skill-keeper/scripts/report.py --serve`(macOS 也可双击项目根的 `启动技能报告.command`)→ 自动开浏览器,报告里直接点 🔄更新 / 🔍看差异(页内红绿 diff,含来源与客户端上下文) / 🗑️删除 / ✕忽略 / ♻️恢复备份。安全边界:只绑 127.0.0.1 + 随机 token(防其他网页跨站调用);所有动作先 tar 备份、成功后自动重扫重报;更新/删除/恢复需页面确认弹窗(confirm);自建 skill 删除仍走 CLI `--force`;动作记入 `data/actions.log`。**静态打开 report.html 时按钮退化为复制等价命令**。
+**一键处理(要动手时用)**:`python3 ~/skill-keeper/scripts/report.py --serve`(macOS 也可双击项目根的 `启动技能报告.command`)→ 自动开浏览器。v2 网页是两阶段:点删除先 `POST /api/plan` 生成不可变计划(展示摘要+digest),确认弹窗后再 `POST /api/apply` 执行(先备份、失败自动回滚、写 `data/audit-v2.jsonl`)。安全边界:只绑 127.0.0.1、随机 token 常量时间比较、POST 校验 Origin、请求体上限 64 KiB、confirm 必须是布尔 true、响应带 nosniff/no-referrer/DENY/CSP(内联脚本按内容 hash 白名单)。**静态打开 report.html 时按钮退化为复制等价的 plan 命令(用 shlex.join 生成,只含 instance_id,绝不含目录名)**。
 
 ### 4. 更新检查(只读)
 
@@ -95,23 +101,25 @@ python3 ~/skill-keeper/scripts/report.py
 python3 ~/skill-keeper/scripts/check_updates.py
 ```
 
-对有 GitHub 来源的 skill 拉上游 SKILL.md 与本地比对;skills.sh 来源经 download API 比对。结果缓存到 `data/updates.json`,含**本地/上游版本对比**、状态(`upstream-newer` / `content-diff` / `local-ahead`)与**自动研判结论** `verdict`(🟢update 建议更新 / 🛡️keep 建议保留 / 🟡manual 需人工研判)+ 一句人话理由 `reason`。研判依据:版本号 → 改动是否只碰说明区 → 上游最后改动时间 vs 本地文件改动时间 → 改动规模;**汇报时直接给结论,不让用户读 diff**。锁内 skill 也可用 `npx -y skills check`(注意:该命令发现更新会**直接更新**,只做检查时用本脚本)。输出「可更新」清单,报给用户确认。
+对比的是**完整目录树**的哈希(不是单个 SKILL.md):本地树 vs 固定上游 commit 的候选树。候选会按内容哈希暂存到 `data/staging/`,结果缓存到 `data/updates.json`,只有四种客观状态:`candidate-update` 有候选更新 / `needs-review` 需审查 / `local-custom` 疑似本地定制(建议保留本地)/ `unverifiable` 无法核实。**不给任何"改动少就可以直接覆盖"式的背书**——任何更新都必须:候选安检(skill-vetter 清单)通过 → `create_update_plan` 绑定 local hash、来源、commit、候选 hash 与 staging 路径 → 用户确认 digest → 原子交换(旧目录自动保留回滚)。远端 HEAD 之后怎么变都不影响已审查的固定候选。
 
 ### 5. 执行动作(需用户确认)
 
-- **更新**:优先 `npx -y skills add <owner/repo>@<slug> -g -y`(会记入锁文件);GitHub 手动来源用 gh api 拉取覆盖。更新前备份。
-- **删除**:
+- **删除**(两阶段,不接受目录名):
   ```bash
-  python3 ~/skill-keeper/scripts/remove_skill.py <目录名> [更多目录名...]
+  python3 ~/skill-keeper/scripts/remove_skill.py plan --instance-id <instance_id> --reason <理由>
+  python3 ~/skill-keeper/scripts/remove_skill.py apply <plan_id> --digest <digest> --confirm
   ```
-  自动:备份 → 从所有位置(~/.agents、~/.zcode、~/.claude、~/.codex、ego)删除 → 清理 `~/.agents/.skill-lock.json` 条目。
+  计划 30 分钟过期;执行 = 互斥锁 → 前置校验(目标指纹未变)→ 创建并验证备份 → 精确删除 → 验证(失败自动回滚)→ 审计。旧式 `remove_skill.py <目录名>` 只打印迁移说明并退出 2,绝不删除。
+- **更新**:check_updates 暂存候选 → 安检通过后在交互报告里生成 update 计划并确认执行;skills.sh 来源没有 commit SHA 时,候选本身的完整文件集和哈希就是不可变对象,应用阶段绝不重新下载。
+- **恢复**:备份页/CLI 生成 restore 计划(先验证 manifest 与全部摘要),目标已存在则冲突失败,不覆盖;旧格式备份只能检视(inspect_legacy_backup),不能自动恢复。
 - **修复**(YAML、符号链接):按报告里的具体指引手工修,修完重扫。
 
 ### 6. 安全安检(体检自动做,复检靠指纹)
 
 **安检是体检的固定步骤,不是附加项**:只要处理建议区出现「🔍 待安检」(第三方来源(GitHub/skills.sh/SkillHub/来源不明)的 skill 没审过,或安检后内容变过——一键更新后通常触发),本次体检就必须逐个审完,不用等用户点名。
 安检动作 = 按 `skill-vetter` 的四步清单(元数据真伪 → 权限范围 → 危险内容红旗 → 仿冒名)由 AI 逐个审查,产出结论:`safe`(安全)/ `warning`(存疑,说清疑点)/ `danger`(判危,建议删除)。
-结论直接记账:交互服务 `POST /api/vet_record`,或直接写 `data/vetted.json`(key=目录名,记当前内容指纹);warning/danger 要向用户说清疑点。自建/插件/随应用自带免检。**复检时机全自动**:内容指纹变了旧结论自动降级「需复检」,不用人工记着;warning/danger 结论常驻红黄体检区,直到复检翻案。
+v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用 `value_review.py record` 记入 `data/value-reviews.json`,结论绑定完整树指纹;**更新候选安检**用 changes 引擎的 `record_candidate_vet`(verdict=safe 才能应用,warning 需第二次确认,danger 直接废弃)。v1 的 `vetted.json` 迁移后一律降级 needs-recheck,按 skill-vetter 清单重审恢复。**复检时机全自动**:完整树哈希变了(任何脚本、模板、参考文件、链接变化)旧结论自动过期;warning/danger 在报告显著标注,直到复检翻案。
 
 ### 7. 汇报
 

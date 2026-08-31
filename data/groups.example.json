@@ -1,5 +1,5 @@
 {
-  "_comment": "skill 分组配置。key=组名,value=本地目录名列表(按目录名匹配)。改动后重跑 scan.py + report.py 生效。未匹配的 skill 自动归入「未分组」,插件 skill 自动归入「ZCode 插件」。",
+  "_comment": "skill 分组配置。key=组名,value=本地目录名列表(按目录名匹配)。改动后重跑 scan.py + report.py 生效。v2 报告另有两个固定分区:受保护类(客户端自带/自建白名单)与第三方价值审查,不依赖本文件。",
   "文档处理": ["pdf", "word-docx"],
   "开发工具": ["git-essentials-1.0.0", "find-skills"],
   "知识管理": ["memory"]

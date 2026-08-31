@@ -5,7 +5,7 @@
 - 不再无条件打开 .skill-lock.json;来源只认 classify_provenance 的证据;
 - 比较的是完整目录树哈希(不是单个 SKILL.md);
 - 输出客观状态:有候选更新 / 需审查 / 疑似本地定制 / 无法核实——
-  不再有"改动少所以放心更新"这类结论,更新必须走 plan/apply + 安检。
+  不给任何"改动少就可以直接覆盖"式的背书,更新必须走 plan/apply + 安检。
 CLI:
   python3 scripts/check_updates.py [--inventory inventory.json] [--output updates.json] [--json]
   --inventory/--output 可完全绕开项目运行时数据(测试、其他 Agent)。
