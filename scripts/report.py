@@ -16,7 +16,9 @@ BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if BASE not in sys.path:
     sys.path.insert(0, BASE)
 
+from scripts.core.github import flatten_repos  # noqa: E402
 from scripts.core.io import load_json_checked  # noqa: E402
+from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
 
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
 VERDICT_GROUPS = ("建议保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
@@ -79,6 +81,7 @@ def latest_reviews(value_reviews):
 def build_view(inv, last, ctx):
     ctx = ctx or {}
     self_built = set(ctx.get("self_built") or [])
+    known = ctx.get("known") or {}
     reviews = latest_reviews(ctx.get("value_reviews") or inv.get("value_reviews"))
     reputation = ctx.get("reputation") or inv.get("reputation") or {}
     updates = {u.get("instance_id"): u for u in
@@ -86,6 +89,17 @@ def build_view(inv, last, ctx):
     insts = inv.get("instances", [])
     inst_by_id = {i.get("instance_id"): i for i in insts}
     logical_by_id = {l.get("logical_id"): l for l in inv.get("logical_skills", [])}
+
+    # 逐实例来源证据(白名单/回执/自述候选);热度卡片按"该 Skill 自己的仓库"取数
+    receipts = {}
+    for inst in insts:
+        if inst.get("kind") in ("builtin", "plugin-cache"):
+            receipts[str(inst.get("instance_id"))] = {
+                "type": inst["kind"], "repo": inst.get("plugin_name"),
+                "client": inst.get("client")}
+    prov_by_iid = {str(i.get("instance_id")): classify_provenance(i, receipts, known)
+                   for i in insts}
+    repos_flat = flatten_repos(reputation if isinstance(reputation, dict) else {})
 
     protected, third_party = [], []
     for inst in insts:
@@ -150,7 +164,8 @@ def build_view(inv, last, ctx):
             "verdict_rows": verdict_rows, "unreviewed": unreviewed,
             "findings_by_skill": findings_by_skill, "updates": updates,
             "reputation": reputation, "reviews": reviews, "backups": backups, "diff": diff,
-            "logical_by_id": logical_by_id, "inst_by_id": inst_by_id}
+            "logical_by_id": logical_by_id, "inst_by_id": inst_by_id,
+            "prov": prov_by_iid, "repos_flat": repos_flat}
 
 
 def _logical_of(inv, inst):
@@ -169,31 +184,22 @@ def _name_of_id(view, iid):
 
 
 def _repo_card(view, inst):
-    """来源 + 热度证据行(热度口径必须解释)。"""
-    iid = inst.get("instance_id")
-    rep = view["reviews"].get(iid) or {}
-    repo = None
-    snap = None
-    rep_repos = (view["reputation"] or {}).get("repos") or {}
-    for r in rep_repos.values():
-        snap = r
-    if rep.get("inventory_fingerprint") and view["reputation"].get("repos"):
-        pass
-    prov = inst.get("source") or {}
-    repo = prov.get("repo") or (snap or {}).get("repo")
-    parts = []
+    """来源 + 热度证据行:只显示该 Skill 自己核实仓库的热度;热度口径必须解释。"""
+    prov = view["prov"].get(str(inst.get("instance_id"))) or {}
+    repo = prov.get("repo")
+    parts = ["来源:{}".format(fmt_source(prov))]
+    snap = view["repos_flat"].get(repo) if repo else None
     if repo:
         parts.append("仓库 {}".format(repo))
-    if snap:
+    if snap and snap.get("stale"):
+        parts.append("热度数据已过期/本次未能刷新({})".format(snap.get("error") or "stale"))
+    elif snap:
         parts.append("stars {} · fork {}{}".format(
             snap.get("stars", "?"), snap.get("forks", "?"),
             " · 已归档" if snap.get("archived") else ""))
         if snap.get("fetched_at"):
             parts.append("数据时间 {}".format(str(snap["fetched_at"])[:16]))
-        note = snap.get("popularity_note") or REPO_SCOPE_NOTE
-        parts.append(note)
-    else:
-        parts.append(REPO_SCOPE_NOTE)
+    parts.append(REPO_SCOPE_NOTE)
     return "；".join(parts)
 
 
@@ -538,6 +544,7 @@ def main():
         "value_reviews": reviews_store.get("reviews", []) if isinstance(reviews_store, dict) else [],
         "reputation": _load(ddir / "reputation.json") or {},
         "self_built": _self_built(ddir),
+        "known": load_user_config(ddir),
     }
     md, view = render_md(inv, last, ctx)
     if args.json:

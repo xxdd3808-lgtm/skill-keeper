@@ -145,11 +145,11 @@ def _status_map(inventory):
 
 
 def _repo_snapshot(reputation, source):
+    from .github import flatten_repos
     repo = (source or {}).get("repo")
     if not repo or not isinstance(reputation, dict):
         return None
-    repos = reputation.get("repos") if isinstance(reputation.get("repos"), dict) else reputation
-    snap = repos.get(repo)
+    snap = flatten_repos(reputation).get(repo)
     return snap if isinstance(snap, dict) else None
 
 

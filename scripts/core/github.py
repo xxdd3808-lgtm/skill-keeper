@@ -76,17 +76,45 @@ def repo_snapshot(repo, gh_runner):
                 "fetched_at": _iso_now()}
 
 
+def flatten_repos(node, out=None):
+    """把任意形态/嵌套的 reputation 文件展平成 {repo: snapshot}。
+
+    修复历史 bug:旧版把整个文件当成缓存表再嵌套写回,导致一层层套娃。
+    规则:键含 "/" 且值是 dict 的视为仓库快照(同仓库取 fetched_at 最新),
+    其余 dict 值继续向下找;非 dict 一律忽略。
+    """
+    if out is None:
+        out = {}
+    if not isinstance(node, dict):
+        return out
+    for key, value in node.items():
+        if not isinstance(value, dict):
+            continue
+        name = str(key)
+        if "/" in name:
+            prev = out.get(name)
+            if prev is None or str(value.get("fetched_at") or "") >= str(prev.get("fetched_at") or ""):
+                out[name] = value
+        else:
+            flatten_repos(value, out)
+    return out
+
+
 def cached_repo_snapshot(repo, reputation_path, gh_runner):
-    """带本地缓存的快照:网络失败时保留旧缓存并标记 stale,不把旧数据清空。"""
+    """带本地缓存的快照:网络失败时保留旧缓存并标记 stale,不把旧数据清空。
+
+    读取时先展平历史嵌套损坏;成功时以规范形态 {"schema_version": 2, "repos": {...}}
+    整体重写,旧文件顺带自愈。
+    """
     reputation_path = Path(reputation_path)
     cache, _ = load_json_checked(reputation_path, {})
-    cache = cache if isinstance(cache, dict) else {}
+    repos = flatten_repos(cache if isinstance(cache, dict) else {})
     snap = repo_snapshot(repo, gh_runner)
     if snap.get("ok"):
-        cache[repo] = snap
-        atomic_write_json(reputation_path, {"schema_version": 2, "repos": cache})
+        repos[repo] = snap
+        atomic_write_json(reputation_path, {"schema_version": 2, "repos": repos})
         return snap
-    old = cache.get(repo)
+    old = repos.get(repo)
     if isinstance(old, dict):
         stale = dict(old)
         stale["stale"] = True
