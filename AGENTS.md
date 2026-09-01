@@ -28,11 +28,12 @@ python3 scripts/make_sample_report.py      # 固定虚构 fixture → examples/r
 - 脚本用 `os.path.realpath(__file__)` 反推项目根,不依赖调用路径;项目实体可整体迁移,客户端发现靠符号链接(如 `~/.agents/skills/skill-keeper` → 项目根)。
 - 个人配置(gitignore):`data/groups.json`、`data/self-built.txt`、`data/known-sources.json`、`data/ignore.json`、`data/workspace-locations.txt`、可选 `data/client-locations.json`(登记适配器未内置的客户端目录)。
 - 运行时产物(含个人数据,永不入库):`data/inventory*.json`、`data/updates.json`、`data/reputation.json`、`data/review-queue.json`、`data/value-reviews.json`、`data/vetted*.json`、`data/report.*`、`data/actions.log`、`data/audit-v2.jsonl`、`data/change-plans/`、`data/staging/`、`data/migrations/`、`backups/`。
-- 铁律:扫描/报告/更新检查/队列只读;所有变更走不可变 ChangePlan → 用户确认 digest → 互斥锁 → 创建并验证备份 → 原子执行 → 验证(失败自动回滚)→ 审计(`data/audit-v2.jsonl`);变更目标只能是 inventory 里的稳定 instance ID;不修改客户端插件缓存;客户端配置按字段白名单读取,token/key/cookie/env 一律不碰;GitHub 星数只是热度参考,任何单一因素不能自动触发删除,系统永不自动删除。
+- 铁律:扫描/报告/更新检查/队列只读;所有变更走不可变 ChangePlan → 用户确认 digest → 互斥锁 → 创建并验证备份 → 原子执行 → 验证(失败自动回滚)→ 审计(`data/audit-v2.jsonl`);变更目标只能是 inventory 里的稳定 instance ID;不修改客户端插件缓存;客户端配置按字段白名单读取,token/key/cookie/env 一律不碰;GitHub 星数只是热度参考,任何单一因素不能自动触发删除,系统永不自动删除;known-sources 登记 `builtin-app` 的应用内置 Skill 受保护,删除/更新计划直接拒绝,处置走所属客户端。
 - 数据 schema:`schema_version=2`,JSON 原子写入(临时文件 + fsync + os.replace)。
 - 提交前自查:`git grep` 不得出现真实 skill 清单、个人路径或个人配置内容。
 
 ## 当前状态与下一步
 
 - v2.0.0(2026-08-31):多客户端适配器发现(七类客户端 + 插件缓存 + 工作区 + `client-locations.json` 自定义;marketplace 商品目录不算已安装,Haha 复用 Claude/共享只加 alias,Cindy 投影只读,Accio 账号编号哈希化);完整目录树指纹(相对路径/类型/权限/链接目标/全部内容,辅助脚本变化也会让安检与审查过期);inventory v2(位置/实例/逻辑身份三层,重复加载与链接漂移结构化 findings,ignore 只翻标记不丢问题);来源核实分级(自建白名单/客户端回执 > known-sources > 自述候选,名称前缀不能骗取免检);GitHub 仓库证据缓存(仓库级热度口径,stale 保留旧数据);重复/替代候选 + 大模型价值审查队列(五种结论,建议删除必须带理由/替代/损失/证据/置信度);带 manifest 的可往返备份与安全恢复(恶意归档/冲突/损坏全部安全失败);事务式更新(固定候选 staging、先安检后激活、原子交换、失败回滚);本地服务两阶段 plan/apply API(64KiB 上限、严格 confirm、Origin 校验、CSP 按内容 hash 白名单);v1 数据迁移(旧安检一律 needs-recheck,旧备份只检视不恢复);示例报告改用固定虚构 fixture。
+- v2.0.0 发布版(2026-09-01):替代品口径收紧——替代候选只认本机已安装逻辑 skill(≤8 个、可为零;同名孪生/同仓库版本差/多客户端副本不互为替代),「建议删除」记账必须指名本机已安装替代品的逻辑 ID,无 `benchmark:` 证据不得断言性能优势;known-sources 的 `builtin-app` 纳入受保护(见铁律);来源白名单真正接入审查队列(此前自建 skill 会误入第三方队列);热度缓存嵌套损坏可自愈,报告热度按各 Skill 自己的仓库归属;更新暂存保留 Git 可执行位,共享候选目录不再被"已最新"副本误删;36 个第三方 Skill 已全部价值审查记账(保留 19 / 观察 13,台账 `data/value-reviews.json`),WorkBuddy 的 neat-freak 漂移副本经用户确认删除,6 个候选更新已按 plan/apply 应用(Accio 与共享库的 pdf/skill-creator/skill-vetter 副本更新后合并为单一逻辑身份);全 Git 历史已清洗个人路径。
 - 候选改进:更多客户端目录适配(可用 `data/client-locations.json` 登记,或增删 `scripts/core/clients/` 适配器)、报告主题、按需增量扫描、skills.sh 市场真实下载量接入。

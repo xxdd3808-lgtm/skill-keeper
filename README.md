@@ -53,7 +53,7 @@ python3 ~/skill-keeper/scripts/remove_skill.py apply <plan_id> --digest <digest>
 
 - 计划不可变、30 分钟过期;执行 = 互斥锁 → 目标指纹复核 → 创建并验证备份(带 manifest,含位置/链接/权限/完整树摘要)→ 精确删除 → 验证(失败自动从备份恢复)→ 审计
 - 备份可逐位置、逐字节恢复;恢复也走两阶段计划,目标已存在则冲突失败、不覆盖;旧格式备份只检视、不自动恢复
-- 自建白名单(`data/self-built.txt`)与客户端自带/插件内容受保护,不进入第三方审查
+- 自建白名单(`data/self-built.txt`)、known-sources 登记 `builtin-app` 的应用内置、客户端自带/插件内容受保护,不进入第三方审查;应用内置出问题建议更新或卸载所属客户端,不能单独删除
 
 ### 自动化接口
 
