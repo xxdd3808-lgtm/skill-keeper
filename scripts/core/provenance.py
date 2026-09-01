@@ -5,6 +5,9 @@
 永远不能换取受保护身份。
 """
 import json
+from pathlib import Path
+
+from .io import load_json_checked
 
 # 客户端回执可接受的类型;其余一律不算受保护证据
 RECEIPT_TYPES = ("builtin", "plugin", "plugin-cache", "client-managed", "adapter-receipt")
@@ -12,6 +15,31 @@ RECEIPT_TYPES = ("builtin", "plugin", "plugin-cache", "client-managed", "adapter
 # known-sources.json 里可作为"已核实来源"的类型
 VERIFIED_SOURCE_TYPES = ("github", "skills.sh", "registry-volces", "registry-modelscope",
                          "registry-openharmony", "skillhub")
+
+
+def load_user_config(data_dir):
+    """读取用户登记的来源白名单:known-sources.json + self-built.txt(只读这两个文件)。
+
+    self-built.txt 每个非注释行视为 {"type": "self-built"};合并后供分类和审查队列使用。
+    """
+    data_dir = Path(data_dir)
+    known, _ = load_json_checked(data_dir / "known-sources.json", {})
+    known = known if isinstance(known, dict) else {}
+    self_built = set()
+    try:
+        text = (data_dir / "self-built.txt").read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            self_built.add(line)
+    merged = {k: (v if isinstance(v, dict) else {"type": "unknown"}) for k, v in known.items()}
+    merged.pop("_comment", None)
+    for name in self_built:
+        merged[name] = {"type": "self-built"}
+    return merged
+
 
 
 def classify_provenance(instance, receipts=None, known_sources=None):

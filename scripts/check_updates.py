@@ -20,7 +20,7 @@ if BASE not in sys.path:
 from scripts.core.fingerprint import tree_hash, tree_manifest          # noqa: E402
 from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_runner  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
-from scripts.core.provenance import classify_provenance                # noqa: E402
+from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
 from scripts.scan import parse_frontmatter                              # noqa: E402
 
 
@@ -70,25 +70,6 @@ def build_receipts(inventory):
                                                       "repo": inst.get("plugin_name"),
                                                       "client": inst.get("client")}
     return receipts
-
-
-def load_user_config(data_dir):
-    data_dir = Path(data_dir)
-    known, _ = load_json_checked(data_dir / "known-sources.json", {})
-    known = known if isinstance(known, dict) else {}
-    self_built = set()
-    try:
-        text = (data_dir / "self-built.txt").read_text(encoding="utf-8")
-    except OSError:
-        text = ""
-    for line in text.splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            self_built.add(line)
-    merged = {k: (v if isinstance(v, dict) else {"type": "unknown"}) for k, v in known.items()}
-    for name in self_built:
-        merged[name] = {"type": "self-built"}
-    return merged
 
 
 def diff_summary(local_manifest, candidate_manifest):

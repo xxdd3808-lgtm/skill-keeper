@@ -58,13 +58,21 @@ def normalize_reviews(existing_reviews):
     return out
 
 
-def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy_vetting=None):
+def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy_vetting=None,
+                       known_sources=None):
     """为每个第三方逻辑 skill 生成审查条目;受保护类不进入队列,只作替代候选。
 
     legacy_vetting: v1 安检台账({目录名: {previous_verdict, vetted_at, note}}),
     按新指纹规则一律显示为 needs-recheck,历史结论保留可见但不当作"已安检"。
+    known_sources: 用户登记的来源白名单(known-sources.json + self-built.txt 合并结果);
+    未提供时回退读 inventory 内嵌的 known_sources 字段。缺了它,自建 skill 会被
+    误当成第三方进入删除审查。
     """
-    inventory = inventory or {}
+    inventory = dict(inventory or {})
+    if known_sources is None:
+        known_sources = inventory.get("known_sources")
+    if isinstance(known_sources, dict) and known_sources:
+        inventory["known_sources"] = known_sources
     status = _status_map(inventory)
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     reviews = normalize_reviews(existing_reviews)

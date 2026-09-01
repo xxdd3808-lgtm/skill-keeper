@@ -118,5 +118,55 @@ class ValueReviewTests(unittest.TestCase):
             self.assertNotIn("codex-builtin-docx", ids)
 
 
+class SourceWiringTests(unittest.TestCase):
+    """来源数据流:known-sources/self-built 白名单必须真正参与队列分类(设计 §3.1/§6)。"""
+
+    def test_self_built_is_excluded_via_known_sources_param(self):
+        from scripts.core.reviews import build_review_queue
+        inv = review_inventory_fixture()
+        queue = build_review_queue(inv, {}, {}, known_sources={"word": {"type": "self-built"}})
+        ids = {x["instance_id"] for x in queue["items"]}
+        self.assertNotIn("third-party-word", ids, "自建白名单必须受保护,不进第三方队列")
+        self.assertIn("unknown-tool", ids, "没登记的仍然要审")
+
+    def test_known_sources_in_inventory_are_honored(self):
+        from scripts.core.reviews import build_review_queue
+        inv = review_inventory_fixture()
+        inv["known_sources"] = {"word": {"type": "github", "repo": "example/word-skills",
+                                         "path": "skills/word/SKILL.md"}}
+        queue = build_review_queue(inv, reputation_fixture(), {})
+        item = next(x for x in queue["items"] if x["instance_id"] == "third-party-word")
+        self.assertEqual(item["provenance"]["type"], "github")
+        self.assertEqual(item["provenance"]["repo"], "example/word-skills")
+        self.assertEqual(item["provenance"]["confidence"], "high")
+
+    def test_queue_cli_loads_personal_config_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td) / "data"
+            data.mkdir()
+            (data / "known-sources.json").write_text(
+                json.dumps({"word": {"type": "self-built"}}), encoding="utf-8")
+            (data / "vetted.json").write_text(json.dumps(
+                {"mystery": {"verdict": "safe", "vetted_at": "2026-01-01 00:00:00",
+                             "note": "v1 旧安检"}}), encoding="utf-8")
+            out = Path(td) / "queue.json"
+            env = dict(os.environ, HOME=td)
+            r = subprocess.run(
+                [sys.executable, "scripts/value_review.py", "queue",
+                 "--inventory", str(FIXTURE), "--output", str(out),
+                 "--data-dir", str(data), "--json"],
+                capture_output=True, text=True, env=env, cwd=str(REPO_ROOT))
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            payload = json.loads(r.stdout)
+            ids = {x["instance_id"] for x in payload["items"]}
+            self.assertNotIn("third-party-word", ids, "CLI 必须读取 known-sources/self-built 白名单")
+            self.assertIn("unknown-tool", ids)
+            item = next(x for x in payload["items"] if x["instance_id"] == "unknown-tool")
+            self.assertIsNotNone(item.get("legacy_vetting"), "v1 安检历史按 needs-recheck 展示")
+            self.assertEqual(item["legacy_vetting"]["previous_verdict"], "safe")
+            self.assertFalse((data / "vetted-v2.json").exists(),
+                             "queue 是只读命令,不得写任何迁移/缓存文件")
+
+
 if __name__ == "__main__":
     unittest.main()

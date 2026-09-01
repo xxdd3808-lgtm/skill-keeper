@@ -19,6 +19,7 @@ if BASE not in sys.path:
     sys.path.insert(0, BASE)
 
 from scripts.core.io import atomic_write_json, load_json_checked  # noqa: E402
+from scripts.core.provenance import load_user_config  # noqa: E402
 from scripts.core.reviews import build_review_queue, record_review  # noqa: E402
 
 
@@ -36,17 +37,16 @@ def _load_reviews(path):
 
 
 def _legacy_vetting(data_dir):
-    """读取 v1 安检台账迁移结果(或直接读 vetted.json),供队列显示 needs-recheck 历史。"""
-    import time as _time
-    from scripts.core.io import atomic_write_json as _awj
-    from scripts.core.migrations import migrate_runtime_state
+    """只读地取 v1 安检台账视图:优先 vetted-v2.json;否则从 vetted.json 现算,绝不写文件。
+
+    queue 是只读命令;v1 台账的落盘迁移只属于 migrate_runtime_state。
+    """
     v2, _ = load_json_checked(data_dir / "vetted-v2.json", {})
     records = v2.get("records") if isinstance(v2, dict) else None
     if not isinstance(records, dict):
         legacy, _ = load_json_checked(data_dir / "vetted.json", {})
-        if isinstance(legacy, dict) and legacy:
-            # 只生成迁移视图,不改动 v1 原件
-            records = {}
+        records = {}
+        if isinstance(legacy, dict):
             for name, rec in legacy.items():
                 if name.startswith("_") or not isinstance(rec, dict):
                     continue
@@ -54,21 +54,11 @@ def _legacy_vetting(data_dir):
                                       "previous_verdict": rec.get("verdict"),
                                       "vetted_at": rec.get("vetted_at"),
                                       "note": rec.get("note")}
-            try:
-                atomic_dir = data_dir
-                atomic_dir.mkdir(parents=True, exist_ok=True)
-                _awj(atomic_dir / "vetted-v2.json", {
-                    "schema_version": 2, "records": records,
-                    "generated_at": _time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "note": "v1 安检结论已按 v2 完整树指纹规则降级为 needs-recheck;重新安检后以新结论为准",
-                })
-            except OSError:
-                pass
     return records or {}
 
 
 def cmd_queue(args):
-    data_dir = default_data_dir()
+    data_dir = Path(args.data_dir) if args.data_dir else default_data_dir()
     inventory_path = Path(args.inventory) if args.inventory else data_dir / "inventory.json"
     output_path = Path(args.output) if args.output else data_dir / "review-queue.json"
     inv, issues = load_json_checked(inventory_path, {})
@@ -79,7 +69,8 @@ def cmd_queue(args):
     reviews_store = _load_reviews(data_dir / "value-reviews.json")
     queue = build_review_queue(inv, reputation if isinstance(reputation, dict) else {},
                                reviews_store["reviews"],
-                               legacy_vetting=_legacy_vetting(data_dir))
+                               legacy_vetting=_legacy_vetting(data_dir),
+                               known_sources=load_user_config(data_dir))
     queue["generated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     atomic_write_json(output_path, queue)
     if args.json:
@@ -110,7 +101,7 @@ def cmd_show(args):
 
 
 def cmd_record(args):
-    data_dir = default_data_dir()
+    data_dir = Path(args.data_dir) if args.data_dir else default_data_dir()
     queue_path = Path(args.queue) if args.queue else data_dir / "review-queue.json"
     reviews_path = Path(args.reviews_out) if args.reviews_out else data_dir / "value-reviews.json"
     queue, issues = load_json_checked(queue_path, {})
@@ -144,6 +135,8 @@ def main():
     p_queue = sub.add_parser("queue", help="生成/刷新审查队列")
     p_queue.add_argument("--inventory", default=None)
     p_queue.add_argument("--output", default=None)
+    p_queue.add_argument("--data-dir", default=None,
+                         help="个人配置目录(known-sources/self-built/vetted;默认项目 data/)")
     p_queue.add_argument("--json", action="store_true")
 
     p_show = sub.add_parser("show", help="查看单个待审查项")
@@ -156,6 +149,8 @@ def main():
     p_rec.add_argument("--model", required=True, help="审查模型名")
     p_rec.add_argument("--queue", default=None)
     p_rec.add_argument("--reviews-out", default=None)
+    p_rec.add_argument("--data-dir", default=None,
+                       help="默认 queue/记录文件的目录(默认项目 data/)")
     p_rec.add_argument("--json", action="store_true")
 
     args = ap.parse_args()
