@@ -24,6 +24,9 @@ from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
 VERDICT_GROUPS = ("建议保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
+# 记账 verdict("保留")→ 报告分组标签("建议保留");其余两边的文字相同
+VERDICT_TO_GROUP = {"保留": "建议保留", "优先保留另一个": "优先保留另一个",
+                    "观察": "观察", "建议删除": "建议删除", "需要人工确认": "需要人工确认"}
 VERDICT_EMOJI = {"建议保留": "💚 建议保留", "优先保留另一个": "🔁 优先保留另一个",
                  "观察": "👀 观察", "建议删除": "🗑️ 建议删除", "需要人工确认": "❓ 需要人工确认"}
 UPDATE_LABEL = {
@@ -136,20 +139,25 @@ def build_view(inv, last, ctx):
 
     verdict_rows = {g: [] for g in VERDICT_GROUPS}
     unreviewed = []
-    inst_by_name = {}
-    for inst, _why in third_party:
-        if not inst.get("is_skill", True):
+    # 审查记录按"逻辑 ID"归并(报告以逻辑 skill 展示);同名不同内容的逻辑各有各的结论
+    reviews_by_lg = {}
+    for rec in (ctx.get("value_reviews") or inv.get("value_reviews") or []):
+        if not isinstance(rec, dict) or not rec.get("logical_id"):
             continue
+        prev = reviews_by_lg.get(rec["logical_id"])
+        if prev is None or str(rec.get("reviewed_at", "")) >= str(prev.get("reviewed_at", "")):
+            reviews_by_lg[rec["logical_id"]] = rec
+    seen_lg = set()
+    for inst, _why in third_party:
         lg = _logical_of(inv, inst)
-        key = lg.get("name") if lg else inst.get("instance_id")
-        inst_by_name.setdefault(key, inst)
-    for name in third_names:
-        inst = inst_by_name.get(name) or next(iter(inst_by_name.values()))
-        iid = inst.get("instance_id")
-        rec = reviews.get(iid)
-        stale = bool(rec and rec.get("skill_tree_hash") not in (None, inst.get("tree_hash")))
-        if rec and rec.get("verdict") in verdict_rows:
-            verdict_rows[rec["verdict"]].append({"inst": inst, "rec": rec, "stale": stale})
+        if not lg or lg.get("logical_id") in seen_lg:
+            continue
+        seen_lg.add(lg.get("logical_id"))
+        rec = reviews_by_lg.get(lg.get("logical_id"))
+        stale = bool(rec and rec.get("skill_tree_hash") not in (None, lg.get("tree_hash")))
+        group = VERDICT_TO_GROUP.get((rec or {}).get("verdict") or "")
+        if rec and group:
+            verdict_rows[group].append({"inst": inst, "rec": rec, "stale": stale})
         else:
             unreviewed.append({"inst": inst, "rec": None, "stale": False})
 

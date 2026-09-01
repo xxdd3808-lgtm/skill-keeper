@@ -367,7 +367,7 @@
       "review_id": "rv-demo-notes",
       "instance_id": "ccc3ccc3ccc3ccc3ccc3",
       "name": "notes-pro",
-      "verdict": "建议保留",
+      "verdict": "保留",
       "reason": "功能独特、与现有工作流互补,维护活跃(演示结论)",
       "alternatives": [],
       "unique_capabilities": [

@@ -47,9 +47,53 @@ class ReportV2Tests(unittest.TestCase):
         self.assertIn("价值审查", md)
         self.assertIn("建议删除", md)
 
+    def test_same_name_logicals_show_their_own_verdicts(self):
+        """两个同名逻辑 skill(不同内容/实例)必须各自显示自己的审查结论。"""
+        from scripts.report import render_html
+        base = json.loads(json.dumps(v2_report_fixture()))
+        # 在 fixture 基础上叠加第二个同名 "word" 逻辑(不同 tree_hash/实例),各自带不同结论
+        base["instances"].append({
+            "instance_id": "fff2fff2fff2fff2fff2", "location_id": "shared",
+            "client": "shared", "kind": "user", "directory_name": "word-accio",
+            "path": "/fixture/home/.agents/skills/word-accio",
+            "real_path": "/fixture/home/.agents/skills/word-accio",
+            "is_symlink": False, "is_skill": True, "mutable": True,
+            "logical_name": "word", "tree_hash": "9" * 64,
+            "description": "同名不同内容的第二份", "function": "同名第二份",
+            "trigger": "auto", "context_bytes": 100, "requires_bins": []})
+        base["logical_skills"].append({
+            "logical_id": "lg-word-2", "name": "word", "tree_hash": "9" * 64,
+            "instance_ids": ["fff2fff2fff2fff2fff2"], "clients": ["shared"],
+            "function": "", "trigger": "auto", "version": "", "context_bytes": 100})
+        base["value_reviews"] = base.get("value_reviews", []) + [{
+            "review_id": "rv-2", "instance_id": "fff2fff2fff2fff2fff2",
+            "logical_id": "lg-word-2", "name": "word", "verdict": "观察",
+            "reason": "与另一份 word 同名不同版,先观察", "alternatives": [],
+            "unique_capabilities": [], "loss_if_removed": "", "confidence": "低",
+            "evidence": ["dup:同名不同版", "source:unknown"],
+            "skill_tree_hash": "9" * 64, "reviewed_at": "2026-09-01 10:00:00",
+            "reviewer_model": "test"}]
+        html = render_html(base, None, None)
+        self.assertIn("同名不同版", html, "第二个同名逻辑的结论必须出现在报告里")
+
+    def test_keep_verdict_lands_in_keep_group(self):
+        """记账 verdict「保留」必须进「建议保留」分组(回归:文字不同导致全部落到未审查)。"""
+        from scripts.report import render_html
+        base = json.loads(json.dumps(v2_report_fixture()))
+        rec = next(r for r in base["value_reviews"] if r["verdict"] == "保留")
+        lg = next(l for l in base["logical_skills"] if l["name"] == "notes-pro")
+        rec["logical_id"] = lg["logical_id"]
+        rec["skill_tree_hash"] = lg["tree_hash"]
+        html = render_html(base, None, None)
+        self.assertGreater(html.count("建议保留</b>"), 0, "分组必须存在")
+        self.assertIn("功能独特", html, "保留结论的理由必须渲染出来")
+
     def test_sample_report_is_deterministic(self):
         out1 = REPO_ROOT / "examples/report-sample.html"
-        h1 = hashlib.sha256(out1.read_bytes()).hexdigest() if out1.exists() else ""
+        # 先生成一次消除磁盘历史状态,再连跑两次对比(同输入必须同输出)
+        subprocess.run([sys.executable, "scripts/make_sample_report.py"],
+                       capture_output=True, text=True, cwd=str(REPO_ROOT), check=True)
+        h1 = hashlib.sha256(out1.read_bytes()).hexdigest()
         subprocess.run([sys.executable, "scripts/make_sample_report.py"],
                        capture_output=True, text=True, cwd=str(REPO_ROOT), check=True)
         h2 = hashlib.sha256(out1.read_bytes()).hexdigest()
