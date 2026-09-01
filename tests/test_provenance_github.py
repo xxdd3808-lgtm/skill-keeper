@@ -1,4 +1,4 @@
-import base64, json, tempfile, unittest
+import base64, json, os, tempfile, unittest
 from pathlib import Path
 from urllib.parse import quote
 
@@ -81,6 +81,26 @@ class ProvenanceGithubTests(unittest.TestCase):
             self.assertEqual((Path(td) / "assets/icon.bin").read_bytes(), b"\x00\xff")
             self.assertEqual(result["commit_sha"], "abc123")
             self.assertTrue((Path(td) / "SKILL.md").exists())
+
+    def test_executable_bit_is_preserved_from_git_mode(self):
+        """Git mode 100755 的文件落地后必须保留可执行位,否则完整树指纹会产生幽灵更新。"""
+        with tempfile.TemporaryDirectory() as td:
+            gh = FakeGh({
+                "repos/o/r/git/trees/abc123?recursive=1": {"tree": [
+                    {"path": "skills/demo/SKILL.md", "type": "blob", "sha": "b3",
+                     "mode": "100644"},
+                    {"path": "skills/demo/scripts/run.sh", "type": "blob", "sha": "b1",
+                     "mode": "100755"},
+                ]},
+                "repos/o/r/git/blobs/b1": {"content": b64(b"#!/bin/sh\necho hi\n"),
+                                           "encoding": "base64"},
+                "repos/o/r/git/blobs/b3": {"content": b64(b"hello\n"), "encoding": "base64"},
+            })
+            result = fetch_skill_tree("o/r", "skills/demo", "abc123", Path(td), gh)
+            self.assertTrue(result["ok"])
+            self.assertTrue(os.access(Path(td) / "scripts/run.sh", os.X_OK),
+                            "Git 可执行文件落地后必须仍可执行")
+            self.assertFalse(os.access(Path(td) / "SKILL.md", os.X_OK))
 
     def test_self_built_and_receipt_evidence_protect(self):
         row = fake_instance(directory="my-tool")

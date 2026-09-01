@@ -158,11 +158,11 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
         rel = str(m["path"])[len(prefix):]
         if not _safe_rel(rel):
             return {"ok": False, "error": "unsafe-path", "path": rel, "commit_sha": commit_sha}
-        fetched.append((rel, m.get("sha")))
+        fetched.append((rel, m.get("sha"), str(m.get("mode") or "")))
 
     dest.mkdir(parents=True, exist_ok=True)
     count = 0
-    for rel, blob_sha in fetched:
+    for rel, blob_sha, git_mode in fetched:
         try:
             bc, bo = gh_runner(["repos/{}/git/blobs/{}".format(repo, blob_sha)])
             if bc != 0:
@@ -176,5 +176,8 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
         local = dest / rel
         local.parent.mkdir(parents=True, exist_ok=True)
         local.write_bytes(content)
+        # Git mode 100755 的文件落地后必须保留可执行位;完整树指纹含权限,丢位会产生幽灵更新
+        if git_mode.endswith("755"):
+            os.chmod(local, 0o755)
         count += 1
     return {"ok": True, "commit_sha": commit_sha, "files": count, "tree_hash": tree_hash(dest)}
