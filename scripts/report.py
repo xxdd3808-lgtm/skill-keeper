@@ -434,7 +434,7 @@ def render_html(inv, last=None, ctx=None):
     extras = []
     if view["backups"]:
         bk_rows = "".join(
-            '<p>• <code>{}</code>({kb} KB · {ts}) {}</p>'.format(
+            '<p>• <code>{}</code>({} KB · {}) {}</p>'.format(
                 esc(b["name"]), b.get("kb", "?"), esc(b.get("ts", "")),
                 btn("♻️ 恢复", "restore", {"backup": b["name"]}, "btn-ghost"))
             for b in view["backups"])
