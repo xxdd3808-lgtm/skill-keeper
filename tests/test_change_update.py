@@ -106,6 +106,22 @@ class ChangeUpdateTests(unittest.TestCase):
         self.assertEqual(tree_hash(env.skill_path), env.local_hash, "验证失败必须换回旧版本")
         self.assertEqual(env.last_audit()["rollback_status"], "restored")
 
+    def test_verify_crash_still_rolls_back_to_old_version(self):
+        """验证函数自身崩溃(抛异常而非返回 False)同样必须换回旧版本。"""
+        env = update_env(self)
+        plan = env.create_plan(candidate="v2")
+        record_candidate_vet(plan.plan_id, env.v2_hash, "safe", ["fixture-review"],
+                             plans_dir=env.plans_dir)
+
+        def boom():
+            raise RuntimeError("rescan crashed")
+        env.context.verify_after_apply = boom
+        with self.assertRaises(ChangeError):
+            apply_plan(plan.plan_id, plan.digest, True, env.context)
+        self.assertEqual(tree_hash(env.skill_path), env.local_hash,
+                         "验证崩溃后原版本必须还在位")
+        self.assertEqual(env.last_audit()["rollback_status"], "restored")
+
 
 if __name__ == "__main__":
     unittest.main()

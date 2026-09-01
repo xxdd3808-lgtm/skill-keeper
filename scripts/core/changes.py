@@ -461,8 +461,12 @@ def _execute_update(row, targets, backup, context, candidate_hash):
                 _shutil.rmtree(target, ignore_errors=True)
                 os.rename(rollback, target)
             raise _RollbackDone("更新交换失败({}),保留原版本".format(type(e).__name__))
-        ok = (context.verify_after_apply() if context.verify_after_apply is not None
-              else tree_hash(target) == candidate_hash)
+        try:
+            ok = (context.verify_after_apply() if context.verify_after_apply is not None
+                  else tree_hash(target) == candidate_hash)
+        except Exception:
+            # 验证器自身崩溃与"返回 False"同责:换回旧版本,不留新内容在位
+            ok = False
         if not ok:
             _shutil.rmtree(target, ignore_errors=True)
             os.rename(rollback, target)
