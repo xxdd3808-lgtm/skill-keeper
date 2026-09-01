@@ -225,7 +225,8 @@ def _scan_entry(location, root: Path, entry: Path, home):
     base["is_skill"] = True
     base["tree_hash"] = tree_hash(real)
     try:
-        text = open(sk, encoding="utf-8", errors="ignore").read(8000)
+        with open(sk, encoding="utf-8", errors="ignore") as f:
+            text = f.read(8000)
     except OSError:
         text = ""
     fm, ok = parse_frontmatter(text)
