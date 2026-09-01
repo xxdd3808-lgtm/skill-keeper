@@ -51,12 +51,12 @@ def fmt_source(source):
     if not isinstance(source, dict):
         return "—"
     t = str(source.get("type") or "unknown")
-    label = {"github": "GitHub", "skills.sh": "skills.sh", "unknown": "来源不明"}.get(t, t)
     conf = source.get("confidence")
-    parts = [label + (f"({conf})" if conf else "")]
-    if source.get("repo"):
-        parts.append(str(source["repo"]))
-    return " · ".join(parts)
+    suffix = "({})".format(conf) if conf else ""
+    if t == "unknown" and "self-declared-source(candidate)" in (source.get("evidence") or []):
+        return "自述来源,未核实" + suffix
+    label = {"github": "GitHub", "skills.sh": "skills.sh", "unknown": "来源不明"}.get(t, t)
+    return label + suffix
 
 
 def classify_instance(inst, self_built):
@@ -82,7 +82,7 @@ def latest_reviews(value_reviews):
 def build_view(inv, last, ctx):
     ctx = ctx or {}
     self_built = set(ctx.get("self_built") or [])
-    known = ctx.get("known") or {}
+    known = ctx.get("known") or inv.get("known_sources") or {}
     reviews = latest_reviews(ctx.get("value_reviews") or inv.get("value_reviews"))
     reputation = ctx.get("reputation") or inv.get("reputation") or {}
     updates = {u.get("instance_id"): u for u in
