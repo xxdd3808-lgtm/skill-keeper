@@ -99,6 +99,7 @@ def check(inventory, data_dir, output_path, gh_runner=None):
     reputation_path = Path(output_path).parent / "reputation.json"
 
     differs, up_to_date, skipped = [], [], []
+    staged_this_run = []
     for logical in inventory.get("logical_skills", []):
         name = logical.get("name") or "?"
         inst = _pick_instance(inventory, logical)
@@ -145,6 +146,7 @@ def check(inventory, data_dir, output_path, gh_runner=None):
             skipped.append({"name": name, "reason": "候选树拉取失败({})".format(staged.get("error"))})
             continue
         staging_path = Path(staged["staging_path"])
+        staged_this_run.append(staging_path)
         candidate_hash = staged["candidate_hash"]
         candidate_manifest = tree_manifest(staging_path)
         try:
@@ -155,7 +157,7 @@ def check(inventory, data_dir, output_path, gh_runner=None):
         if candidate_hash == local_hash:
             up_to_date.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
                                "commit_sha": commit_sha})
-            shutil.rmtree(staging_path, ignore_errors=True)  # 已一致,候选无需保留
+            # 不在这里删 staging:同一上游候选可能被另一个待更新逻辑引用,统一在循环外清理
             continue
         lv, cv = str(logical.get("version") or ""), candidate_version
         if lv and cv and ver_tuple(cv) > ver_tuple(lv):
@@ -172,6 +174,11 @@ def check(inventory, data_dir, output_path, gh_runner=None):
                         "status": status, "note": note,
                         "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
                         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    # 循环结束后统一清理:只删没有任何待更新项引用的候选目录
+    referenced = {str(Path(d["staging_path"])) for d in differs}
+    for staging_path in staged_this_run:
+        if str(staging_path) not in referenced:
+            shutil.rmtree(staging_path, ignore_errors=True)
     return {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "differs": differs, "up_to_date": up_to_date, "skipped": skipped}
 
