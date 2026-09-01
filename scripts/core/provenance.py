@@ -16,6 +16,25 @@ RECEIPT_TYPES = ("builtin", "plugin", "plugin-cache", "client-managed", "adapter
 VERIFIED_SOURCE_TYPES = ("github", "skills.sh", "registry-volces", "registry-modelscope",
                          "registry-openharmony", "skillhub")
 
+# known-sources.json 里用户明确登记为受保护的身份(不进第三方价值/删除审查);
+# builtin-app 是客户端/应用托管的 Skill,处置走所属客户端
+KNOWN_PROTECTED_TYPES = ("self-built", "builtin-app")
+
+# 客户端托管类的问题处置建议:不能单独删除,只能更新或卸载所属客户端
+CLIENT_MANAGED_ADVICE = {
+    "builtin-app": "应用内置 Skill:发现问题时建议更新或卸载所属客户端,不要单独删除",
+    "builtin": "客户端自带 Skill:发现问题时建议更新客户端本体,不要单独删除",
+    "plugin": "插件管理 Skill:发现问题时建议通过客户端插件系统更新或卸载,不要单独删除",
+    "plugin-cache": "插件缓存副本:由客户端插件系统管理,不要单独删除",
+}
+
+
+def client_managed_advice(source):
+    """客户端托管身份的处置建议文案;非托管类返回 None。"""
+    if not isinstance(source, dict):
+        return None
+    return CLIENT_MANAGED_ADVICE.get(str(source.get("type") or ""))
+
 
 def load_user_config(data_dir):
     """读取用户登记的来源白名单:known-sources.json + self-built.txt(只读这两个文件)。
@@ -55,9 +74,12 @@ def classify_provenance(instance, receipts=None, known_sources=None):
     iid = str(instance.get("instance_id") or "")
 
     ks = known_sources.get(directory) or known_sources.get(iid)
-    if isinstance(ks, dict) and ks.get("type") == "self-built":
-        return {"class": "protected", "type": "self-built", "repo": None, "path": None,
-                "confidence": "high", "evidence": ["self-built-whitelist"], "review_required": False}
+    if isinstance(ks, dict) and ks.get("type") in KNOWN_PROTECTED_TYPES:
+        ev = [str(ks.get("type")) + "-whitelist"]
+        if ks.get("_confirmed_at"):
+            ev.append("confirmed:" + str(ks["_confirmed_at"]))
+        return {"class": "protected", "type": ks["type"], "repo": None, "path": None,
+                "confidence": "high", "evidence": ev, "review_required": False}
 
     receipt = receipts.get(iid) or receipts.get(directory)
     if isinstance(receipt, dict) and receipt.get("type") in RECEIPT_TYPES:

@@ -61,6 +61,30 @@ class ChangeRemoveTests(unittest.TestCase):
         with self.assertRaises(ChangeError):
             create_remove_plan([env.iid], inv, "test", env.plans_dir)
 
+    def test_builtin_app_registered_target_refuses_individual_removal(self):
+        """登记为 builtin-app 的 skill 不能单独删除;处置走所属客户端(更新或卸载)。"""
+        env = change_env(self)
+        with self.assertRaises(ChangeError):
+            create_remove_plan([env.iid], env.inventory, "test", env.plans_dir,
+                               known_sources={"demo": {"type": "builtin-app"}})
+        self.assertTrue(env.skill_path.exists(), "builtin-app 目标不得生成删除计划")
+        # 未登记时照常可计划(保护只针对客户端托管身份)
+        plan = create_remove_plan([env.iid], env.inventory, "test", env.plans_dir,
+                                  known_sources={"other": {"type": "builtin-app"}})
+        self.assertEqual(plan.target_ids, (env.iid,))
+
+    def test_update_plan_refuses_builtin_app_target(self):
+        from scripts.core.changes import create_update_plan
+        env = change_env(self)
+        staging = env.home / "data/staging/cand"
+        staging.mkdir(parents=True)
+        write_skill(staging, "cand", body="v2")
+        snap = {"instance_id": env.iid, "staging_path": str(staging),
+                "candidate_hash": tree_hash(staging), "repo": "example/demo"}
+        with self.assertRaises(ChangeError):
+            create_update_plan(env.iid, snap, env.inventory, env.plans_dir,
+                               known_sources={"demo": {"type": "builtin-app"}})
+
     def test_apply_requires_exact_digest_and_rolls_back_on_verify_failure(self):
         env = change_env(self)
         plan = env.remove_plan()

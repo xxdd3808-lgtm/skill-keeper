@@ -19,6 +19,7 @@ from scripts.core.audit import read_audit                    # noqa: E402
 from scripts.core.changes import (ChangeContext, ChangeError,  # noqa: E402
                                   apply_plan, create_remove_plan)
 from scripts.core.io import load_json_checked                 # noqa: E402
+from scripts.core.provenance import load_user_config          # noqa: E402
 
 
 def default_context() -> ChangeContext:
@@ -43,7 +44,9 @@ def _load_inventory():
 def cmd_plan(args):
     inventory = _load_inventory()
     try:
-        plan = create_remove_plan(args.instance_id, inventory, args.reason, default_context().plans_dir)
+        plan = create_remove_plan(args.instance_id, inventory, args.reason,
+                                  default_context().plans_dir,
+                                  known_sources=load_user_config(default_context().data_dir))
     except ChangeError as e:
         print("🛑 " + str(e))
         return 1

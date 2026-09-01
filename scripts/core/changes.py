@@ -76,7 +76,22 @@ def _validate_instance_id(raw) -> str:
     return text
 
 
-def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir) -> ChangePlan:
+def _client_managed_refusal(inst, known_sources):
+    """用户登记为 builtin-app 的 skill 由所属客户端托管:拒绝单独删除/更新计划。"""
+    if not known_sources:
+        return None
+    from .provenance import classify_provenance, client_managed_advice
+    prov = classify_provenance(inst, {}, known_sources)
+    advice = client_managed_advice(prov)
+    if advice and prov.get("class") == "protected":
+        return "{}(目录 {}):{}".format(
+            str(inst.get("logical_name") or inst.get("directory_name")),
+            str(inst.get("directory_name")), advice)
+    return None
+
+
+def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir,
+                       known_sources=None) -> ChangePlan:
     """生成固定候选更新计划:precondition 同时绑定本地 hash、来源、commit、候选 hash 与 staging 路径。"""
     iid = _validate_instance_id(instance_id)
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
@@ -85,6 +100,9 @@ def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir) ->
         raise ChangeError("instance_id 不在当前 inventory 中(先重跑 scan.py): " + iid)
     if not inst.get("mutable"):
         raise ChangeError("实例不可变(客户端自带/插件缓存),拒绝更新: " + iid)
+    refusal = _client_managed_refusal(inst, known_sources)
+    if refusal:
+        raise ChangeError("该 Skill 由所属客户端托管,不能单独更新: " + refusal)
     snap = candidate_snapshot or {}
     if str(snap.get("instance_id")) != iid:
         raise ChangeError("候选快照与目标实例不一致")
@@ -202,8 +220,9 @@ def _load_vet(plan_id, context, candidate_hash):
     return vet
 
 
-def create_remove_plan(instance_ids, inventory, reason, plans_dir) -> ChangePlan:
-    """为可变实例生成不可变删除计划;目标不存在/不可变/路径越界都直接拒绝。"""
+def create_remove_plan(instance_ids, inventory, reason, plans_dir,
+                       known_sources=None) -> ChangePlan:
+    """为可变实例生成不可变删除计划;目标不存在/不可变/路径越界/客户端托管都直接拒绝。"""
     if not isinstance(reason, str) or not reason.strip():
         raise ChangeError("必须给出删除理由(写给自己和审计看的)")
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
@@ -216,6 +235,9 @@ def create_remove_plan(instance_ids, inventory, reason, plans_dir) -> ChangePlan
             raise ChangeError("instance_id 不在当前 inventory 中(先重跑 scan.py): " + iid)
         if not inst.get("mutable"):
             raise ChangeError("实例不可变(客户端自带/插件缓存),拒绝删除: " + iid)
+        refusal = _client_managed_refusal(inst, known_sources)
+        if refusal:
+            raise ChangeError("该 Skill 由所属客户端托管,不能单独删除: " + refusal)
         loc = loc_by_id.get(inst.get("location_id"))
         if not loc or not loc.get("mutable"):
             raise ChangeError("实例所属位置不可变,拒绝删除: " + iid)

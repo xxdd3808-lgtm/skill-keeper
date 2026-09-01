@@ -3,7 +3,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 from scripts.core.github import fetch_skill_tree, repo_snapshot
-from scripts.core.provenance import classify_provenance, search_source_candidates
+from scripts.core.provenance import (VERIFIED_SOURCE_TYPES, classify_provenance,
+                                     client_managed_advice, search_source_candidates)
 
 
 def fake_instance(directory="demo", logical_name=None, kind="user", source=None):
@@ -90,6 +91,17 @@ class ProvenanceGithubTests(unittest.TestCase):
         self.assertEqual(r2["class"], "protected")
         r3 = classify_provenance(row, {}, {})  # 无任何证据 → 第三方
         self.assertEqual(r3["class"], "third-party")
+
+    def test_known_builtin_app_is_protected_but_not_a_source(self):
+        """用户在 known-sources 登记的 builtin-app:受保护,但不是可更新来源。"""
+        row = fake_instance(directory="autoglm-websearch")
+        result = classify_provenance(row, {}, {"autoglm-websearch": {"type": "builtin-app"}})
+        self.assertEqual(result["class"], "protected", "builtin-app 必须受保护")
+        self.assertFalse(result["review_required"], "不进入第三方价值审查")
+        self.assertNotIn(result["type"], VERIFIED_SOURCE_TYPES, "builtin-app 不是可更新来源类型")
+        advice = client_managed_advice(result)
+        self.assertIn("客户端", advice or "", "必须建议通过所属客户端处理")
+        self.assertIsNone(client_managed_advice({"type": "github"}), "普通来源没有托管建议")
 
     def test_declared_source_is_only_a_candidate(self):
         row = fake_instance(directory="word", source={"type": "github", "repo": "example/word"})

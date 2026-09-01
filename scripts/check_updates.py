@@ -107,8 +107,9 @@ def check(inventory, data_dir, output_path, gh_runner=None):
             continue
         source = classify_provenance(inst, receipts, known_sources)
         if source["class"] == "protected":
-            reason = {"self-built": "自建,不从上游更新"}.get(source["type"],
-                                                   "客户端自带/插件管理(" + source["type"] + "),不可更新")
+            reason = {"self-built": "自建,不从上游更新",
+                      "builtin-app": "应用内置 skill,更新或卸载走所属客户端"}.get(
+                source["type"], "客户端自带/插件管理(" + source["type"] + "),不可更新")
             skipped.append({"name": name, "reason": reason})
             continue
         repo = source.get("repo") or (source.get("candidate_source") or {}).get("repo")

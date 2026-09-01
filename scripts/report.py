@@ -18,7 +18,8 @@ if BASE not in sys.path:
 
 from scripts.core.github import flatten_repos  # noqa: E402
 from scripts.core.io import load_json_checked  # noqa: E402
-from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
+from scripts.core.provenance import (classify_provenance, client_managed_advice,  # noqa: E402
+                                     load_user_config)
 from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
@@ -59,12 +60,16 @@ def fmt_source(source):
     return label + suffix
 
 
-def classify_instance(inst, self_built):
-    """报告分类:客户端自带/插件 → 受保护;自建白名单 → 受保护;其余第三方。"""
+def classify_instance(inst, self_built, known=None):
+    """报告分类:客户端自带/插件 → 受保护;自建/应用内置白名单 → 受保护;其余第三方。"""
     if inst.get("kind") in ("builtin", "plugin-cache"):
         return "protected", ("客户端自带/插件管理",)
     if inst.get("directory_name") in self_built or inst.get("instance_id") in self_built:
         return "protected", ("自建白名单",)
+    ks = (known or {}).get(str(inst.get("directory_name"))) or \
+         (known or {}).get(str(inst.get("instance_id")))
+    if isinstance(ks, dict) and ks.get("type") in ("self-built", "builtin-app"):
+        return "protected", ("应用内置" if ks.get("type") == "builtin-app" else "自建白名单",)
     return "third-party", ()
 
 
@@ -112,7 +117,7 @@ def build_view(inv, last, ctx):
 
     protected, third_party = [], []
     for inst in insts:
-        cls, why = classify_instance(inst, self_built)
+        cls, why = classify_instance(inst, self_built, known)
         (protected if cls == "protected" else third_party).append((inst, why))
     # 逻辑 skill 去重计数(报告按逻辑 skill 展示,实例明细在表里)
     seen_lg, protected_names, third_names, tp_ids = set(), [], [], []
@@ -174,7 +179,8 @@ def build_view(inv, last, ctx):
             "findings_by_skill": findings_by_skill, "updates": updates,
             "reputation": reputation, "reviews": reviews, "backups": backups, "diff": diff,
             "logical_by_id": logical_by_id, "inst_by_id": inst_by_id,
-            "prov": prov_by_iid, "repos_flat": repos_flat, "queue_items": queue_items}
+            "prov": prov_by_iid, "repos_flat": repos_flat, "queue_items": queue_items,
+            "known": known}
 
 
 def _logical_of(inv, inst):
@@ -291,6 +297,12 @@ def findings_badges(view, inst):
     for f in rows:
         cls = "badge-red" if f.get("severity") == "red" else ("badge-yellow" if f.get("severity") == "yellow" else "")
         out.append('<span class="badge {}">{}</span>'.format(cls, esc(f.get("message"))))
+    if rows:
+        # 客户端托管身份(应用内置/插件/缓存)的问题不单独删 Skill,处置走所属客户端
+        prov = view["prov"].get(str(inst.get("instance_id"))) or {}
+        advice = client_managed_advice(prov)
+        if advice:
+            out.append('<span class="badge badge-yellow">💡{}</span>'.format(esc(advice)))
     return "".join(out) or '<span class="badge badge-green">✅</span>'
 
 
@@ -392,7 +404,7 @@ def render_html(inv, last=None, ctx=None):
     # 全量明细表
     rows = []
     for inst in view["inv"].get("instances", []):
-        cls, _why = classify_instance(inst, set())
+        cls, _why = classify_instance(inst, set(), view.get("known"))
         if cls == "protected":
             action = '<span class="mut">受保护</span>'
         else:
@@ -513,7 +525,7 @@ def render_md(inv, last=None, ctx=None):
     for inst in view["inv"].get("instances", []):
         rows = view["findings_by_skill"].get(inst.get("logical_name"), [])
         health = "；".join(f.get("message") for f in rows) or "✅"
-        cls, _ = classify_instance(inst, set())
+        cls, _ = classify_instance(inst, set(), view.get("known"))
         L.append("| {}{} | {} | {} | {} |".format(
             inst.get("logical_name"),
             "(受保护)" if cls == "protected" else "",

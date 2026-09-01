@@ -62,6 +62,40 @@ class ReportV2Tests(unittest.TestCase):
         self.assertNotIn("/Users/", text)
         self.assertNotIn("sk-", text)
 
+    def test_builtin_app_instances_are_protected_in_report(self):
+        from scripts.report import render_html
+        inv = {
+            "schema_version": 2, "scanned_at": "2026-09-01 10:00:00", "home_display": "~",
+            "locations": [{"location_id": "shared", "client": "shared",
+                           "path": "/fixture/home/.agents/skills", "kind": "user",
+                           "mutable": True, "evidence": ["t"], "aliases": []}],
+            "instances": [{
+                "instance_id": "inst-ba-0000000000000", "location_id": "shared",
+                "client": "shared", "kind": "user", "directory_name": "autoglm-websearch",
+                "path": "/fixture/home/.agents/skills/autoglm-websearch",
+                "real_path": "/fixture/home/.agents/skills/autoglm-websearch",
+                "is_symlink": False, "is_skill": True, "mutable": True,
+                "logical_name": "autoglm-websearch", "tree_hash": "a" * 64,
+                "description": "应用内置搜索", "function": "应用内置搜索", "trigger": "auto",
+                "context_bytes": 100, "requires_bins": [],
+            }],
+            "logical_skills": [{"logical_id": "lg-ba", "name": "autoglm-websearch",
+                                "tree_hash": "a" * 64, "instance_ids": ["inst-ba-0000000000000"],
+                                "clients": ["shared"], "function": "", "trigger": "auto",
+                                "version": "", "context_bytes": 100}],
+            "findings": [{"code": "missing-bins", "severity": "yellow",
+                          "instance_id": "inst-ba-0000000000000",
+                          "skill": "autoglm-websearch", "location_id": "shared",
+                          "message": "依赖命令缺失: fake-bin", "ignored": False}],
+            "config_issues": [], "total": 1, "operational_ok": True, "health_status": "yellow",
+        }
+        html = render_html(inv, None, {"known": {"autoglm-websearch": {"type": "builtin-app"}}})
+        self.assertNotIn('data-id="inst-ba-0000000000000"', html,
+                         "应用内置 skill 不得出现删除按钮")
+        self.assertIn("受保护", html)
+        self.assertIn("更新或卸载所属客户端", html,
+                      "有问题时建议更新/卸载所属客户端,而不是单独删除")
+
 
 if __name__ == "__main__":
     unittest.main()

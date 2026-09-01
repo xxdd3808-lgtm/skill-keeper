@@ -143,6 +143,16 @@ class SourceWiringTests(unittest.TestCase):
         self.assertEqual(item["provenance"]["repo"], "example/word-skills")
         self.assertEqual(item["provenance"]["confidence"], "high")
 
+    def test_builtin_app_registered_skills_are_protected(self):
+        from scripts.core.reviews import build_review_queue
+        inv = review_inventory_fixture()
+        queue = build_review_queue(inv, {}, {}, known_sources={
+            "word": {"type": "builtin-app"}, "mystery": {"type": "builtin-app"}})
+        ids = {x["instance_id"] for x in queue["items"]}
+        self.assertEqual(ids, set(), "登记为 builtin-app 的 skill 全部不进第三方审查队列")
+        self.assertIn("lg-word", queue["index"]["installed_logical_ids"],
+                      "受保护不等于不存在,仍在已安装清单里")
+
     def test_queue_cli_loads_personal_config_and_writes_nothing(self):
         with tempfile.TemporaryDirectory() as td:
             data = Path(td) / "data"

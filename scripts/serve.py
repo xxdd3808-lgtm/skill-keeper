@@ -34,6 +34,7 @@ from scripts.core.changes import (ChangeContext, ChangeError, LockBusy,  # noqa:
                                   apply_plan, create_remove_plan,
                                   create_restore_plan, create_update_plan)
 from scripts.core.io import atomic_write_json, load_json_checked   # noqa: E402
+from scripts.core.provenance import load_user_config               # noqa: E402
 
 MAX_BODY = 64 * 1024
 SERVER_VERSION = "skill-keeper/2.0"
@@ -82,17 +83,19 @@ def _plan_public(row):
 
 def _handle_plan(ctx, body):
     action = str(body.get("action") or "").strip()
+    known = load_user_config(ctx.data_dir)
     with ctx.process_lock:
         if action == "remove":
             plan = create_remove_plan(body.get("instance_ids") or [], ctx._load_inventory(),
-                                      str(body.get("reason") or ""), ctx.engine.plans_dir)
+                                      str(body.get("reason") or ""), ctx.engine.plans_dir,
+                                      known_sources=known)
         elif action == "restore":
             backup_id = str(body.get("backup_id") or "")
             if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", backup_id):
                 raise ChangeError("backup_id 格式不合法")
             plan = create_restore_plan(backup_id, ctx.backup_dir, ctx.engine.plans_dir)
         elif action == "update":
-            plan = _plan_update_from_updates(ctx, body)
+            plan = _plan_update_from_updates(ctx, body, known)
         else:
             raise ChangeError("action 必须是 remove|restore|update")
     row = _plan_public(plan.to_dict())
@@ -102,7 +105,7 @@ def _handle_plan(ctx, body):
     return row
 
 
-def _plan_update_from_updates(ctx, body):
+def _plan_update_from_updates(ctx, body, known=None):
     """从 check_updates 的 staging 结果生成更新计划(候选必须已 staged 且 hash 一致)。"""
     iid = str(body.get("instance_id") or "")
     updates, _ = load_json_checked(ctx.data_dir / "updates.json", {})
@@ -117,7 +120,8 @@ def _plan_update_from_updates(ctx, body):
                 "candidate_hash": hit.get("candidate_hash"), "repo": hit.get("repo"),
                 "source": "github", "source_dir": "skills/" + str(hit.get("name")),
                 "commit_sha": hit.get("commit_sha")}
-    return create_update_plan(iid, snapshot, ctx._load_inventory(), ctx.engine.plans_dir)
+    return create_update_plan(iid, snapshot, ctx._load_inventory(), ctx.engine.plans_dir,
+                              known_sources=known)
 
 
 def _handle_apply(ctx, body):
