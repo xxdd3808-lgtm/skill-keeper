@@ -202,11 +202,36 @@ def candidate_pairs(inventory, min_similarity=0.32):
     return rows
 
 
-def alternative_candidates(inventory, target_logical_id, min_similarity=0.32):
-    """可能与目标重叠的其他逻辑 skill(含受保护类):有区分度的关键词重叠或相似度达标。
+def _same_identity(a_lg, b_lg, rep_a, rep_b, src_a, src_b):
+    """同一 Skill 的不同安装形态:真副本 / 符号链接孪生 / 同仓库同路径的版本差。
 
-    区分度 = 共享词元的文档频率 ≤ 35%(常见的通用词如"支持/自动/api"不算重叠),
-    保证这一层真的在缩小范围。
+    这些形态是"同一个逻辑身份的不同装法",绝不能互为替代候选。
+    """
+    real_a = str(rep_a.get("real_path") or "")
+    real_b = str(rep_b.get("real_path") or "")
+    if real_a and real_a == real_b:
+        return True
+    name_eq = str(a_lg.get("name") or "") == str(b_lg.get("name") or "")
+    dir_eq = str(rep_a.get("directory_name") or "") == str(rep_b.get("directory_name") or "")
+    if not name_eq or not dir_eq:
+        return False
+    repo_a = str(src_a.get("repo") or "")
+    if repo_a and repo_a == str(src_b.get("repo") or ""):
+        return True
+    return bool(rep_a.get("is_symlink") or rep_b.get("is_symlink"))
+
+
+def alternative_candidates(inventory, target_logical_id, min_similarity=0.32,
+                           max_candidates=8):
+    """目标可能存在的本地替代候选(含受保护类)——只圈定审查范围,不下替代结论。
+
+    替代品语义(宁缺毋滥):候选必须来自当前 inventory 已安装的本地逻辑 skill;
+    同一逻辑身份不互为候选(_same_identity);仅一两个共同关键词或名称相似而
+    功能不同的一律不入选,允许一个候选都没有。
+    入选条件(可解释,满足其一):
+      - 综合相似度 ≥ min_similarity;或
+      - ≥2 个有区分度的共同词元(df ≤ 全库 15%),其中至少 1 个是稀有词元(df ≤ 2)。
+    是否真能替代(核心功能覆盖、兼容性、独特能力、维护、成本)由大模型综合判断。
     """
     logicals = inventory.get("logical_skills", [])
     if not logicals:
@@ -224,35 +249,40 @@ def alternative_candidates(inventory, target_logical_id, min_similarity=0.32):
         for tok in set().union(name_t, desc_t):
             df[tok] = df.get(tok, 0) + 1
     max_df = max(2, int(total * 0.15))
-    rare_df = max(2, int(total * 0.05))
+    rare_df = 2
 
     target = next((lg for lg in logicals if lg.get("logical_id") == target_logical_id), None)
     if target is None:
         return []
-    t_name, t_desc, t_body = tok_map[target.get("logical_id")]
-    t_all = t_name | t_desc
-    t_body = t_body
+    t_status = status.get(target_logical_id) or {}
+    t_all = tok_map[target.get("logical_id")][0] | tok_map[target.get("logical_id")][1]
     out = []
     for lg in logicals:
-        if lg.get("logical_id") == target_logical_id:
+        lg_id = lg.get("logical_id")
+        if lg_id == target_logical_id:
             continue
-        l_name, l_desc, l_body = tok_map[lg.get("logical_id")]
-        l_all = l_name | l_desc
-        breakdown = pair_breakdown(target, lg, tok_map[target.get("logical_id")], tok_map[lg.get("logical_id")])
+        st = status.get(lg_id) or {}
+        rep = st.get("representative") or {}
+        t_rep = t_status.get("representative") or {}
+        if _same_identity(target, lg, t_rep, rep,
+                          t_status.get("source") or {}, st.get("source") or {}):
+            continue
+        breakdown = pair_breakdown(target, lg, tok_map[target.get("logical_id")], tok_map[lg_id])
         score = pair_score(breakdown)
+        l_all = tok_map[lg_id][0] | tok_map[lg_id][1]
         shared = [t for t in significant_overlap(t_all, l_all) if df.get(t, 0) <= max_df]
         rare = [t for t in shared if df.get(t, 0) <= rare_df]
-        # 单个普通共享词不算替代信号;要:≥2 个有区分度词元,或 1 个极稀有词元,或相似度达标
-        if score >= min_similarity or len(shared) >= 2 or rare:
-            reasons = []
-            if shared:
-                detail = ",".join("{}(df{})".format(t, df.get(t, 0)) for t in (rare or shared)[:3])
-                reasons.append("keyword-overlap:" + detail)
-            reasons.append("similarity:" + str(score))
-            st = status.get(lg.get("logical_id"), {})
-            out.append({"logical_id": lg.get("logical_id"), "name": lg.get("name"),
-                        "protected": st.get("protected", False),
-                        "instance_id": (st.get("representative") or {}).get("instance_id"),
-                        "score": score, "reasons": reasons})
+        keyword_hit = len(shared) >= 2 and bool(rare)
+        if score < min_similarity and not keyword_hit:
+            continue
+        reasons = []
+        if shared:
+            detail = ",".join("{}(df{})".format(t, df.get(t, 0)) for t in (rare or shared)[:3])
+            reasons.append("keyword-overlap:" + detail)
+        reasons.append("similarity:" + str(score))
+        out.append({"logical_id": lg_id, "name": lg.get("name"),
+                    "protected": st.get("protected", False),
+                    "instance_id": rep.get("instance_id"),
+                    "score": score, "reasons": reasons})
     out.sort(key=lambda x: (-x["score"], x["name"]))
-    return out
+    return out[:max_candidates]

@@ -60,7 +60,7 @@
       "evidence": ["default-shared-dir"],
       "logical_name": "word",
       "tree_hash": "2222222222222222222222222222222222222222222222222222222222222222",
-      "description": "第三方 Word 周报生成 skill(演示,来源声称 GitHub)",
+      "description": "生成 Word 文档周报的第三方 skill(演示,来源声称 GitHub)",
       "version": "0.9.0",
       "function": "生成 Word 周报",
       "trigger": "slash",

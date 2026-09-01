@@ -19,6 +19,7 @@ if BASE not in sys.path:
 from scripts.core.github import flatten_repos  # noqa: E402
 from scripts.core.io import load_json_checked  # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
+from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
 VERDICT_GROUPS = ("建议保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
@@ -101,6 +102,14 @@ def build_view(inv, last, ctx):
                    for i in insts}
     repos_flat = flatten_repos(reputation if isinstance(reputation, dict) else {})
 
+    # 审查队列的替代候选(只在队列与当前 inventory 指纹一致时展示,防止拿旧候选误导)
+    queue_items = {}
+    queue = ctx.get("queue")
+    if isinstance(queue, dict) and queue.get("inventory_fingerprint") and \
+            queue.get("inventory_fingerprint") == inventory_fingerprint(inv):
+        queue_items = {x.get("logical_id"): x for x in queue.get("items", [])
+                       if isinstance(x, dict)}
+
     protected, third_party = [], []
     for inst in insts:
         cls, why = classify_instance(inst, self_built)
@@ -165,7 +174,7 @@ def build_view(inv, last, ctx):
             "findings_by_skill": findings_by_skill, "updates": updates,
             "reputation": reputation, "reviews": reviews, "backups": backups, "diff": diff,
             "logical_by_id": logical_by_id, "inst_by_id": inst_by_id,
-            "prov": prov_by_iid, "repos_flat": repos_flat}
+            "prov": prov_by_iid, "repos_flat": repos_flat, "queue_items": queue_items}
 
 
 def _logical_of(inv, inst):
@@ -262,6 +271,13 @@ def review_card_html(view, row, group):
         h.append('<p class="mut">尚未审查:加入大模型审查队列(value_review.py queue)后逐项审。</p>')
         h.append('<p>删除后可能失去:—(尚未审查,先审查再决定)</p>')
     h.append('<p class="mut">{}</p>'.format(esc(_repo_card(view, inst))))
+    lg = _logical_of(view["inv"], inst)
+    qitem = view["queue_items"].get(lg.get("logical_id")) if lg else None
+    cands = (qitem or {}).get("alternative_candidates") or []
+    if cands:
+        names = "、".join(esc(c.get("name") or c.get("logical_id")) for c in cands[:3])
+        h.append('<p class="mut">替代候选(未确认,供审查,共 {} 个):{}</p>'.format(
+            len(cands), names))
     h.append('<div>{}</div>'.format(btn("🗑️ 删除(两阶段)", "remove",
                                         {"id": iid, "name": name, "cmd": _safe_plan_cmd(iid)},
                                         "btn-danger")))
@@ -545,6 +561,7 @@ def main():
         "reputation": _load(ddir / "reputation.json") or {},
         "self_built": _self_built(ddir),
         "known": load_user_config(ddir),
+        "queue": _load(ddir / "review-queue.json"),
     }
     md, view = render_md(inv, last, ctx)
     if args.json:

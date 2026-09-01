@@ -48,13 +48,15 @@ def full_v2_fixture(testcase):
 
 def _record_and_save(queue, data, target_name):
     item = next(x for x in queue["items"] if x["name"] == target_name)
+    installed = (queue.get("index") or {}).get("installed_logical_ids") or []
+    alternative = next(lg for lg in installed if lg != item["logical_id"])
     payload = {
         "instance_id": item["instance_id"], "verdict": "建议删除",
-        "reason": "功能与客户端自带能力重复,无独特价值(端到端演示)",
-        "alternatives": [], "unique_capabilities": [],
+        "reason": "功能与已保留 skill 重复,无独特价值(端到端演示)",
+        "alternatives": [alternative], "unique_capabilities": [],
         "loss_if_removed": "仅失去演示目录,无功能损失",
         "confidence": "高",
-        "evidence": ["overlap:与内置能力重叠", "source:unknown 来源不明"],
+        "evidence": ["overlap:与保留能力重叠", "source:unknown 来源不明"],
     }
     record = record_review(queue, payload, "end-to-end-model")
     atomic_write_json(data / "value-reviews.json",

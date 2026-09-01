@@ -44,8 +44,11 @@ class ValueReviewTests(unittest.TestCase):
         self.assertIn("third-party-word", target_ids)
         self.assertIn("unknown-tool", target_ids, "来源未知同样要审查")
         docx_item = next(x for x in queue["items"] if x["instance_id"] == "third-party-word")
-        self.assertIn("codex-builtin-docx", docx_item["alternative_candidates"],
+        cand_by_iid = {c["instance_id"]: c for c in docx_item["alternative_candidates"]}
+        self.assertIn("codex-builtin-docx", cand_by_iid,
                       "受保护 skill 可以作为替代候选")
+        self.assertTrue(cand_by_iid["codex-builtin-docx"]["protected"],
+                        "替代候选必须标注受保护身份")
 
     def test_delete_recommendation_requires_explanation_not_fixed_score(self):
         from scripts.core.reviews import record_review
