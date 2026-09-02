@@ -60,6 +60,61 @@ class ReportV2Tests(unittest.TestCase):
         md, _ = render_md(v2_report_fixture(), None, ctx)
         self.assertIn("backup-20260902-090000-abcdef.tar.gz", md)
 
+    def test_dashboard_metrics_navigate_to_matching_sections(self):
+        """顶部指标必须有稳定落点;大区块默认收起,点击后由 JS 展开祖先 details。"""
+        from scripts.report import render_html
+        base = v2_report_fixture()
+        html = render_html(base, None, {
+            "updates": base["updates"],
+            "updates_checked_at": "2026-09-02 10:00:00",
+        })
+        for target in ("instance-details", "protected-skills", "third-party-review",
+                       "health-yellow", "update-review", "verdict-delete",
+                       "verdict-confirm", "verdict-keep", "verdict-prefer-other",
+                       "verdict-observe"):
+            self.assertIn('id="{}"'.format(target), html)
+        self.assertIn('href="#health-yellow"', html)
+        self.assertIn('href="#update-review"', html)
+        self.assertNotIn('href="#verdict-delete"', html,
+                         "零值结论只展示为不可点击指标")
+        self.assertIn("待更新/复核", html)
+        self.assertIn("上次检查:2026-09-02 10:00:00", html)
+        self.assertIn('<details id="protected-skills">', html,
+                      "大区块默认收起,避免报告打开即被长表淹没")
+        self.assertIn('<details id="instance-details">', html)
+        self.assertIn("function openJump(hash)", html)
+
+    def test_findings_are_attached_to_their_instance_not_same_name_siblings(self):
+        """同名不同实例的告警不能互相复制,否则顶部黄灯与明细会对不上。"""
+        from scripts.report import render_html
+        base = json.loads(json.dumps(v2_report_fixture()))
+        base["instances"].append({
+            "instance_id": "fff2fff2fff2fff2fff2", "location_id": "shared",
+            "client": "shared", "kind": "user", "directory_name": "word-copy",
+            "path": "/fixture/home/.agents/skills/word-copy",
+            "real_path": "/fixture/home/.agents/skills/word-copy", "is_symlink": False,
+            "is_skill": True, "mutable": True, "logical_name": "word",
+            "tree_hash": "9" * 64, "description": "同名第二份", "function": "",
+            "trigger": "auto", "context_bytes": 100, "requires_bins": [],
+        })
+        base["logical_skills"].append({
+            "logical_id": "lg-word-2", "name": "word", "tree_hash": "9" * 64,
+            "instance_ids": ["fff2fff2fff2fff2fff2"], "clients": ["shared"],
+            "function": "", "trigger": "auto", "version": "", "context_bytes": 100,
+        })
+        base["findings"].append({
+            "code": "duplicate-only", "severity": "yellow",
+            "instance_id": "fff2fff2fff2fff2fff2", "skill": "word",
+            "location_id": "shared", "message": "仅第二份实例的问题", "ignored": False,
+        })
+        html = render_html(base)
+        original = html[html.index('id="instance-aaa1aaa1aaa1aaa1aaa1"'):]
+        original = original[:original.index("</tr>")]
+        sibling = html[html.index('id="instance-fff2fff2fff2fff2fff2"'):]
+        sibling = sibling[:sibling.index("</tr>")]
+        self.assertNotIn("仅第二份实例的问题", original)
+        self.assertIn("仅第二份实例的问题", sibling)
+
     def test_same_name_logicals_show_their_own_verdicts(self):
         """两个同名逻辑 skill(不同内容/实例)必须各自显示自己的审查结论。"""
         from scripts.report import render_html

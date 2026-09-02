@@ -30,6 +30,13 @@ VERDICT_TO_GROUP = {"保留": "建议保留", "优先保留另一个": "优先�
                     "观察": "观察", "建议删除": "建议删除", "需要人工确认": "需要人工确认"}
 VERDICT_EMOJI = {"建议保留": "💚 建议保留", "优先保留另一个": "🔁 优先保留另一个",
                  "观察": "👀 观察", "建议删除": "🗑️ 建议删除", "需要人工确认": "❓ 需要人工确认"}
+VERDICT_ANCHORS = {
+    "建议保留": "verdict-keep",
+    "优先保留另一个": "verdict-prefer-other",
+    "观察": "verdict-observe",
+    "建议删除": "verdict-delete",
+    "需要人工确认": "verdict-confirm",
+}
 UPDATE_LABEL = {
     "candidate-update": "🟢 有候选更新——先安检,再走 plan/apply(远端变化不影响已审查候选)",
     "needs-review": "🟡 与上游有差异——需要审查后再决定",
@@ -163,10 +170,13 @@ def build_view(inv, last, ctx):
             unreviewed.append({"inst": inst, "rec": None, "stale": False})
 
     findings_by_skill = {}
+    findings_by_instance = {}
     for f in inv.get("findings", []):
         if f.get("ignored"):
             continue
         findings_by_skill.setdefault(f.get("skill"), []).append(f)
+        if f.get("instance_id"):
+            findings_by_instance.setdefault(f.get("instance_id"), []).append(f)
 
     counts = {"total": inv.get("total", len(inv.get("logical_skills", []))),
               "protected": len(protected_names), "third_party": len(third_names),
@@ -176,6 +186,8 @@ def build_view(inv, last, ctx):
     live = [f for f in inv.get("findings", []) if not f.get("ignored")]
     counts["red"] = sum(1 for f in live if f.get("severity") == "red")
     counts["yellow"] = sum(1 for f in live if f.get("severity") == "yellow")
+    counts["updates"] = len(updates)
+    attention = [f for f in live if f.get("severity") in ("red", "yellow")]
 
     diff = None
     if last:
@@ -185,7 +197,9 @@ def build_view(inv, last, ctx):
     backups = ctx.get("backups") or []
     return {"inv": inv, "counts": counts, "protected_names": protected_names,
             "verdict_rows": verdict_rows, "unreviewed": unreviewed,
-            "findings_by_skill": findings_by_skill, "updates": updates,
+            "findings_by_skill": findings_by_skill, "findings_by_instance": findings_by_instance,
+            "attention_findings": attention, "updates": updates,
+            "updates_checked_at": ctx.get("updates_checked_at"),
             "reputation": reputation, "reviews": reviews, "backups": backups, "diff": diff,
             "logical_by_id": logical_by_id, "inst_by_id": inst_by_id,
             "prov": prov_by_iid, "repos_flat": repos_flat, "queue_items": queue_items,
@@ -301,7 +315,7 @@ def review_card_html(view, row, group):
 
 
 def findings_badges(view, inst):
-    rows = view["findings_by_skill"].get(inst.get("logical_name"), [])
+    rows = view["findings_by_instance"].get(inst.get("instance_id"), [])
     out = []
     for f in rows:
         cls = "badge-red" if f.get("severity") == "red" else ("badge-yellow" if f.get("severity") == "yellow" else "")
@@ -315,13 +329,136 @@ def findings_badges(view, inst):
     return "".join(out) or '<span class="badge badge-green">✅</span>'
 
 
+def _jump_metric(label, count, target, cls="", title=None):
+    """顶部导航指标:有内容才可点击,零值明确呈现但不制造空跳转。"""
+    classes = "metric " + cls + (" metric-zero" if not count else "")
+    text = '<span class="metric-label">{}</span><strong>{}</strong>'.format(
+        esc(label), esc(count))
+    if count:
+        return '<a class="{}" href="#{}" data-jump aria-label="{}">{}</a>'.format(
+            classes, esc(target), esc(title or "定位" + label), text)
+    return '<span class="{}" aria-disabled="true" title="暂无项目">{}</span>'.format(
+        classes, text)
+
+
+def _back_top():
+    return '<a class="back-top" href="#report-top" data-jump>回到顶部 ↑</a>'
+
+
+def _instance_context(inst):
+    """给问题/更新条目一个不暴露绝对路径的定位说明。"""
+    if not inst:
+        return "安装实例"
+    client = CLIENT_LABELS.get(inst.get("client"), inst.get("client") or "未知客户端")
+    if inst.get("plugin_name"):
+        version = inst.get("plugin_version")
+        plugin = "插件 {}{}".format(inst.get("plugin_name"),
+                                    " " + str(version) if version else "")
+        return "{} · {}".format(client, plugin)
+    return "{} · {}".format(client, inst.get("kind") or "用户目录")
+
+
+def _finding_row(view, finding):
+    iid = finding.get("instance_id")
+    inst = view["inst_by_id"].get(iid) or {}
+    name = finding.get("skill") or inst.get("logical_name") or iid or "未命名 Skill"
+    severity = finding.get("severity") or "info"
+    badge_cls = "badge-red" if severity == "red" else ("badge-yellow" if severity == "yellow" else "")
+    label = "🔴 红灯" if severity == "red" else ("🟡 黄灯" if severity == "yellow" else "提示")
+    target = "#instance-{}".format(iid) if iid else "#instance-details"
+    return ('<div class="attention-row {}">'
+            '<div class="attention-head"><b>{}</b><span class="badge {}">{}</span></div>'
+            '<p>{}</p><p class="mut">{} · <a href="{}" data-jump>定位安装实例</a></p>'
+            '</div>').format(
+                "attention-" + esc(severity), esc(name), badge_cls, esc(label),
+                esc(finding.get("message") or "未提供问题说明"),
+                esc(_instance_context(inst)), esc(target))
+
+
+def _update_row(view, update):
+    iid = update.get("instance_id")
+    inst = view["inst_by_id"].get(iid) or {}
+    name = update.get("name") or inst.get("logical_name") or iid or "未命名 Skill"
+    status = update.get("status") or "unknown"
+    short = {
+        "candidate-update": "🟢 有候选更新",
+        "needs-review": "🟡 需要审查",
+        "local-custom": "🛡️ 本地定制",
+        "unverifiable": "⏭️ 无法核实",
+    }.get(status, status)
+    diff = update.get("full_diff_summary") or {}
+    changed = []
+    for key, label in (("modified", "修改"), ("added", "新增"), ("removed", "删除")):
+        if diff.get(key):
+            changed.append("{} {} 项".format(label, len(diff[key])))
+    detail = "；".join(changed) or "检测到完整目录树差异"
+    target = "#instance-{}".format(iid) if iid else "#instance-details"
+    return ('<div class="attention-row attention-update">'
+            '<div class="attention-head"><b>{}</b><span class="badge badge-yellow">{}</span></div>'
+            '<p>{}</p><p class="mut">{} · {} · <a href="{}" data-jump>定位安装实例</a></p>'
+            '</div>').format(esc(name), esc(short), esc(detail),
+                               esc(_instance_context(inst)), esc(update.get("repo") or "来源待核实"),
+                               esc(target))
+
+
+def _attention_section(view):
+    """把顶部的红/黄/更新数字对应到可见的、可定位的处理清单。"""
+    c = view["counts"]
+    red = [f for f in view["attention_findings"] if f.get("severity") == "red"]
+    yellow = [f for f in view["attention_findings"] if f.get("severity") == "yellow"]
+    updates = list(view["updates"].values())
+    parts = []
+    if red:
+        parts.append('<details id="health-red" open><summary><b>🔴 红灯问题</b>'
+                     '<span class="cnt">{} 个</span></summary><div class="attention-list">{}</div>{}</details>'.format(
+                         len(red), "".join(_finding_row(view, f) for f in red), _back_top()))
+    if yellow:
+        parts.append('<details id="health-yellow" open><summary><b>🟡 黄灯问题</b>'
+                     '<span class="cnt">{} 个安装实例</span></summary><div class="attention-list">{}</div>{}</details>'.format(
+                         len(yellow), "".join(_finding_row(view, f) for f in yellow), _back_top()))
+    updates_checked = view.get("updates_checked_at") or ""
+    update_note = "上次检查:{}".format(updates_checked) if updates_checked else "状态来自最近一次更新检查"
+    update_body = ("".join(_update_row(view, u) for u in updates)
+                   if updates else '<p class="mut">当前没有发现上游差异。</p>')
+    parts.append('<details id="update-review"{}><summary><b>🔄 待更新/复核</b>'
+                 '<span class="cnt">{} 个</span></summary><p class="mut">{}。候选更新仍需先安检，再走计划→确认→备份→执行。</p>'
+                 '<div class="attention-list">{}</div>{}</details>'.format(
+                     " open" if updates else "", len(updates), esc(update_note), update_body, _back_top()))
+    if not red and not yellow and not updates:
+        intro = '<p class="all-clear">✅ 当前没有红灯、黄灯或待更新项目。</p>'
+    else:
+        intro = '<p class="mut">这里只列需要处理的事项；完整实例信息在下方明细中。</p>'
+    return '<section id="attention"><h2>需要关注 <span class="cnt">{} 项</span></h2>{}{}</section>'.format(
+        c["red"] + c["yellow"] + c["updates"], intro, "".join(parts))
+
+
 JS_BLOB = """
 function token(){return new URLSearchParams(location.search).get('t');}
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 function toast(m){let t=document.getElementById('toast');t.textContent=m;t.className='show';clearTimeout(t._h);t._h=setTimeout(()=>t.className='',4000);}
 function copyText(s){(navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast('已复制命令')).catch(()=>{const ta=document.createElement('textarea');ta.value=s;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();toast('已复制命令');});}
+function openJump(hash){
+  if(!hash||hash.charAt(0)!=='#')return;
+  const target=document.getElementById(hash.slice(1));if(!target)return;
+  const reveal=()=>{
+    for(let p=target;p;p=p.parentElement){
+      if((p.tagName||'').toLowerCase()==='details'){
+        p.open=true;p.setAttribute('open','');
+      }
+    }
+  };
+  reveal();setTimeout(reveal,0);
+  history.replaceState(null,'',hash);
+  target.classList.remove('target-flash');void target.offsetWidth;target.classList.add('target-flash');
+  target.scrollIntoView({behavior:'smooth',block:'start'});
+}
+window.addEventListener('hashchange',()=>openJump(location.hash));
+window.addEventListener('DOMContentLoaded',()=>{if(location.hash)openJump(location.hash);});
+if(location.hash)openJump(location.hash);
 async function post(path,body){const t=token();const r=await fetch(path+(path.includes('?')?'&':'?')+'t='+encodeURIComponent(t),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){}return {status:r.status,j:j};}
 document.addEventListener('click',async e=>{
+  const jump=e.target.closest('a[data-jump]');
+  if(jump){e.preventDefault();openJump(jump.getAttribute('href'));return;}
   const b=e.target.closest('button[data-act]');if(!b)return;
   const act=b.dataset.act,id=b.dataset.id;
   if(act==='copy'){copyText(b.dataset.cmd||'');toast('已复制命令');return;}
@@ -393,19 +530,27 @@ def _claude_app_present():
 def render_html(inv, last=None, ctx=None):
     view = build_view(inv, last, ctx)
     c = view["counts"]
-    chips = [
-        '<span class="chip">逻辑 skill {total}</span>'.format(**c),
-        '<span class="chip chip-green">🛡️ 受保护 {protected}</span>'.format(**c),
-        '<span class="chip">第三方 {third_party}</span>'.format(**c),
-        '<span class="chip chip-red">🔴 红 {red}</span>'.format(**c),
-        '<span class="chip chip-yellow">🟡 黄 {yellow}</span>'.format(**c),
-        '<span class="chip">💚 建议保留 {建议保留}</span>'.format(**c),
-        '<span class="chip">🔁 优先保留另一个 {优先保留另一个}</span>'.format(**c),
-        '<span class="chip">👀 观察 {观察}</span>'.format(**c),
-        '<span class="chip">🗑️ 建议删除 {建议删除}</span>'.format(**c),
-        '<span class="chip">❓ 需要人工确认 {需要人工确认}</span>'.format(**c),
-        '<span class="chip">🔍 未审查 {unreviewed}</span>'.format(**c),
+    overview_metrics = [
+        _jump_metric("逻辑 Skill", c["total"], "instance-details"),
+        _jump_metric("🛡️ 受保护", c["protected"], "protected-skills", "metric-green"),
+        _jump_metric("第三方", c["third_party"], "third-party-review"),
     ]
+    attention_metrics = [
+        _jump_metric("🔴 红灯", c["red"], "health-red", "metric-red"),
+        _jump_metric("🟡 黄灯", c["yellow"], "health-yellow", "metric-yellow"),
+        _jump_metric("🔄 待更新/复核", c["updates"], "update-review", "metric-blue"),
+        _jump_metric("🔍 未审查", c["unreviewed"], "verdict-unreviewed", "metric-blue"),
+    ]
+    verdict_metrics = [
+        _jump_metric(VERDICT_EMOJI[g], c[g], VERDICT_ANCHORS[g]) for g in VERDICT_GROUPS
+    ]
+    dashboard = (
+        '<section id="report-top" class="dashboard">'
+        '<div class="metric-group"><div class="metric-title">资产概况</div><div class="metrics">{}</div></div>'
+        '<div class="metric-group"><div class="metric-title">需要关注</div><div class="metrics">{}</div></div>'
+        '<div class="metric-group"><div class="metric-title">价值结论</div><div class="metrics">{}</div></div>'
+        '</section>').format("".join(overview_metrics), "".join(attention_metrics),
+                              "".join(verdict_metrics))
 
     # 各客户端加载上下文总览(用户最关心的口径:每个客户端启动时占用多少条)
     load_rows = _client_load_rows(inv)
@@ -414,7 +559,7 @@ def render_html(inv, last=None, ctx=None):
             esc(CLIENT_LABELS.get(c, c)), e, s, d, esc(n))
         for c, e, s, d, n in load_rows) or '<tr><td colspan="5">无</td></tr>'
     load_sec = (
-        '<details open><summary><b>📱 各客户端加载上下文</b>'
+        '<details id="client-load"><summary><b>📱 各客户端加载上下文</b>'
         '<span class="cnt">启动即占用 name+description;同名多份=重复占用</span></summary>'
         '<table><tr><th>客户端</th><th>加载条目</th><th>实际技能</th><th>重复条目</th><th>备注</th></tr>'
         '{}</table></details>').format(load_cells)
@@ -427,7 +572,7 @@ def render_html(inv, last=None, ctx=None):
             esc(name), esc(lg.get("function") or ""),
             esc("、".join(lg.get("clients") or []))))
     protected_sec = (
-        '<details open><summary><b>🛡️ 受保护类(客户端自带 / 用户自建)</b>'
+        '<details id="protected-skills"><summary><b>🛡️ 受保护类(客户端自带 / 用户自建)</b>'
         '<span class="cnt">{n} 个 · 不进入清理建议,内容安检仍适用</span></summary>'
         '<table><tr><th>Skill</th><th>功能</th><th>客户端</th></tr>{rows}</table></details>'
     ).format(n=c["protected"], rows="".join(prot_rows) or '<tr><td colspan="3">无</td></tr>')
@@ -437,20 +582,23 @@ def render_html(inv, last=None, ctx=None):
     for group in VERDICT_GROUPS:
         rows = view["verdict_rows"][group]
         cards = "".join(review_card_html(view, row, group) for row in rows)
+        open_attr = " open" if rows and group in ("建议删除", "需要人工确认") else ""
         sections.append(
-            '<details open><summary><b>{}</b><span class="cnt">{} 个</span></summary>'
-            '<div class="cards">{}</div></details>'.format(
-                esc(VERDICT_EMOJI[group]), len(rows), cards or '<p class="mut">无</p>'))
+            '<details id="{}"{}><summary><b>{}</b><span class="cnt">{} 个</span></summary>'
+            '<div class="cards">{}</div>{}</details>'.format(
+                VERDICT_ANCHORS[group], open_attr, esc(VERDICT_EMOJI[group]), len(rows),
+                cards or '<p class="mut">无</p>', _back_top()))
     un_rows = "".join(review_card_html(view, row, "") for row in view["unreviewed"])
     sections.append(
-        '<details open><summary><b>🔍 待审查(第三方)</b><span class="cnt">{n} 个</span></summary>'
-        '<div class="cards">{cards}</div></details>'.format(
-            n=len(view["unreviewed"]), cards=un_rows or '<p class="mut">无</p>'))
+        '<details id="verdict-unreviewed"{}><summary><b>🔍 待审查(第三方)</b><span class="cnt">{n} 个</span></summary>'
+        '<div class="cards">{cards}</div>{back}</details>'.format(
+            " open" if view["unreviewed"] else "", n=len(view["unreviewed"]),
+            cards=un_rows or '<p class="mut">无</p>', back=_back_top()))
     value_sec = (
-        '<h3>第三方 Skill 价值审查</h3>'
+        '<section id="third-party-review"><h2>第三方 Skill 价值审查</h2>'
         '<p class="mut">口径:{note}。结论只有五种;「建议删除」必有理由、替代、损失与置信度,'
-        '且永不自动执行。结论过期会显著标注。</p>{sections}').format(
-        note=esc(REPO_SCOPE_NOTE), sections="".join(sections))
+        '且永不自动执行。结论过期会显著标注。</p>{sections}{back}</section>').format(
+        note=esc(REPO_SCOPE_NOTE), sections="".join(sections), back=_back_top())
 
     # 全量明细表
     rows = []
@@ -464,15 +612,18 @@ def render_html(inv, last=None, ctx=None):
                                              "cmd": _safe_plan_cmd(inst.get("instance_id"))},
                          "btn-danger")
         rows.append(
-            '<tr><td><b>{}</b>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
+            '<tr id="instance-{}"><td><b>{}</b>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
+                esc(inst.get("instance_id")),
                 esc(inst.get("logical_name")),
                 ' <span class="badge">受保护</span>' if cls == "protected" else "",
                 esc(inst.get("function") or ""), esc(inst.get("client") or ""),
                 esc(inst.get("kind") or ""), findings_badges(view, inst), action))
     table_sec = (
-        '<details open><summary><b>📋 安装实例明细</b><span class="cnt">{} 个实例</span></summary>'
+        '<details id="instance-details"><summary><b>📋 安装实例明细</b>'
+        '<span class="cnt">{} 个实例 / {} 个逻辑 Skill</span></summary>'
         '<table><tr><th>Skill</th><th>功能</th><th>客户端</th><th>位置类型</th><th>健康</th><th>操作</th></tr>'
-        '{}</table></details>').format(len(view["inv"].get("instances", [])), "".join(rows))
+        '{}</table>{}</details>').format(len(view["inv"].get("instances", [])), c["total"],
+                                         "".join(rows), _back_top())
 
     extras = []
     if view["backups"]:
@@ -493,11 +644,25 @@ def render_html(inv, last=None, ctx=None):
     head = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Skill 管家报告 v2</title><style>
-body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:1120px;margin:24px auto;padding:0 16px;color:#1f2937;background:#f8fafc}
-h1{font-size:22px} h3{margin-top:22px} .chips{margin:10px 0} .chip{display:inline-block;background:#e2e8f0;border-radius:99px;padding:3px 12px;margin:2px;font-size:13px}
-.chip-red{background:#fee2e2;color:#b91c1c} .chip-yellow{background:#fef9c3;color:#a16207} .chip-green{background:#dcfce7;color:#15803d}
-details{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:10px 0;padding:10px 16px}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:1120px;margin:24px auto;padding:0 16px;color:#1f2937;background:#f8fafc;scroll-behavior:smooth}
+h1{font-size:22px;margin-bottom:6px} h2{font-size:19px;margin:24px 0 8px} h3{margin-top:22px}
+.dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.metric-group{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px}
+.metric-title{font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px}
+.metrics{display:flex;flex-wrap:wrap;gap:5px}
+.metric{display:flex;align-items:center;gap:7px;background:#f1f5f9;border:1px solid transparent;border-radius:9px;padding:7px 9px;color:#334155;text-decoration:none;font-size:12px;line-height:1.2}
+.metric:hover{border-color:#94a3b8;background:#e2e8f0}.metric:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.metric strong{font-size:15px}.metric-green{background:#ecfdf5;color:#15803d}.metric-red{background:#fef2f2;color:#b91c1c}.metric-yellow{background:#fefce8;color:#a16207}.metric-blue{background:#eff6ff;color:#1d4ed8}
+.metric-zero{opacity:.55;cursor:default}.metric-label{white-space:nowrap}
+details{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:10px 0;padding:10px 16px;scroll-margin-top:14px}
+/* 锚点跳转的无脚本兜底:--serve 的安全策略即使暂时阻止内联脚本,目标内容仍可见。 */
+details:target > .cards,details:target > .attention-list{display:grid!important}
+details:target > table{display:table!important}
+details:target > .body,details:target > p,details:target > a{display:block!important}
 summary{cursor:pointer;font-size:16px;padding:4px 0} .cnt{color:#6b7280;font-size:13px;margin-left:10px}
+section{scroll-margin-top:14px}.back-top{display:inline-block;margin-top:8px;color:#64748b;font-size:12px;text-decoration:none}.back-top:hover{text-decoration:underline}
+details.target-flash,section.target-flash,tr.target-flash{animation:target-flash 1.8s ease-out}
+@keyframes target-flash{0%{box-shadow:0 0 0 3px #93c5fd}100%{box-shadow:0 0 0 0 transparent}}
 table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
 th{text-align:left;color:#6b7280;border-bottom:2px solid #e5e7eb;padding:6px 8px}
 td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
@@ -511,15 +676,18 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 .btn{display:inline-block;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:3px 10px;margin:1px 2px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:#f3f4f6} .btn:disabled{opacity:.5}
 .btn-danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c} .btn-ghost{color:#6b7280}
+.attention-list{display:grid;gap:7px;margin:8px 0}.attention-row{border-left:4px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px 10px}.attention-red{border-left-color:#ef4444}.attention-yellow{border-left-color:#eab308}.attention-update{border-left-color:#3b82f6}.attention-head{display:flex;align-items:center;gap:6px}.attention-row p{margin:4px 0;font-size:13px}.all-clear{color:#15803d;margin:8px 0}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2937;color:#fff;border-radius:99px;padding:8px 18px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:80%}
 #toast.show{opacity:.95}
+@media(max-width:760px){body{margin:14px auto}.dashboard{grid-template-columns:1fr}.cards{grid-template-columns:1fr}table{display:block;overflow-x:auto;white-space:nowrap}}
 </style></head><body>
 <h1>📋 Skill 管家报告 <span class="mut">v2 · 价值审查面板</span></h1>
 <div>生成时间:__TS__</div>
-<div class="chips">__CHIPS__</div>
+__DASHBOARD__
+__ATTENTION__
 __LOAD__
-__PROTECTED__
 __VALUE__
+__PROTECTED__
 __TABLE__
 <h3>其他</h3>__EXTRAS__
 <p style="color:#9ca3af;font-size:12px">由 skill-keeper v2 生成 · 所有删除/恢复都走 计划→确认→备份→执行→验证 两阶段流程,永不自动执行 · 一键操作需 <code>report.py --serve</code>(静态打开时按钮复制等价命令)</p>
@@ -528,7 +696,8 @@ __TABLE__
 </body></html>"""
     return (head
             .replace("__TS__", esc(inv.get("scanned_at") or ""))
-            .replace("__CHIPS__", "".join(chips))
+            .replace("__DASHBOARD__", dashboard)
+            .replace("__ATTENTION__", _attention_section(view))
             .replace("__LOAD__", load_sec)
             .replace("__PROTECTED__", protected_sec)
             .replace("__VALUE__", value_sec)
@@ -542,8 +711,8 @@ def render_md(inv, last=None, ctx=None):
     c = view["counts"]
     L = ["# Skill 管家报告(v2)",
          "",
-         "> 生成时间:{} · 逻辑 skill **{}** 个(受保护 {} / 第三方 {});红 {} 黄 {}".format(
-             inv.get("scanned_at"), c["total"], c["protected"], c["third_party"], c["red"], c["yellow"]),
+         "> 生成时间:{} · 逻辑 skill **{}** 个(受保护 {} / 第三方 {});红 {} 黄 {} · 待更新/复核 {}".format(
+             inv.get("scanned_at"), c["total"], c["protected"], c["third_party"], c["red"], c["yellow"], c["updates"]),
          "",
          "口径:{}。".format(REPO_SCOPE_NOTE),
          "",
@@ -554,8 +723,24 @@ def render_md(inv, last=None, ctx=None):
     for _cl, _e, _s, _d, _n in _client_load_rows(inv):
         L.append("| {} | {} | {} | {} | {} |".format(
             CLIENT_LABELS.get(_cl, _cl), _e, _s, _d, _n))
+    L += ["", "## 一、需要关注", ""]
+    if view["attention_findings"]:
+        for finding in view["attention_findings"]:
+            inst = view["inst_by_id"].get(finding.get("instance_id"), {})
+            level = "🔴" if finding.get("severity") == "red" else "🟡"
+            L.append("- {} **{}** — {}（{}）".format(
+                level, finding.get("skill") or inst.get("logical_name") or "未命名 Skill",
+                finding.get("message") or "未提供问题说明", _instance_context(inst)))
+    if view["updates"]:
+        for update in view["updates"].values():
+            L.append("- 🔄 **{}** — {}（{}）".format(
+                update.get("name") or "未命名 Skill",
+                UPDATE_LABEL.get(update.get("status"), update.get("status") or "未知状态"),
+                update.get("repo") or "来源待核实"))
+    if not view["attention_findings"] and not view["updates"]:
+        L.append("- ✅ 当前没有红灯、黄灯或待更新项目。")
     L += ["",
-          "## 一、价值审查(第三方 Skill)",
+          "## 二、价值审查(第三方 Skill)",
           ""]
     for group in VERDICT_GROUPS:
         L.append("**{}**({} 个)".format(VERDICT_EMOJI[group], c[group]))
@@ -578,13 +763,13 @@ def render_md(inv, last=None, ctx=None):
     for row in view["unreviewed"]:
         L.append("- **{}**({})尚未审查".format(row["inst"].get("logical_name"),
                                                row["inst"].get("function") or ""))
-    L += ["", "## 二、受保护类(客户端自带 / 用户自建,{} 个)".format(c["protected"])]
+    L += ["", "## 三、受保护类(客户端自带 / 用户自建,{} 个)".format(c["protected"])]
     for name in view["protected_names"] or ["(无)"]:
         L.append("- {}".format(name))
-    L += ["", "## 三、安装实例明细", "",
+    L += ["", "## 四、安装实例明细", "",
           "| Skill | 客户端 | 位置类型 | 健康 |", "|---|---|---|---|"]
     for inst in view["inv"].get("instances", []):
-        rows = view["findings_by_skill"].get(inst.get("logical_name"), [])
+        rows = view["findings_by_instance"].get(inst.get("instance_id"), [])
         health = "；".join(f.get("message") for f in rows) or "✅"
         cls, _ = classify_instance(inst, set(), view.get("known"))
         L.append("| {}{} | {} | {} | {} |".format(
@@ -625,9 +810,11 @@ def main():
         print("🛑 inventory 不是 v2(先跑 scan.py 重新扫描)")
         sys.exit(2)
     last = _load(ddir / "inventory-last.json")
+    update_store = _load(ddir / "updates.json") or {}
     reviews_store = _load(ddir / "value-reviews.json") or {}
     ctx = {
-        "updates": ( _load(ddir / "updates.json") or {}).get("differs", []),
+        "updates": update_store.get("differs", []) if isinstance(update_store, dict) else [],
+        "updates_checked_at": update_store.get("checked_at") if isinstance(update_store, dict) else "",
         "ignore": _load(ddir / "ignore.json") or {},
         "backups": backups_list(),
         "value_reviews": reviews_store.get("reviews", []) if isinstance(reviews_store, dict) else [],
@@ -644,6 +831,7 @@ def main():
             "total": c["total"], "protected": c["protected"], "third_party": c["third_party"],
             "verdicts": {g: c[g] for g in VERDICT_GROUPS},
             "unreviewed": c["unreviewed"], "red": c["red"], "yellow": c["yellow"],
+            "updates": c["updates"],
             "operational_ok": True, "health_status": inv.get("health_status", "ok"),
         }, ensure_ascii=False, indent=1))
         sys.exit(1 if c["red"] else 0)

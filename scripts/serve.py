@@ -5,7 +5,7 @@
 - 只绑 127.0.0.1;所有 API 需要随机 token(常量时间比较);POST 校验 Origin;
 - 请求体上限 64 KiB;confirm 必须是 JSON 布尔 true,字符串 "false" 一律拒绝;
 - 所有响应带 nosniff/no-referrer/DENY/Permissions-Policy;HTML 另带白名单式 CSP
-  (内联脚本用运行时计算的 SHA-256 hash,不用 unsafe-eval);
+  (交互脚本通过带 token 的同源资源加载,不用 unsafe-inline/unsafe-eval);
 - 所有变更动作都走统一变更引擎:计划不可变、执行要 digest 确认、先备份、失败回滚、
   成功失败都写审计;进程内锁 + 文件锁双重防并发;
 - 不把异常 repr、绝对用户路径或客户端配置内容返回浏览器。
@@ -196,7 +196,14 @@ def _build_handler(ctx, token):
                     html = (ctx.data_dir / "report.html").read_bytes()
                 except OSError:
                     return self._send(404, {"ok": False, "error": "report.html 不存在,先跑 report.py"})
+                html = _externalize_report_script(html, token)
                 return self._send(200, html, "text/html; charset=utf-8", html=html)
+            if u.path == "/report.js":
+                if not self._auth(q):
+                    return self._send(403, {"ok": False, "error": "token 缺失或不正确"})
+                from scripts.report import JS_BLOB
+                return self._send(200, JS_BLOB.encode("utf-8"),
+                                  "application/javascript; charset=utf-8")
             if not self._auth(q):
                 return self._send(403, {"ok": False, "error": "token 缺失或不正确"})
             m = re.fullmatch(r"/api/plan/([A-Za-z0-9._-]{1,80})", u.path)
@@ -294,7 +301,7 @@ def _handle_ignore(ctx, body):
 
 
 def _csp_for(html: bytes) -> str:
-    """为报告页计算白名单式 CSP:内联脚本按内容 hash 放行,不用 unsafe-eval。"""
+    """为报告页计算白名单式 CSP:同源脚本或内联脚本 hash,不用 unsafe-eval。"""
     text = html.decode("utf-8", errors="ignore")
     script_srcs = ["'self'"]
     for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", text, re.S):
@@ -303,6 +310,15 @@ def _csp_for(html: bytes) -> str:
     return ("default-src 'self'; connect-src 'self'; img-src 'self'; "
             "script-src {}; style-src 'self' 'unsafe-inline'; "
             "form-action 'self'; base-uri 'none'".format(" ".join(script_srcs)))
+
+
+def _externalize_report_script(html, token):
+    """把报告中的内联脚本改成同源脚本,让严格 CSP 下的浏览器也能执行交互。"""
+    marker = re.search(rb"<script>(.*?)</script>", html, re.S)
+    if not marker:
+        return html
+    src = b'<script src="/report.js?t=' + token.encode("ascii") + b'"></script>'
+    return html[:marker.start()] + src + html[marker.end():]
 
 
 def create_server(data_dir, home=None, port=0, backup_dir=None):

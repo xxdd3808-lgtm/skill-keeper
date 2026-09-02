@@ -75,8 +75,27 @@ class ServeApiTests(unittest.TestCase):
         self.assertEqual(r.headers["Referrer-Policy"], "no-referrer")
         self.assertEqual(r.headers["X-Frame-Options"], "DENY")
         self.assertIn("default-src", r.headers.get("Content-Security-Policy", ""))
-        self.assertIn("script-src 'self' 'sha256-", r.headers.get("Content-Security-Policy", ""))
+        self.assertIn("script-src 'self'", r.headers.get("Content-Security-Policy", ""))
         self.assertNotIn("unsafe-eval", r.headers.get("Content-Security-Policy", ""))
+        self.assertIn(b'<script src="/report.js?t=', body)
+
+    def test_report_script_is_same_origin_and_token_protected(self):
+        srv, _, _ = self._server_with_report()
+        conn = HTTPConnection("127.0.0.1", srv["port"], timeout=10)
+        conn.request("GET", "/report.js?t=" + srv["token"])
+        r = conn.getresponse()
+        body = r.read()
+        conn.close()
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.headers["Content-Type"], "application/javascript; charset=utf-8")
+        self.assertIn(b"function openJump", body)
+
+        conn = HTTPConnection("127.0.0.1", srv["port"], timeout=10)
+        conn.request("GET", "/report.js")
+        r = conn.getresponse()
+        r.read()
+        conn.close()
+        self.assertEqual(r.status, 403)
 
     def test_remove_plan_apply_roundtrip_on_temp_home(self):
         from scripts.scan import build_inventory
