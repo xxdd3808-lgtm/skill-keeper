@@ -111,5 +111,77 @@ class ScanV2Tests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, "有红色问题时退出码必须是 1")
 
 
+class ClientLoadModelTests(unittest.TestCase):
+    """2026-09:Codex 自动导入共享库后的按客户端加载模型与重复检测。"""
+
+    def build_codex_dup_home(self, testcase):
+        """shared 与 ~/.codex/skills 各放一份同名 skill(Codex 现在两个都读)。"""
+        home = temp_home(testcase)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        write_skill(home / ".agents/skills", "dup-tool", description="shared copy")
+        write_skill(home / ".codex/skills", "dup-tool", description="codex copy")
+        return home, data
+
+    def test_codex_duplicate_via_shared_is_flagged(self):
+        from scripts.scan import build_inventory
+        home, data = self.build_codex_dup_home(self)
+        inv = build_inventory(home, data)
+        dups = [f for f in inv["findings"] if f["code"] == "duplicate-load"]
+        self.assertTrue(any("Codex" in f["message"] and f["skill"] == "dup-tool" for f in dups),
+                        "Codex 经共享库的同名双载必须报 duplicate-load")
+        self.assertEqual(inv["client_load"]["codex"]["duplicates"], ["dup-tool"])
+        self.assertEqual(inv["client_load"]["codex"]["entries"], 2)
+
+    def test_stale_plugin_version_not_counted_as_loaded(self):
+        from scripts.scan import build_inventory
+        from tests.helpers import make_plugin_cache
+        home = temp_home(self)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        write_skill(home / ".agents/skills", "solo")
+        make_plugin_cache(home / ".zcode/cli/plugins/cache", "demo-plugin", "0.4.1",
+                          "demo-skill", nested=True)
+        make_plugin_cache(home / ".zcode/cli/plugins/cache", "demo-plugin", "0.4.0",
+                          "demo-skill", nested=True)
+        inv = build_inventory(home, data)
+        stale = [f for f in inv["findings"] if f["code"] == "stale-plugin-version"]
+        self.assertEqual(len(stale), 1, "旧版本残留应记 info,不算加载")
+        self.assertEqual(stale[0].get("severity"), "info")
+        zc = inv["client_load"]["zcode"]
+        self.assertEqual(zc["duplicates"], [], "同插件新旧版本不算同名重复加载")
+        self.assertEqual(zc["skills"], 2, "solo + demo-skill(仅最高版本)")
+
+    def test_builtin_app_skill_in_shared_is_flagged(self):
+        from scripts.scan import build_inventory
+        home = temp_home(self)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        write_skill(home / ".agents/skills", "vendor-app-tool", description="app builtin")
+        (data / "known-sources.json").write_text(json.dumps({
+            "vendor-app-tool": {"type": "builtin-app", "repo": None, "path": None,
+                                "note": "测试应用自带"}}, ensure_ascii=False), encoding="utf-8")
+        inv = build_inventory(home, data)
+        self.assertTrue(any(f["code"] == "builtin-app-spread" and f["skill"] == "vendor-app-tool"
+                            for f in inv["findings"]),
+                        "应用内置技能进入共享库必须报 builtin-app-spread")
+
+    def test_haha_wrapper_double_load_aggregated(self):
+        from scripts.scan import build_inventory
+        home = temp_home(self)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        write_skill(home / ".agents/skills", "mirror-tool", description="shared")
+        claude = home / ".claude/skills"
+        claude.mkdir(parents=True)
+        os.symlink(home / ".agents/skills/mirror-tool", claude / "mirror-tool")
+        (home / ".claude/cc-haha").mkdir(parents=True)
+        inv = build_inventory(home, data)
+        wrapper = [f for f in inv["findings"] if f["code"] == "wrapper-double-load"]
+        self.assertEqual(len(wrapper), 1, "Haha 双载聚合为一条,不逐个刷屏")
+        self.assertIn("1 个同名技能", wrapper[0]["message"])
+        self.assertEqual(inv["client_load"]["haha"]["duplicates"], ["mirror-tool"])
+
+
 if __name__ == "__main__":
     unittest.main()

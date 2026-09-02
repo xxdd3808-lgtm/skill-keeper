@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 2.0.0
+version: 2.1.0
 ---
 
 # skill-keeper · 本地 Skill 管家(v2)
@@ -59,12 +59,14 @@ python3 ~/skill-keeper/scripts/check_updates.py --json
 python3 ~/skill-keeper/scripts/scan.py
 ```
 
-输出概要(总数、来源分布、健康问题、重复加载),详情写入 `data/inventory.json`。健康检查包含:
+输出概要(总数、来源分布、健康问题、**各客户端加载条目与重复**)、详情写入 `data/inventory.json`。健康检查包含:
 - frontmatter 完整性(YAML 可解析、name/description 必填)、瘦身壳残留
 - 悬空/循环符号链接
-- **链接漂移**:`~/.claude/skills` 等快捷方式指向的内容与主库(`~/.agents/skills`)是否一致
+- **链接漂移**:快捷方式指向的内容与主库(`~/.agents/skills`)是否一致
 - **依赖命令**:skill 声明的外部程序(如 metadata 里的 requires.bins)在系统中是否存在,缺失则 🟡 提示
-- 同名多份、ZCode 双份加载
+- **按客户端的重复加载**:按各客户端真实加载拓扑(见下)统计同名多份,逐个 🟡 报告;Haha 的镜像双载聚合为一条
+- **插件版本去重**:插件缓存里同插件多版本并存时只有最高版本参与加载,旧版本记缓存残留(info,不占上下文)
+- **应用内置技能扩散**:builtin-app 技能出现在共享库会被所有客户端加载,🟡 提示收回所属客户端
 
 ### 2. 第三方价值审查队列(扫描后先做)
 
@@ -93,7 +95,7 @@ python3 ~/skill-keeper/scripts/report.py
 - `data/report.md` 纯文本版
 - **`data/report.html` 交互式网页版**(按分组折叠、红黄绿标色,可直接让用户用浏览器打开)——给用户看报告时优先给这个
 
-内容:顶部先给结论(受保护类数量、第三方待审、💚建议保留 / 🔁优先保留另一个 / 👀观察 / 🗑️建议删除 / ❓需要人工确认 五组各多少、未审查多少);**受保护类**(客户端自带/自建,不进入清理建议);**第三方价值审查卡片**(每张含:结论与理由、主要依据、更值得保留的替代、独特能力、删除后可能失去什么、置信度、审查时间与模型、仓库热度口径提示、安检状态、候选更新状态;过期结论显著标注);安装实例明细;备份恢复区(两阶段,冲突不覆盖);与上次盘点 diff。
+内容:顶部先给**各客户端加载上下文总览**(每个客户端加载条目/实际技能/重复条目——这是控制启动上下文的核心口径);受保护类数量、第三方待审、💚建议保留 / 🔁优先保留另一个 / 👀观察 / 🗑️建议删除 / ❓需要人工确认 五组各多少、未审查多少;**受保护类**(客户端自带/自建,不进入清理建议);**第三方价值审查卡片**(每张含:结论与理由、主要依据、更值得保留的替代、独特能力、删除后可能失去什么、置信度、审查时间与模型、仓库热度口径提示、安检状态、候选更新状态;过期结论显著标注);安装实例明细;备份恢复区(两阶段,冲突不覆盖);与上次盘点 diff。
 
 **一键处理(要动手时用)**:`python3 ~/skill-keeper/scripts/report.py --serve`(macOS 也可双击项目根的 `启动技能报告.command`)→ 自动开浏览器。v2 网页是两阶段:点删除先 `POST /api/plan` 生成不可变计划(展示摘要+digest),确认弹窗后再 `POST /api/apply` 执行(先备份、失败自动回滚、写 `data/audit-v2.jsonl`)。安全边界:只绑 127.0.0.1、随机 token 常量时间比较、POST 校验 Origin、请求体上限 64 KiB、confirm 必须是布尔 true、响应带 nosniff/no-referrer/DENY/CSP(内联脚本按内容 hash 白名单)。**静态打开 report.html 时按钮退化为复制等价的 plan 命令(用 shlex.join 生成,只含 instance_id,绝不含目录名)**。
 
@@ -143,8 +145,11 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
 - `plugin`:ZCode 插件自带,由插件系统管理
 - `unknown`:来源不明,报告里标注待补
 
-## 客户端加载规则(已按官方文档核实)
+## 客户端加载规则(已按实测核实,2026-09-02)
 
-- ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`。
-- Claude Code 读 `~/.claude/skills`(目录本体真实,条目为逐项指向 `~/.agents/skills` 的符号链接);Codex CLI 读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
-- 每个 skill 常驻上下文的是 name+description;SKILL.md 全文在触发时才加载。
+- ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`(智谱 autoglm 技能放在这里,只给 ZCode 加载)。
+- **Codex:2026-08-25 起的桌面版自动导入外部 Agent 技能库 `~/.agents/skills`**——共享库里有什么,Codex 就整体加载什么;再叠加自身 `~/.codex/skills`、`~/.codex/skills/.system`(内置)与插件缓存。往共享库加东西前要想清楚 Codex 也会带上。
+- Claude Code 读 `~/.claude/skills`(目录本体真实,条目为逐项指向 `~/.agents/skills` 的符号链接),不读共享库;Codex CLI 旧版读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
+- Haha(存在 `~/.claude/cc-haha` 时)同时读 Claude 目录与共享库——镜像同名条目会双份,机制固有;Cindy 是共享库+Codex 目录的只读投影。
+- 每个客户端插件缓存只加载各插件的最高版本,旧版本目录是残留,不占上下文。
+- 每个 skill 常驻上下文的是 name+description;SKILL.md 全文在触发时才加载。**目标态:一个客户端内一个名字只有一份;应用专属技能只留在所属客户端;共享库只放真正的通用技能。**

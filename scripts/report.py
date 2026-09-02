@@ -21,6 +21,7 @@ from scripts.core.io import load_json_checked  # noqa: E402
 from scripts.core.provenance import (classify_provenance, client_managed_advice,  # noqa: E402
                                      load_user_config)
 from scripts.core.reviews import inventory_fingerprint  # noqa: E402
+from scripts.scan import CLIENT_LABELS  # noqa: E402
 
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
 VERDICT_GROUPS = ("建议保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
@@ -359,6 +360,25 @@ document.addEventListener('click',async e=>{
 """
 
 
+def _client_load_rows(inv):
+    """各客户端加载总览行:客户端 / 加载条目 / 实际技能 / 重复条目 / 备注。"""
+    cl = inv.get("client_load") or {}
+    notes = {
+        "codex": "2026-08-25 起自动导入共享库 ~/.agents/skills",
+        "haha": "同时读 Claude 目录与共享库(机制固有)",
+        "cindy": "只读投影(共享库 + Codex 目录)",
+    }
+    rows = []
+    for client in ("zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego"):
+        s = cl.get(client)
+        if not s or not s.get("entries"):
+            continue
+        dup = "⚠️ {} 个重复:{}".format(len(s["duplicates"]), "、".join(s["duplicates"][:8]) +
+                                       ("…" if len(s["duplicates"]) > 8 else "")) if s["duplicates"] else "✅"
+        rows.append((client, s["entries"], s["skills"], dup, notes.get(client, "")))
+    return rows
+
+
 def render_html(inv, last=None, ctx=None):
     view = build_view(inv, last, ctx)
     c = view["counts"]
@@ -375,6 +395,18 @@ def render_html(inv, last=None, ctx=None):
         '<span class="chip">❓ 需要人工确认 {需要人工确认}</span>'.format(**c),
         '<span class="chip">🔍 未审查 {unreviewed}</span>'.format(**c),
     ]
+
+    # 各客户端加载上下文总览(用户最关心的口径:每个客户端启动时占用多少条)
+    load_rows = _client_load_rows(inv)
+    load_cells = "".join(
+        '<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td class="mut">{}</td></tr>'.format(
+            esc(CLIENT_LABELS.get(c, c)), e, s, d, esc(n))
+        for c, e, s, d, n in load_rows) or '<tr><td colspan="5">无</td></tr>'
+    load_sec = (
+        '<details open><summary><b>📱 各客户端加载上下文</b>'
+        '<span class="cnt">启动即占用 name+description;同名多份=重复占用</span></summary>'
+        '<table><tr><th>客户端</th><th>加载条目</th><th>实际技能</th><th>重复条目</th><th>备注</th></tr>'
+        '{}</table></details>').format(load_cells)
 
     # 受保护区
     prot_rows = []
@@ -474,6 +506,7 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 <h1>📋 Skill 管家报告 <span class="mut">v2 · 价值审查面板</span></h1>
 <div>生成时间:__TS__</div>
 <div class="chips">__CHIPS__</div>
+__LOAD__
 __PROTECTED__
 __VALUE__
 __TABLE__
@@ -485,6 +518,7 @@ __TABLE__
     return (head
             .replace("__TS__", esc(inv.get("scanned_at") or ""))
             .replace("__CHIPS__", "".join(chips))
+            .replace("__LOAD__", load_sec)
             .replace("__PROTECTED__", protected_sec)
             .replace("__VALUE__", value_sec)
             .replace("__TABLE__", table_sec)
@@ -502,8 +536,16 @@ def render_md(inv, last=None, ctx=None):
          "",
          "口径:{}。".format(REPO_SCOPE_NOTE),
          "",
-         "## 一、价值审查(第三方 Skill)",
-         ""]
+         "## 〇、各客户端加载上下文(启动即占用)",
+         "",
+         "| 客户端 | 加载条目 | 实际技能 | 重复条目 | 备注 |",
+         "|---|---|---|---|---|"]
+    for _cl, _e, _s, _d, _n in _client_load_rows(inv):
+        L.append("| {} | {} | {} | {} | {} |".format(
+            CLIENT_LABELS.get(_cl, _cl), _e, _s, _d, _n))
+    L += ["",
+          "## 一、价值审查(第三方 Skill)",
+          ""]
     for group in VERDICT_GROUPS:
         L.append("**{}**({} 个)".format(VERDICT_EMOJI[group], c[group]))
         rows = view["verdict_rows"][group]

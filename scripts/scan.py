@@ -21,8 +21,31 @@ from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
 HOME = os.path.expanduser("~")
 LOCK_FILE = os.path.join(HOME, ".agents/.skill-lock.json")
 
-# ZCode 会在用户/共享/插件缓存之间发现同名 skill 并全部列出 → 只在这组客户端里判重复加载
-ZCODE_DISCOVERY_CLIENTS = ("zcode", "shared")
+# 客户端 → 实际读取的位置(加载拓扑,2026-09 按各客户端真实行为核实):
+# - ZCode:~/.zcode/skills → 共享库 → 工作区 .zcode/.agents → 插件缓存;
+# - Codex:2026-08-25 起自动导入外部 Agent 技能库 ~/.agents/skills(external agent home),
+#   叠加自身目录、.system 与插件缓存——共享库内容会整体进入 Codex;
+# - Claude Code:~/.claude/skills(逐项符号链接)+ 插件缓存,不读共享库;
+# - Haha:复用 Claude 目录与共享库(机制固有,镜像同名会双份);
+# - Cindy:只读投影,不单列重复(其内容随共享库/Codex 目录变化)。
+CLIENT_LABELS = {
+    "zcode": "ZCode", "codex": "Codex", "claude-code": "Claude Code", "haha": "Haha",
+    "cindy": "Cindy", "accio": "Accio", "workbuddy": "WorkBuddy", "ego": "Ego",
+}
+# 重复加载逐个报告的客户端;Haha 聚合为一条,Cindy 不报
+DUP_FINDING_CLIENTS = ("zcode", "codex", "claude-code", "accio", "workbuddy", "ego")
+
+
+def _location_in_client(loc, client):
+    if client == "zcode":
+        return loc["client"] == "zcode" or loc["client"] == "workspace-zcode" or loc["location_id"] == "shared"
+    if client == "codex":
+        return loc["client"] == "codex" or loc["location_id"] == "shared"
+    if client == "claude-code":
+        return loc["client"] == "claude-code"
+    if client == "haha":
+        return "haha" in (loc.get("aliases") or [])
+    return loc["client"] == client
 
 # 各位置的加载优先级(数字小先加载,用于遮蔽/重复判定与展示排序)
 _PRIORITY_RULES = (
@@ -278,34 +301,119 @@ def _apply_ignore(findings, data_dir: Path):
                 f["ignored"] = True
 
 
-def _structural_findings(instances):
-    """重复加载(ZCode 发现集内同名多份)与链接漂移(符号链接内容 ≠ shared 正本)。"""
+def _version_key(v):
+    """宽松版本比较键:'0.4.10' > '0.4.9'。"""
+    return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.-]", str(v or "0")))
+
+
+def _effective_loaded(instances):
+    """插件缓存内同一插件多版本并存时,只有最高版本真正参与加载(按 ZCode/Codex 实测行为);
+    旧版本目录只是缓存残留。返回 (参与加载的实例, 旧版本残留实例)。"""
+    best = {}
+    for i in instances:
+        if i.get("plugin_name"):
+            key = (i["location_id"], i["plugin_name"])
+            v = _version_key(i.get("plugin_version"))
+            if key not in best or v > best[key]:
+                best[key] = v
+    loaded, stale = [], []
+    for i in instances:
+        if i.get("plugin_name"):
+            key = (i["location_id"], i["plugin_name"])
+            if _version_key(i.get("plugin_version")) < best[key]:
+                stale.append(i)
+                continue
+        loaded.append(i)
+    return loaded, stale
+
+
+def _client_load_stats(instances, locations):
+    """每个客户端真实加载的技能条目数与同名重复(启动上下文口径)。"""
+    loaded, _ = _effective_loaded(instances)
+    stats = {}
+    for client in CLIENT_LABELS:
+        loc_ids = {l["location_id"] for l in locations if _location_in_client(l, client)}
+        insts = [i for i in loaded if i["is_skill"] and i["location_id"] in loc_ids]
+        by_name = {}
+        for i in insts:
+            by_name.setdefault(i["logical_name"], []).append(i)
+        dups = sorted(n for n, v in by_name.items() if len(v) > 1)
+        stats[client] = {
+            "entries": len(insts), "skills": len(by_name), "duplicates": dups,
+            "dup_entries": len(insts) - len(by_name),
+        }
+    return stats
+
+
+def _structural_findings(instances, locations, data_dir):
+    """按客户端加载拓扑查重复加载;链接漂移;插件旧版本残留;应用内置技能扩散。"""
     findings = []
+    loaded, stale = _effective_loaded(instances)
     by_name = {}
-    for inst in instances:
+    for inst in loaded:
         if inst["is_skill"]:
             by_name.setdefault(inst["logical_name"], []).append(inst)
 
-    for name, insts in sorted(by_name.items()):
-        zc = [i for i in insts if i["client"] in ZCODE_DISCOVERY_CLIENTS]
-        if len(zc) > 1:
-            locs = "、".join(i["display_path"].rsplit("/", 1)[0] for i in zc)
+    for client in DUP_FINDING_CLIENTS:
+        loc_ids = {l["location_id"] for l in locations if _location_in_client(l, client)}
+        for name in sorted({n for n, v in by_name.items()
+                            if len([i for i in v if i["location_id"] in loc_ids]) > 1}):
+            insts = [i for i in by_name[name] if i["location_id"] in loc_ids]
+            locs = "、".join(i["display_path"].rsplit("/", 1)[0] for i in insts)
             findings.append({
-                "code": "duplicate-load", "severity": "yellow", "instance_id": zc[0]["instance_id"],
-                "skill": name, "location_id": zc[0]["location_id"],
-                "message": f"ZCode 同名 {len(zc)} 份:{locs}(全部进列表,只加载第一份)",
-                "ignored": False, "related_ids": [i["instance_id"] for i in zc[1:]],
+                "code": "duplicate-load", "severity": "yellow", "instance_id": insts[0]["instance_id"],
+                "skill": name, "location_id": insts[0]["location_id"],
+                "message": f"{CLIENT_LABELS[client]} 同名 {len(insts)} 份:{locs}"
+                           f"(全部进入加载列表,重复占用启动上下文)",
+                "ignored": False, "related_ids": [i["instance_id"] for i in insts[1:]],
             })
-        master = next((i for i in insts if i["location_id"] == "shared" and not i["is_symlink"]), None)
-        if not master:
-            continue
-        for i in insts:
-            if i is master or not i["is_symlink"] or not i["is_skill"]:
-                continue
-            if i["tree_hash"] != master["tree_hash"]:
+
+    # Haha:同时读 Claude 目录与共享库,镜像同名会双份——聚合为一条,不逐个刷屏
+    haha_ids = {l["location_id"] for l in locations if _location_in_client(l, "haha")}
+    haha_dups = sorted(n for n, v in by_name.items()
+                       if len([i for i in v if i["location_id"] in haha_ids]) > 1)
+    if haha_dups:
+        findings.append({
+            "code": "wrapper-double-load", "severity": "yellow",
+            "instance_id": "-", "skill": "(haha)", "location_id": "shared",
+            "message": f"Haha 同时读取 Claude 目录与共享库,{len(haha_dups)} 个同名技能会双份加载"
+                       f"(Haha 机制固有;精简共享库与 Claude 镜像的同名条目可同步减少)",
+            "ignored": False,
+        })
+
+    for i in stale:
+        findings.append(_finding(
+            "stale-plugin-version", "info", i,
+            f"插件 {i.get('plugin_name')} 旧版本 {i.get('plugin_version')} 残留缓存"
+            f"(客户端只加载最高版本,不占上下文;清理请在所属客户端操作)"))
+
+    # 应用内置技能(builtin-app)出现在共享库 → 会被所有读共享库的客户端加载
+    ks = load_json_checked(Path(data_dir) / "known-sources.json", {})[0]
+    if isinstance(ks, dict):
+        builtin = {k: v for k, v in ks.items()
+                   if isinstance(v, dict) and v.get("type") == "builtin-app"}
+        for inst in instances:
+            if (inst["is_skill"] and inst["location_id"] == "shared"
+                    and inst["directory_name"] in builtin):
+                meta = builtin[inst["directory_name"]]
                 findings.append(_finding(
-                    "link-drift", "yellow", i,
-                    f"链接漂移: {i['display_path']} 的内容与主库 {master['display_path']} 不一致"))
+                    "builtin-app-spread", "yellow", inst,
+                    f"应用内置技能 {inst['directory_name']}({meta.get('note') or 'builtin-app'})"
+                    f"位于共享库,会被 ZCode/Codex 等所有读取共享库的客户端加载;"
+                    f"建议仅保留在所属客户端自己的目录"))
+
+    master_by_name = {}
+    for inst in instances:
+        if inst["is_skill"] and inst["location_id"] == "shared" and not inst["is_symlink"]:
+            master_by_name.setdefault(inst["logical_name"], inst)
+    for inst in instances:
+        master = master_by_name.get(inst.get("logical_name"))
+        if not master or inst is master or not inst["is_symlink"] or not inst["is_skill"]:
+            continue
+        if inst["tree_hash"] != master["tree_hash"]:
+            findings.append(_finding(
+                "link-drift", "yellow", inst,
+                f"链接漂移: {inst['display_path']} 的内容与主库 {master['display_path']} 不一致"))
     return findings
 
 
@@ -352,9 +460,10 @@ def build_inventory(home, data_dir) -> dict:
                 inst, f = _scan_entry(loc, root, entry, home)
                 instances.append(inst)
                 findings.extend(f)
-    findings.extend(_structural_findings(instances))
+    findings.extend(_structural_findings(instances, [l.to_dict() for l in locations], data_dir))
     _apply_ignore(findings, data_dir)
     logical = _build_logical_skills(instances)
+    client_load = _client_load_stats(instances, [l.to_dict() for l in locations])
 
     inv = {
         "schema_version": SCHEMA_VERSION,
@@ -363,6 +472,7 @@ def build_inventory(home, data_dir) -> dict:
         "locations": [loc.to_dict() for loc in locations],
         "instances": instances,
         "logical_skills": logical,
+        "client_load": client_load,
         "findings": findings,
         "config_issues": config_issues,
         "total": len(logical),
@@ -445,6 +555,7 @@ def main():
             "schema_version": inv["schema_version"], "scanned_at": inv["scanned_at"],
             "total": inv["total"], "instances": len(inv["instances"]),
             "locations": len(inv["locations"]), "duplicated": dup,
+            "client_load": inv.get("client_load", {}),
             "red": red, "yellow": yellow, "junk_count": len(inv["instances"]) - sum(1 for i in inv["instances"] if i["is_skill"]),
             "ignored_issues": ignored_n, "need_vet": [],
             "operational_ok": inv["operational_ok"], "health_status": inv["health_status"],
@@ -453,6 +564,12 @@ def main():
 
     print(f"✅ 扫描完成:{inv['total']} 个逻辑 skill / {len(inv['instances'])} 个安装实例 → {cur}")
     print(f"位置:{len(inv['locations'])} 个;" + "、".join(sorted({loc['client'] for loc in inv['locations']})))
+    cl = inv.get("client_load", {})
+    load_line = "、".join(
+        f"{CLIENT_LABELS[c]} {cl[c]['entries']}" + (f"(重复{cl[c]['dup_entries']})" if cl[c]["dup_entries"] else "")
+        for c in ("zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego")
+        if cl.get(c, {}).get("entries"))
+    print(f"客户端加载条目:{load_line or '无'}")
     print(f"健康:{len(red)} 红 / {len(yellow)} 黄;重复加载 {len(dup)} 个;忽略 {ignored_n} 条")
     print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
     sys.exit(1 if red else 0)

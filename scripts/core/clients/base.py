@@ -52,7 +52,8 @@ def discover_skill_roots(location):
     root = Path(location.path)
     if not root.is_dir():
         return []
-    nested = location.client in ("zcode", "claude-code", "accio")  # 市场/插件/版本/skills
+    # 市场/插件/版本/skills 四层(zcode/claude-code/accio/codex);workbuddy 是插件/版本/skills 三层
+    nested = location.client in ("zcode", "claude-code", "accio", "codex")
     pattern = "*/*/*/skills" if nested else "*/*/skills"
     return sorted(p for p in root.glob(pattern) if p.is_dir())
 
