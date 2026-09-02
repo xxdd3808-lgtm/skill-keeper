@@ -85,6 +85,22 @@ class ChangeRemoveTests(unittest.TestCase):
             create_update_plan(env.iid, snap, env.inventory, env.plans_dir,
                                known_sources={"demo": {"type": "builtin-app"}})
 
+    def test_refusal_applies_even_when_caller_omits_known_sources(self):
+        """回归(2026-09-02):外部 Agent 绕过 CLI 直调 create_remove_plan 并省略
+        known_sources,builtin-app 保护没有生效。白名单必须默认从 data 目录加载,
+        传 falsy 视同未提供——想绕过保护没有入口。"""
+        env = change_env(self)
+        import json
+        env.data.mkdir(parents=True, exist_ok=True)
+        (env.data / "known-sources.json").write_text(
+            json.dumps({"demo": {"type": "builtin-app"}}), encoding="utf-8")
+        with self.assertRaises(ChangeError):
+            create_remove_plan([env.iid], env.inventory, "test", env.plans_dir)
+        with self.assertRaises(ChangeError):
+            create_remove_plan([env.iid], env.inventory, "test", env.plans_dir,
+                               known_sources={})
+        self.assertTrue(env.skill_path.exists(), "builtin-app 目标不得生成删除计划")
+
     def test_apply_requires_exact_digest_and_rolls_back_on_verify_failure(self):
         env = change_env(self)
         plan = env.remove_plan()

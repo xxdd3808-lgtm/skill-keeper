@@ -90,9 +90,23 @@ def _client_managed_refusal(inst, known_sources):
     return None
 
 
+def _known_sources_or_load(known_sources, plans_dir):
+    """known_sources 未传时从 plans_dir 的父目录(即 data_dir)自行加载来源白名单。
+
+    2026-09-02 复盘:外部 Agent 绕过 CLI 直接调 create_remove_plan 并省略
+    known_sources,导致 builtin-app 保护(删除计划直接拒绝)没有生效,autoglm
+    五件套被当作 AutoClaw 残留删除(有备份,后端服务确已消亡,无功能损失)。
+    防线必须默认在位:调用方想忘都忘不了(显式传 falsy 视同未提供,不许空表跳过保护)。"""
+    if not known_sources:
+        from .provenance import load_user_config
+        known_sources = load_user_config(Path(plans_dir).parent)
+    return known_sources
+
+
 def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir,
                        known_sources=None) -> ChangePlan:
     """生成固定候选更新计划:precondition 同时绑定本地 hash、来源、commit、候选 hash 与 staging 路径。"""
+    known_sources = _known_sources_or_load(known_sources, plans_dir)
     iid = _validate_instance_id(instance_id)
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
     inst = by_id.get(iid)
@@ -223,6 +237,7 @@ def _load_vet(plan_id, context, candidate_hash):
 def create_remove_plan(instance_ids, inventory, reason, plans_dir,
                        known_sources=None) -> ChangePlan:
     """为可变实例生成不可变删除计划;目标不存在/不可变/路径越界/客户端托管都直接拒绝。"""
+    known_sources = _known_sources_or_load(known_sources, plans_dir)
     if not isinstance(reason, str) or not reason.strip():
         raise ChangeError("必须给出删除理由(写给自己和审计看的)")
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
