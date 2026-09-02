@@ -39,9 +39,10 @@
 
 ### 报告 `report.py`
 
-- Markdown + 交互 HTML:顶部先给结论(受保护类、第三方待审、五种结论各多少、未审查多少),受保护区 + 价值审查卡片 + 实例明细 + 备份区
+- Markdown + 交互 HTML:顶部按「资产概况 / 需要关注 / 价值结论」分组,先给结论(受保护类、第三方待审、五种结论各多少、未审查多少、待更新/复核多少),再给受保护区 + 价值审查卡片 + 实例明细 + 备份区
+- 顶部非零指标可点击直达对应区块;红/黄灯和待更新项显示可处理清单,每条问题可继续定位到具体安装实例;大表默认折叠,避免报告打开即被长表淹没。健康问题按安装实例计数,同一个逻辑 Skill 的多个物理实例可能各产生一条记录
 - 每张第三方卡片展示:结论与理由、主要依据、更值得保留的替代、独特能力、**删除后可能失去什么**、置信度、审查时间与模型、仓库热度口径提示、安检状态、候选更新状态;过期结论显著标注
-- **一键操作** `report.py --serve`(macOS 可双击 `启动技能报告.command`):本地服务(仅 127.0.0.1 + 随机 token + Origin 校验 + 请求体上限),网页按钮走两阶段——先生成计划(展示摘要+digest),确认后执行;全程记入 `data/audit-v2.jsonl`。静态打开 report.html 时,按钮退化为复制等价的安全 plan 命令(只含 instance_id)
+- **一键操作** `report.py --serve`(macOS 可双击 `启动技能报告.command`):本地服务(仅 127.0.0.1 + 随机 token + Origin 校验 + 请求体上限),交互脚本通过带 token 的同源 `/report.js` 加载,网页按钮走两阶段——先生成计划(展示摘要+digest),确认后执行;全程记入 `data/audit-v2.jsonl`。静态打开 report.html 时仍是单文件,按钮退化为复制等价的安全 plan 命令(只含 instance_id)
 
 ### 安全删除 / 更新 / 恢复
 
@@ -92,7 +93,7 @@ python3 ~/skill-keeper/scripts/report.py && open ~/skill-keeper/data/report.html
 | `~/.zcode/skills` + `~/.zcode/cli/plugins/cache/**` | ZCode(缓存只读,识别旧版本) |
 | `~/.agents/skills` | 共享库(Haha 复用时只加标记,不重复计数) |
 | `~/.claude/skills` + `~/.claude/plugins/cache/**` | Claude Code(Haha 启动器存在时同一位置标注复用) |
-| `~/.codex/skills`、`~/.codex/.system/skills`、`~/.codex/plugins/cache/**` | Codex CLI(系统/缓存只读) |
+| `~/.codex/skills`、`~/.codex/skills/.system`(兼容旧布局 `~/.codex/.system/skills`)、`~/.codex/plugins/cache/**` | Codex CLI(系统/缓存只读) |
 | `~/.accio/accounts/*/skills` | Accio Work(账号编号哈希化,绝不输出原始账号) |
 | `~/.workbuddy/skills`、`connectors/skills`、`plugins/cache/**` | WorkBuddy(marketplace 商品目录不算已安装) |
 | `~/Library/Application Support/Cindy/...` | Cindy(投影只读,同一实体按真实路径去重) |

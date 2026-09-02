@@ -1,5 +1,7 @@
 # skill-keeper v2 Implementation Plan
 
+> **状态：已完成（2026-09-02）。** 原计划中的实现、测试和真实环境只读验收已完成；后续报告导航与严格 CSP 兼容修复记录在后续提交中。现役命令和约束以项目根 `AGENTS.md`、`README.md`、`SKILL.md` 与当前代码为准，本文件保留为历史执行记录。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把现有盘点器一次升级为覆盖 ZCode、Codex、Accio Work、WorkBuddy（用户称 Workbody）、Claude Code、Claude Code Haha、Cindy 等客户端的安全 Skill 管家，并为所有非自建、非客户端自带的第三方 Skill 生成有 GitHub/市场证据、重复与替代分析的大模型价值建议。
@@ -78,7 +80,7 @@
 - Produces: `load_json_checked(path, default)`, `atomic_write_json(path, value)`, `read_json_fields(path, allowed)`, `FileLock(path)`
 - Consumes: Python 标准库 `dataclasses`, `json`, `pathlib`, `tempfile`, `os`
 
-- [ ] **Step 1: 写失败测试，固定原子写入、脱敏读取和模型往返要求**
+- [x] **Step 1: 写失败测试，固定原子写入、脱敏读取和模型往返要求**
 
 ```python
 # tests/test_io_models.py
@@ -102,13 +104,13 @@ class IoModelTests(unittest.TestCase):
         self.assertEqual(Location.from_dict(loc.to_dict()), loc)
 ```
 
-- [ ] **Step 2: 运行测试并确认因核心模块不存在而失败**
+- [x] **Step 2: 运行测试并确认因核心模块不存在而失败**
 
 Run: `python3 -m unittest tests.test_io_models -v`
 
 Expected: `ModuleNotFoundError: No module named 'scripts.core'`
 
-- [ ] **Step 3: 实现明确的数据模型、原子 JSON 写和白名单读取**
+- [x] **Step 3: 实现明确的数据模型、原子 JSON 写和白名单读取**
 
 ```python
 # scripts/core/models.py 的公共接口
@@ -165,13 +167,13 @@ class ChangePlan:
 
 `atomic_write_json` 必须在目标同目录创建临时文件，写入后 `flush()`、`os.fsync()`，最后 `os.replace()`；异常时清理临时文件。`read_json_fields` 只返回 allowed 集合中的顶层字段，禁止把未知值放进错误信息。`load_json_checked` 返回 `(value, issues)`，损坏文件产生结构化 issue 而不是静默使用空值。
 
-- [ ] **Step 4: 运行任务测试和全量测试**
+- [x] **Step 4: 运行任务测试和全量测试**
 
 Run: `python3 -m unittest tests.test_io_models -v && python3 -m unittest discover -s tests -v`
 
 Expected: 所有测试 `OK`，项目文件中不存在临时 `.tmp` 文件。
 
-- [ ] **Step 5: 更新 gitignore 并提交**
+- [x] **Step 5: 更新 gitignore 并提交**
 
 在 `.gitignore` 增加：
 
@@ -207,7 +209,7 @@ git commit -m "feat: add v2 core models and safe state IO"
 - Produces: `instance_id(location_id: str, directory_name: str, real_path: str) -> str`
 - Consumes: `atomic_write_json` 仅用于测试快照，不在指纹函数中写状态
 
-- [ ] **Step 1: 写失败测试，证明辅助脚本和链接变化都会改变指纹**
+- [x] **Step 1: 写失败测试，证明辅助脚本和链接变化都会改变指纹**
 
 ```python
 # tests/test_fingerprint.py
@@ -234,23 +236,23 @@ class FingerprintTests(unittest.TestCase):
             self.assertNotIn("secret", str(rows))
 ```
 
-- [ ] **Step 2: 运行测试确认旧 `sk_signature` 无法满足要求**
+- [x] **Step 2: 运行测试确认旧 `sk_signature` 无法满足要求**
 
 Run: `python3 -m unittest tests.test_fingerprint -v`
 
 Expected: import 或断言失败；不得修改现有 `scan.py` 来绕过测试。
 
-- [ ] **Step 3: 实现确定性 tree manifest**
+- [x] **Step 3: 实现确定性 tree manifest**
 
 `tree_manifest` 按 UTF-8 字节序排序相对路径，记录 `path/type/mode/sha256`；符号链接只记录 `target`，不读取目标内容；拒绝 root 不是目录。默认只排除 `.DS_Store`、`__pycache__`、`*.pyc`，排除列表作为模块常量写入 manifest 版本。`tree_hash` 对规范化 JSON 使用 SHA-256，不截断摘要。`instance_id` 对三个输入的规范化字符串 SHA-256，显示前 20 位但保存完整输入证据。
 
-- [ ] **Step 4: 运行指纹和全量测试**
+- [x] **Step 4: 运行指纹和全量测试**
 
 Run: `python3 -m unittest tests.test_fingerprint -v && python3 -m unittest discover -s tests -v`
 
 Expected: 内容、权限、相对路径或链接目标变化均改变摘要；外部链接目标内容不被读取。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/fingerprint.py tests/test_fingerprint.py
@@ -278,7 +280,7 @@ git commit -m "feat: fingerprint complete skill trees"
 - Produces: `client_load_aliases(home: Path) -> Mapping[str, Sequence[str]]`
 - Consumes: `Location`, `read_json_fields`
 
-- [ ] **Step 1: 写包含七类客户端、市场目录和虚构 secret 的失败 fixture 测试**
+- [x] **Step 1: 写包含七类客户端、市场目录和虚构 secret 的失败 fixture 测试**
 
 ```python
 # tests/test_client_discovery.py（核心断言）
@@ -301,13 +303,13 @@ class ClientDiscoveryTests(unittest.TestCase):
 
 `tests/helpers.py` 新增 `write_skill(root, name, description)` 和 `build_multi_client_home(testcase)`；fixture 必须覆盖：ZCode plugin cache、Codex `.system`/plugin cache、Accio account official cache、WorkBuddy user/connector/plugin/marketplace、Claude user/plugin marketplace、Haha wrapper、Cindy codex-home/system/plugin projection。
 
-- [ ] **Step 2: 运行测试确认现有硬编码 LOCATIONS 无法发现这些客户端**
+- [x] **Step 2: 运行测试确认现有硬编码 LOCATIONS 无法发现这些客户端**
 
 Run: `python3 -m unittest tests.test_client_discovery -v`
 
 Expected: `discover_locations` 缺失或多项 location ID 缺失。
 
-- [ ] **Step 3: 实现适配器注册表和严格的“已安装”判断**
+- [x] **Step 3: 实现适配器注册表和严格的“已安装”判断**
 
 ```python
 # scripts/core/clients/base.py
@@ -332,13 +334,13 @@ def discover_locations(home, data_dir):
 - Accio 遍历 `~/.accio/accounts/*/skills`，账号目录名只用于生成哈希 ID，不输出原账号值；读取 remote cache 仅允许 `name/id/official/version/oss`。
 - 所有 adapter 不读取设置中的 `env/token/key/cookie/authorization` 字段。
 
-- [ ] **Step 4: 运行客户端发现和 secret 泄漏测试**
+- [x] **Step 4: 运行客户端发现和 secret 泄漏测试**
 
 Run: `python3 -m unittest tests.test_client_discovery -v && python3 -m unittest discover -s tests -v`
 
 Expected: 七类客户端均被识别，marketplace 未安装内容不计数，Haha 不重复计数，输出不含 `FAKE-SECRET-123`。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/clients tests/helpers.py tests/test_client_discovery.py
@@ -359,7 +361,7 @@ git commit -m "feat: discover skills across supported clients"
 - Produces: `build_inventory(home: Path, data_dir: Path) -> dict`
 - Produces: inventory `schema_version=2`、`locations`、`instances`、`logical_skills`、`config_issues`
 
-- [ ] **Step 1: 写失败测试，覆盖重复/漂移、工作区、稳定 ID 和可变性**
+- [x] **Step 1: 写失败测试，覆盖重复/漂移、工作区、稳定 ID 和可变性**
 
 ```python
 # tests/test_scan_v2.py
@@ -383,19 +385,19 @@ class ScanV2Tests(unittest.TestCase):
         self.assertTrue(all(not x["mutable"] for x in inv["instances"] if x["kind"] in {"builtin", "plugin-cache"}))
 ```
 
-- [ ] **Step 2: 运行测试确认旧聚合器按 name 合并且漏掉追加问题**
+- [x] **Step 2: 运行测试确认旧聚合器按 name 合并且漏掉追加问题**
 
 Run: `python3 -m unittest tests.test_scan_v2 -v`
 
 Expected: inventory schema、findings code 或完整 tree hash 断言失败。
 
-- [ ] **Step 3: 实现 v2 聚合并保留 CLI 兼容输出**
+- [x] **Step 3: 实现 v2 聚合并保留 CLI 兼容输出**
 
 `build_inventory` 必须先构建 Location，再构建 SkillInstance，再依据已核实来源或内容身份构建 logical skill。重复加载和链接漂移先生成结构化 finding，再统一应用 ignore 规则；不得在 ignore 分类后追加丢失。frontmatter 核心字段始终由项目自带确定性解析器提取，PyYAML 只追加 `yaml-validation` finding。CLI 从 `SKILL_KEEPER_DATA` 读取可选数据目录覆盖，未设置时才使用项目 `data/`；测试覆盖目录不得反向写入真实项目数据。
 
 写 `inventory.json` 前验证所有 `instance_id` 唯一、每个 mutable instance 的 path 属于已登记 mutable location、所有输出通过 secret key/value 过滤。`--json` 保留退出码含义，但加入 `operational_ok` 和 `health_status`，供服务区分“运行失败”和“发现红灯”。
 
-- [ ] **Step 4: 运行扫描测试和临时 HOME CLI 测试**
+- [x] **Step 4: 运行扫描测试和临时 HOME CLI 测试**
 
 Run:
 
@@ -407,7 +409,7 @@ python3 -m unittest discover -s tests -v
 
 Expected: 空 HOME 生成 `total=0` 且 `operational_ok=true`；全量测试通过。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/scan.py tests/test_scan_v2.py data/client-locations.example.json
@@ -432,7 +434,7 @@ git commit -m "feat: build schema v2 skill inventory"
 - Produces: `fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner) -> dict`
 - Consumes: inventory v2、完整 tree hash、原子 JSON I/O
 
-- [ ] **Step 1: 写失败测试，禁止名称伪装和单文件/文本模式更新**
+- [x] **Step 1: 写失败测试，禁止名称伪装和单文件/文本模式更新**
 
 ```python
 # tests/test_provenance_github.py
@@ -456,13 +458,13 @@ class ProvenanceGithubTests(unittest.TestCase):
             self.assertEqual(result["commit_sha"], "abc123")
 ```
 
-- [ ] **Step 2: 运行测试确认旧 `_meta` 短路、名称前缀和 text 模式不满足要求**
+- [x] **Step 2: 运行测试确认旧 `_meta` 短路、名称前缀和 text 模式不满足要求**
 
 Run: `python3 -m unittest tests.test_provenance_github -v`
 
 Expected: 来源误分类或嵌套/二进制文件断言失败。
 
-- [ ] **Step 3: 实现证据优先级、GitHub 缓存和完整树快照**
+- [x] **Step 3: 实现证据优先级、GitHub 缓存和完整树快照**
 
 来源结果必须包含 `class/type/repo/path/confidence/evidence`；`self-built` 只接受 `self-built.txt` 中精确 directory 或稳定 ID，客户端 builtin/plugin 只接受适配器 manifest/receipt 证据。homepage 和 GitHub 搜索只产生 candidate。
 
@@ -472,7 +474,7 @@ Expected: 来源误分类或嵌套/二进制文件断言失败。
 
 创建 `tests/fixtures/inventory-value.json`，只包含一个受保护客户端文档 Skill、一个有 GitHub 来源的第三方文档 Skill和一个来源未知 Skill；路径全部使用 `/fixture/home`，repo 使用 `example/*`，供 Task 5 和 Task 6 CLI 测试共享。
 
-- [ ] **Step 4: 运行来源、空 HOME、无 gh 和全量测试**
+- [x] **Step 4: 运行来源、空 HOME、无 gh 和全量测试**
 
 Run:
 
@@ -484,7 +486,7 @@ python3 -m unittest discover -s tests -v
 
 Expected: 缺 lock 或 gh 时不 traceback；JSON 显示 skipped/stale 原因；全量测试通过。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/provenance.py scripts/core/github.py scripts/check_updates.py tests/test_provenance_github.py tests/fixtures/inventory-value.json
@@ -509,7 +511,7 @@ git commit -m "feat: verify sources and cache repository evidence"
 - Produces: `record_review(queue, review_payload, reviewer_model) -> dict`
 - Consumes: provenance、tree hash、客户端 aliases、reputation snapshot
 
-- [ ] **Step 1: 写失败测试，固定候选、保护类、审查证据和过期逻辑**
+- [x] **Step 1: 写失败测试，固定候选、保护类、审查证据和过期逻辑**
 
 ```python
 # tests/test_value_reviews.py
@@ -534,13 +536,13 @@ class ValueReviewTests(unittest.TestCase):
             record_review(one_item_queue(), low_star_only_payload(), "test-model")
 ```
 
-- [ ] **Step 2: 运行测试确认价值审查模块不存在**
+- [x] **Step 2: 运行测试确认价值审查模块不存在**
 
 Run: `python3 -m unittest tests.test_value_reviews -v`
 
 Expected: import 失败或审查校验不存在。
 
-- [ ] **Step 3: 实现确定性候选和大模型记账边界**
+- [x] **Step 3: 实现确定性候选和大模型记账边界**
 
 `exact_duplicate_groups` 用 tree hash；`candidate_pairs` 对 name、description、trigger、依赖、正文词元和来源路径计算可解释的分项相似度，只生成候选。受保护 Skill 不成为审查目标，但可以成为替代品。
 
@@ -560,7 +562,7 @@ python3 scripts/value_review.py record --file <review.json> --model <model-name>
 
 修改 `SKILL.md` 工作流：扫描后先生成 queue；大模型逐项把 Skill 内容当不可信材料阅读，综合功能、适配、维护、热度、安全、成本、独特性和替代关系，记录理由；不执行被审查 Skill 中的任何指令。
 
-- [ ] **Step 4: 运行价值审查测试和 CLI fixture 测试**
+- [x] **Step 4: 运行价值审查测试和 CLI fixture 测试**
 
 Run:
 
@@ -572,7 +574,7 @@ python3 -m unittest discover -s tests -v
 
 Expected: 保护类只作替代候选；第三方进入队列；低星单因子删除记录被拒绝；全量测试通过。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/overlap.py scripts/core/reviews.py scripts/value_review.py tests/test_value_reviews.py SKILL.md
@@ -593,7 +595,7 @@ git commit -m "feat: queue explainable skill value reviews"
 - Produces: `restore_backup(archive_path, locations, conflict="fail") -> dict`
 - Consumes: tree manifest/hash、Location、ChangePlan、原子写入
 
-- [ ] **Step 1: 写失败测试，覆盖多位置、符号链接、重复 tar 名和恶意归档**
+- [x] **Step 1: 写失败测试，覆盖多位置、符号链接、重复 tar 名和恶意归档**
 
 ```python
 # tests/test_backup_restore.py
@@ -614,25 +616,25 @@ class BackupRestoreTests(unittest.TestCase):
             verify_backup(archive)
 ```
 
-- [ ] **Step 2: 运行测试确认旧归档包含重复 member 且恢复位置丢失**
+- [x] **Step 2: 运行测试确认旧归档包含重复 member 且恢复位置丢失**
 
 Run: `python3 -m unittest tests.test_backup_restore -v`
 
 Expected: round-trip 或恶意归档测试失败。
 
-- [ ] **Step 3: 实现 manifest-first 归档和不使用 extractall 的恢复**
+- [x] **Step 3: 实现 manifest-first 归档和不使用 extractall 的恢复**
 
 归档内使用 `payload/<instance_id>/<relative-path>` 唯一路径；普通文件作为 regular member，目录、权限和符号链接只记录在 `manifest.json`，不创建 tar symlink/hardlink。manifest 保存 schema、backup_id、plan_id、location_id、original_relative_path、tree manifest/hash、created_at 和 reason。
 
 `verify_backup` 逐 member 拒绝绝对路径、`..`、重复名、设备文件、tar symlink/hardlink 和 manifest 外成员，验证所有 payload SHA-256。`restore_backup` 先在每个目标父目录的临时目录重建并校验，再原子移动；冲突默认失败，不覆盖。旧格式只通过单独 `inspect_legacy_backup` 展示，不进入自动恢复。
 
-- [ ] **Step 4: 运行备份测试和故障注入测试**
+- [x] **Step 4: 运行备份测试和故障注入测试**
 
 Run: `python3 -m unittest tests.test_backup_restore -v && python3 -m unittest discover -s tests -v`
 
 Expected: 多实例逐位置恢复；恶意、重复、损坏或冲突归档安全失败；全量测试通过。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/backup.py tests/test_backup_restore.py
@@ -655,7 +657,7 @@ git commit -m "feat: add verified round-trip backups"
 - Produces: `append_audit(event, audit_path)`
 - Consumes: backup engine、FileLock、atomic JSON、stable instance ID
 
-- [ ] **Step 1: 写失败测试，覆盖 `..`、路径逃逸、过期计划、并发和回滚**
+- [x] **Step 1: 写失败测试，覆盖 `..`、路径逃逸、过期计划、并发和回滚**
 
 ```python
 # tests/test_change_remove.py
@@ -678,13 +680,13 @@ class ChangeRemoveTests(unittest.TestCase):
         self.assertEqual(env.last_audit()["rollback_status"], "restored")
 ```
 
-- [ ] **Step 2: 运行测试并确认旧 CLI 仍能把 `..` 拼到根目录**
+- [x] **Step 2: 运行测试并确认旧 CLI 仍能把 `..` 拼到根目录**
 
 Run: `python3 -m unittest tests.test_change_remove -v`
 
 Expected: 安全计划接口不存在或危险输入未拒绝；绝不实际调用旧 CLI 的 `..`。
 
-- [ ] **Step 3: 实现计划、路径约束、文件锁和统一 CLI**
+- [x] **Step 3: 实现计划、路径约束、文件锁和统一 CLI**
 
 `create_remove_plan` 只接受 inventory 中 mutable instance ID，读取当前 tree hash 作为 precondition；plan JSON 规范化后计算 digest，默认 30 分钟过期。`apply_plan` 要求 `confirm is True`、digest 完全一致、计划未过期、目标 hash 未变；获取 `data/.change.lock` 后创建并验证备份，再删除精确目标。删除使用 `unlink`/`shutil.rmtree`，每个 resolved target 必须位于对应 Location 根目录下一层或计划声明的相对路径。
 
@@ -699,13 +701,13 @@ python3 scripts/remove_skill.py apply <plan_id> --digest <digest> --confirm
 
 旧的 `remove_skill.py <目录名>` 只打印迁移说明并退出 2，绝不删除。
 
-- [ ] **Step 4: 运行路径、并发、回滚和全量测试**
+- [x] **Step 4: 运行路径、并发、回滚和全量测试**
 
 Run: `python3 -m unittest tests.test_change_remove -v && python3 -m unittest discover -s tests -v`
 
 Expected: 任意字符串无法成为目标；只有精确 plan 可执行；第二个并发申请安全失败；故障自动恢复。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/audit.py scripts/core/changes.py scripts/remove_skill.py tests/test_change_remove.py
@@ -727,7 +729,7 @@ git commit -m "feat: require immutable plans for destructive changes"
 - Extends: `apply_plan` 支持 action `update`
 - Consumes: GitHub/skills.sh staged candidate、完整 tree diff、backup、audit
 
-- [ ] **Step 1: 写失败测试，覆盖 TOCTOU、嵌套/二进制、未安检和交换失败**
+- [x] **Step 1: 写失败测试，覆盖 TOCTOU、嵌套/二进制、未安检和交换失败**
 
 ```python
 # tests/test_change_update.py
@@ -749,13 +751,13 @@ class ChangeUpdateTests(unittest.TestCase):
             apply_plan(plan.plan_id, plan.digest, True, env.context)
 ```
 
-- [ ] **Step 2: 运行测试确认旧更新会重取 HEAD 并逐文件清空原目录**
+- [x] **Step 2: 运行测试确认旧更新会重取 HEAD 并逐文件清空原目录**
 
 Run: `python3 -m unittest tests.test_change_update -v`
 
 Expected: staged snapshot、candidate vet 或原子交换接口缺失。
 
-- [ ] **Step 3: 实现 staging、完整 diff、候选安检绑定和原子交换**
+- [x] **Step 3: 实现 staging、完整 diff、候选安检绑定和原子交换**
 
 检查更新时把固定 commit/市场响应的完整候选放入 `data/staging/<plan_id>`，保存 candidate tree hash 和逐文件 add/remove/modify 摘要。更新计划 precondition 同时绑定 local hash、source、commit SHA、candidate hash 和 staging path。
 
@@ -763,13 +765,13 @@ Expected: staged snapshot、candidate vet 或原子交换接口缺失。
 
 skills.sh 没有 commit SHA 时，候选本身的完整文件集和 hash 是不可变对象；应用阶段不得重新调用 `npx skills add`。
 
-- [ ] **Step 4: 运行更新故障注入和全量测试**
+- [x] **Step 4: 运行更新故障注入和全量测试**
 
 Run: `python3 -m unittest tests.test_change_update -v && python3 -m unittest discover -s tests -v`
 
 Expected: 远端 HEAD 改变不影响已审查候选；未安检、staging 被改、交换失败和验证失败均拒绝或回滚。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/changes.py scripts/check_updates.py tests/test_change_update.py
@@ -789,7 +791,7 @@ git commit -m "feat: stage and atomically apply reviewed updates"
 - Consumes: change engine、value review、audit、inventory v2
 - Removes: 直接 `/api/remove`、直接覆盖式 `/api/update` 和直接 `extractall` 恢复
 
-- [ ] **Step 1: 写失败 HTTP 测试，固定确认布尔值、请求大小、token 和串行变更**
+- [x] **Step 1: 写失败 HTTP 测试，固定确认布尔值、请求大小、token 和串行变更**
 
 ```python
 # tests/test_serve_api.py（使用临时 ThreadingHTTPServer）
@@ -809,25 +811,25 @@ class ServeApiTests(unittest.TestCase):
         self.assertEqual(r.headers["X-Frame-Options"], "DENY")
 ```
 
-- [ ] **Step 2: 运行测试确认旧 API 可直接执行且 `bool("false")` 为真**
+- [x] **Step 2: 运行测试确认旧 API 可直接执行且 `bool("false")` 为真**
 
 Run: `python3 -m unittest tests.test_serve_api -v`
 
 Expected: 路由、严格确认、413 或安全 header 断言失败。
 
-- [ ] **Step 3: 实现两阶段 API、严格请求解析和统一错误响应**
+- [x] **Step 3: 实现两阶段 API、严格请求解析和统一错误响应**
 
-请求体最大 64 KiB；`confirm` 必须 `is True`；token 使用 `secrets.compare_digest`；POST 校验 `Origin` 为空或精确为当前 localhost origin。所有响应添加 `nosniff/no-referrer/DENY/Permissions-Policy`。CSP 的 `default-src`、`connect-src`、`img-src` 仅允许本地资源；内联 `JS_BLOB` 使用运行时计算的 SHA-256 script hash 白名单，不使用 `unsafe-eval`。服务不把异常 repr、绝对用户路径或配置内容返回浏览器。
+请求体最大 64 KiB；`confirm` 必须 `is True`；token 使用 `secrets.compare_digest`；POST 校验 `Origin` 为空或精确为当前 localhost origin。所有响应添加 `nosniff/no-referrer/DENY/Permissions-Policy`。CSP 的 `default-src`、`connect-src`、`img-src` 仅允许本地资源；交互报告脚本通过带 token 的同源 `/report.js` 加载，不使用 `unsafe-inline`/`unsafe-eval` 脚本权限；静态 `report.html` 仍可单文件打开。服务不把异常 repr、绝对用户路径或配置内容返回浏览器。
 
 `/api/plan` 只生成计划并返回普通人摘要、digest、备份策略和影响；`/api/apply` 调用统一 change engine。进程内锁避免两个 HTTP handler 同时进入变更引擎，文件锁处理跨进程竞争。失败动作也写 audit。
 
-- [ ] **Step 4: 运行 API、并发和全量测试**
+- [x] **Step 4: 运行 API、并发和全量测试**
 
 Run: `python3 -m unittest tests.test_serve_api -v && python3 -m unittest discover -s tests -v`
 
 Expected: 未授权、伪确认、超大请求和并发变更被拒绝；合法计划可在临时 HOME 完成。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/serve.py tests/test_serve_api.py
@@ -850,7 +852,7 @@ git commit -m "feat: use two-phase plans in local report service"
 - Produces: `data/report.md`、`data/report.html`、`report.py --json`
 - Produces: 固定 fixture 生成的脱敏示例报告
 
-- [ ] **Step 1: 写失败测试，固定五种结论、热度口径、替代说明和静态命令安全**
+- [x] **Step 1: 写失败测试，固定五种结论、热度口径、替代说明和静态命令安全**
 
 ```python
 # tests/test_report_v2.py
@@ -868,13 +870,13 @@ class ReportV2Tests(unittest.TestCase):
         self.assertNotIn("remove_skill.py x;touch", html)
 ```
 
-- [ ] **Step 2: 运行测试确认旧报告没有价值审查和完整 plan 摘要**
+- [x] **Step 2: 运行测试确认旧报告没有价值审查和完整 plan 摘要**
 
 Run: `python3 -m unittest tests.test_report_v2 -v`
 
 Expected: 新分区、口径或安全静态操作断言失败。
 
-- [ ] **Step 3: 实现 v2 报告和固定公开 fixture**
+- [x] **Step 3: 实现 v2 报告和固定公开 fixture**
 
 报告顶部先展示：受保护类数量、第三方待审、建议保留、重复二选一、观察、建议删除、需确认。每张第三方卡片展示来源置信度、GitHub/市场证据时间、仓库级热度提示、替代候选、独特能力、删除损失、置信度和过期状态。
 
@@ -882,7 +884,7 @@ Expected: 新分区、口径或安全静态操作断言失败。
 
 `make_sample_report.py` 只读取 `examples/fixtures/inventory-v2.json`；fixture 全部使用虚构名称、repo、路径、日期和数字，不读取 `data/inventory.json`。
 
-- [ ] **Step 4: 生成示例、运行 HTML 测试并人工检查**
+- [x] **Step 4: 生成示例、运行 HTML 测试并人工检查**
 
 Run:
 
@@ -899,7 +901,7 @@ python3 -m unittest discover -s tests -v
 
 Expected: 两次示例摘要完全一致；报告不含未转义 HTML 或危险命令。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/report.py scripts/make_sample_report.py tests/test_report_v2.py examples/fixtures/inventory-v2.json examples/report-sample.html
@@ -925,7 +927,7 @@ git commit -m "feat: report explainable keep and remove guidance"
 - Produces: legacy backup inspection result，不自动恢复旧备份
 - Consumes: v1 inventory/vetted/updates、v2 schema、三份历史备份只读元数据
 
-- [ ] **Step 1: 写失败测试，固定用户配置保留、旧记录降级和三份历史案例**
+- [x] **Step 1: 写失败测试，固定用户配置保留、旧记录降级和三份历史案例**
 
 ```python
 # tests/test_migrations_docs.py
@@ -943,19 +945,19 @@ class MigrationDocsTests(unittest.TestCase):
         self.assertTrue(all(x["restored"] is False for x in result))
 ```
 
-- [ ] **Step 2: 运行测试确认当前状态没有 schema 迁移**
+- [x] **Step 2: 运行测试确认当前状态没有 schema 迁移**
 
 Run: `python3 -m unittest tests.test_migrations_docs -v`
 
 Expected: migration/legacy inspection 接口缺失。
 
-- [ ] **Step 3: 实现迁移并把所有文档改成同一套 v2 事实**
+- [x] **Step 3: 实现迁移并把所有文档改成同一套 v2 事实**
 
 迁移前原子备份旧 JSON 到 `data/migrations/`，但不提交；groups/self-built/known-sources/ignore/workspace-locations 原样保留。旧 vetted 记录保留历史 note/date，但状态设为 `needs-recheck`，直到完整 tree hash 重新安检。旧 updates 失效重建。旧备份仅列出重复 member、缺少位置 manifest 等限制，绝不自动恢复。
 
 README、SKILL、AGENTS 必须统一写明：支持的客户端、GitHub 热度口径、第三方价值审查、大模型综合判断、禁止自动删除、plan/apply 操作、安全备份恢复和新命令。删除“只改几行可放心更新”“所有插件天然免检”等旧承诺。SKILL version 和服务版本同步升级到 `2.0.0`。
 
-- [ ] **Step 4: 运行迁移、文档命令和个人数据泄漏检查**
+- [x] **Step 4: 运行迁移、文档命令和个人数据泄漏检查**
 
 Run:
 
@@ -967,7 +969,7 @@ git grep -nE 'FAKE-SECRET-123|ANTHROPIC_AUTH_TOKEN|sk-[A-Za-z0-9]{12,}|/Users/[^
 
 Expected: 全量测试通过；grep 无输出；示例和文档不含真实账号编号、个人 inventory 或 secret。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts/core/migrations.py tests/test_migrations_docs.py README.md SKILL.md AGENTS.md data/*.example.*
@@ -994,7 +996,7 @@ git commit -m "docs: document v2 migration and review workflow"
 - Consumes: 全部 v2 CLI、核心模块、fixture 和报告
 - Produces: 可重复的测试结果、真实只读 inventory/report、最终 Git 提交
 
-- [ ] **Step 1: 写端到端测试，模拟“扫描→GitHub证据→审查→计划→备份→删除→恢复”**
+- [x] **Step 1: 写端到端测试，模拟“扫描→GitHub证据→审查→计划→备份→删除→恢复”**
 
 ```python
 # tests/test_end_to_end.py
@@ -1013,7 +1015,7 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual([x["status"] for x in env.audit()], ["success", "success"])
 ```
 
-- [ ] **Step 2: 运行全量测试、编译和 CLI help**
+- [x] **Step 2: 运行全量测试、编译和 CLI help**
 
 Run:
 
@@ -1029,7 +1031,7 @@ python3 scripts/report.py --help
 
 Expected: 全部成功；危险入口没有旧式任意目录删除用法。
 
-- [ ] **Step 3: 在真实 HOME 只运行盘点、GitHub证据刷新和报告，不执行写操作**
+- [x] **Step 3: 在真实 HOME 只运行盘点、GitHub证据刷新和报告，不执行写操作**
 
 Run:
 
@@ -1042,7 +1044,7 @@ python3 scripts/report.py
 
 Expected: 报告识别 ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Haha、Cindy；marketplace 未安装内容不膨胀总数；无 traceback。`check_updates.py` 退出 1 仅表示发现差异时，应人工检查 JSON 的 `operational_ok` 为 true。
 
-- [ ] **Step 4: 人工查看 HTML、审计敏感信息和 Git diff**
+- [x] **Step 4: 人工查看 HTML、审计敏感信息和 Git diff**
 
 Run:
 
@@ -1056,7 +1058,7 @@ git grep -nE '/Users/[^/]+/' -- ':!AGENTS.md' ':!docs/superpowers/specs/*' ':!do
 
 人工确认：报告中的客户端关系、受保护/第三方分类、GitHub 热度口径、替代建议和操作按钮与规格一致；报告页面不显示真实 token、账号编号或客户端私密配置。运行时 data/backups 不进入 git status。
 
-- [ ] **Step 5: 修复验收发现的问题后重复全量测试并提交最终验收**
+- [x] **Step 5: 修复验收发现的问题后重复全量测试并提交最终验收**
 
 Run:
 
@@ -1075,15 +1077,15 @@ Expected: 工作区只剩用户原有的无关改动；最终提交不包含 `da
 
 ## Final Acceptance Checklist
 
-- [ ] 全部 `unittest` 通过，测试数量不为 0。
-- [ ] 任意路径、`.`、`..`、链接逃逸和未登记目录不能成为变更目标。
-- [ ] 多客户端多副本备份可以逐位置、逐字节恢复。
-- [ ] 更新安装的是已查看、已安检的固定 candidate hash，远端后续变化不影响它。
-- [ ] ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Haha、Cindy 均被正确发现；marketplace 商品目录不算已安装。
-- [ ] 用户自建和有证据的客户端自带内容受保护；名称前缀或自报 name 不能骗取免检。
-- [ ] 所有第三方 Skill 有来源状态、热度证据、重复/替代候选和大模型审查队列。
-- [ ] “建议删除”有理由、替代品、删除损失、证据和置信度，且不会自动执行。
-- [ ] CLI 和网页共用 plan/apply、备份、锁、回滚和审计引擎。
-- [ ] 报告和日志不含客户端 secret、真实账号编号或未脱敏个人数据。
-- [ ] README、SKILL、AGENTS、示例报告和实际行为一致。
-- [ ] Code、Memory、word-docx 历史备份只读验证完成，没有被恢复或再次删除。
+- [x] 全部 `unittest` 通过，测试数量不为 0。
+- [x] 任意路径、`.`、`..`、链接逃逸和未登记目录不能成为变更目标。
+- [x] 多客户端多副本备份可以逐位置、逐字节恢复。
+- [x] 更新安装的是已查看、已安检的固定 candidate hash，远端后续变化不影响它。
+- [x] ZCode、Codex、Accio Work、WorkBuddy、Claude Code、Haha、Cindy 均被正确发现；marketplace 商品目录不算已安装。
+- [x] 用户自建和有证据的客户端自带内容受保护；名称前缀或自报 name 不能骗取免检。
+- [x] 所有第三方 Skill 有来源状态、热度证据、重复/替代候选和大模型审查队列。
+- [x] “建议删除”有理由、替代品、删除损失、证据和置信度，且不会自动执行。
+- [x] CLI 和网页共用 plan/apply、备份、锁、回滚和审计引擎。
+- [x] 报告和日志不含客户端 secret、真实账号编号或未脱敏个人数据。
+- [x] README、SKILL、AGENTS、示例报告和实际行为一致。
+- [x] Code、Memory、word-docx 历史备份只读验证完成，没有被恢复或再次删除。
