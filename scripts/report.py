@@ -365,9 +365,11 @@ def _client_load_rows(inv):
     cl = inv.get("client_load") or {}
     notes = {
         "codex": "2026-08-25 起自动导入共享库 ~/.agents/skills",
-        "haha": "同时读 Claude 目录与共享库(机制固有)",
+        "haha": "复用 ~/.claude/skills 镜像(Claude Code 卸载后由 Haha 独用)" if cl.get("haha") else "",
         "cindy": "只读投影(共享库 + Codex 目录)",
     }
+    if cl.get("claude-code") and cl.get("haha") and not _claude_app_present():
+        notes["claude-code"] = "应用已卸载,目录实际由 Haha 读取"
     rows = []
     for client in ("zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego"):
         s = cl.get(client)
@@ -377,6 +379,15 @@ def _client_load_rows(inv):
                                        ("…" if len(s["duplicates"]) > 8 else "")) if s["duplicates"] else "✅"
         rows.append((client, s["entries"], s["skills"], dup, notes.get(client, "")))
     return rows
+
+
+def _claude_app_present():
+    """只查应用是否存在(不读内容):Claude Code 应用卸载后,claude 目录实际只有 Haha 在用。"""
+    for base in ("/Applications", os.path.expanduser("~/Applications")):
+        for name in ("Claude.app", "Claude Code.app"):
+            if os.path.isdir(os.path.join(base, name)):
+                return True
+    return False
 
 
 def render_html(inv, last=None, ctx=None):

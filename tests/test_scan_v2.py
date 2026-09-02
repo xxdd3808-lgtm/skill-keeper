@@ -185,6 +185,22 @@ class ClientLoadModelTests(unittest.TestCase):
         self.assertEqual(inv["client_load"]["haha"]["entries"],
                          inv["client_load"]["claude-code"]["entries"])
 
+    def test_haha_detected_via_installed_app_bundle(self):
+        """Claude Code 卸载只留 Haha 后,~/.claude/cc-haha 可能被一并清空——
+        只要 Haha 应用还在(~/Applications/Claude Code Haha.app),镜像仍要归属 Haha。"""
+        from scripts.scan import build_inventory
+        home = temp_home(self)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        write_skill(home / ".agents/skills", "mirror-tool", description="shared")
+        claude = home / ".claude/skills"
+        claude.mkdir(parents=True)
+        os.symlink(home / ".agents/skills/mirror-tool", claude / "mirror-tool")
+        (home / "Applications/Claude Code Haha.app").mkdir(parents=True)
+        inv = build_inventory(home, data)
+        self.assertEqual(inv["client_load"]["haha"]["entries"], 1,
+                         "无 cc-haha 配置目录时,靠已安装应用识别 Haha")
+
     def test_wrapper_double_load_aggregates_for_shared_alias(self):
         """真正同时读 Claude 目录与共享库的包装客户端(未来出现时):聚合为一条,不刷屏。"""
         from scripts.scan import _structural_findings

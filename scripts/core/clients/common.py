@@ -12,9 +12,21 @@ from .base import ClientAdapter, WORKSPACE_CLIENT_PREFIX, hashed_token
 
 
 def haha_installed(home: Path) -> bool:
-    """只判断 Haha 标志物是否存在,不做任何内容读取。"""
+    """只判断 Haha 标志物是否存在,不做任何内容读取:
+    ~/.claude/cc-haha 配置目录(应用启动后会重建),或已安装的 Claude Code Haha 应用
+    (2026-09-02 用户卸载 Claude Code 只留 Haha 后,配置目录可能被一并清空)。
+    系统 /Applications 只在扫描真实 HOME 时查看,避免污染测试的临时 HOME。"""
     marker = Path(home) / ".claude/cc-haha"
-    return marker.is_dir() or marker.is_file()
+    if marker.is_dir() or marker.is_file():
+        return True
+    app = "Claude Code Haha.app"
+    if (Path(home) / "Applications" / app).is_dir():
+        return True
+    try:
+        same_home = str(Path(home).resolve()) == str(Path("~/").expanduser().resolve())
+    except OSError:
+        same_home = False
+    return same_home and (Path("/Applications") / app).is_dir()
 
 
 def client_load_aliases(home: Path):
