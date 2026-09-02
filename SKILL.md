@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 2.1.0
+version: 2.1.1
 ---
 
 # skill-keeper · 本地 Skill 管家(v2)
@@ -106,7 +106,7 @@ python3 ~/skill-keeper/scripts/report.py
 python3 ~/skill-keeper/scripts/check_updates.py
 ```
 
-对比的是**完整目录树**的哈希(不是单个 SKILL.md):本地树 vs 固定上游 commit 的候选树。候选会按内容哈希暂存到 `data/staging/`,结果缓存到 `data/updates.json`,只有四种客观状态:`candidate-update` 有候选更新 / `needs-review` 需审查 / `local-custom` 疑似本地定制(建议保留本地)/ `unverifiable` 无法核实。**不给任何"改动少就可以直接覆盖"式的背书**——任何更新都必须:候选安检(skill-vetter 清单)通过 → `create_update_plan` 绑定 local hash、来源、commit、候选 hash 与 staging 路径 → 用户确认 digest → 原子交换(旧目录自动保留回滚)。远端 HEAD 之后怎么变都不影响已审查的固定候选。
+对比的是**完整目录树**的哈希(不是单个 SKILL.md):本地树 vs 固定上游 commit 的候选树。候选会按内容哈希暂存到系统缓存目录(`~/Library/Caches/skill-keeper/staging`,`SKILL_KEEPER_STAGING` 可覆盖;绝不放仓库 data/ 内,否则会被 ZCode 技能面板递归扫成重复技能),结果缓存到 `data/updates.json`,只有四种客观状态:`candidate-update` 有候选更新 / `needs-review` 需审查 / `local-custom` 疑似本地定制(建议保留本地)/ `unverifiable` 无法核实。**不给任何"改动少就可以直接覆盖"式的背书**——任何更新都必须:候选安检(skill-vetter 清单)通过 → `create_update_plan` 绑定 local hash、来源、commit、候选 hash 与 staging 路径 → 用户确认 digest → 原子交换(旧目录自动保留回滚)。远端 HEAD 之后怎么变都不影响已审查的固定候选。
 
 ### 5. 执行动作(需用户确认)
 

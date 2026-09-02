@@ -47,6 +47,19 @@ class ReportV2Tests(unittest.TestCase):
         self.assertIn("价值审查", md)
         self.assertIn("建议删除", md)
 
+    def test_backup_section_renders_without_crash(self):
+        """回归(2026-09-02):备份行模板误用 {kb}/{ts} 命名占位符,render 一遇到
+        真实备份列表就 KeyError,网页版从 9-01 起一直渲染失败而测试全绿——
+        因为测试从未传过 ctx.backups。备份区必须在 HTML 与 Markdown 双通道有覆盖。"""
+        from scripts.report import render_html, render_md
+        ctx = {"backups": [{"name": "backup-20260902-090000-abcdef.tar.gz",
+                            "kb": 12, "ts": "2026-09-02 09:00:00"}]}
+        html = render_html(v2_report_fixture(), None, ctx)
+        self.assertIn("backup-20260902-090000-abcdef.tar.gz", html)
+        self.assertIn("12 KB", html)
+        md, _ = render_md(v2_report_fixture(), None, ctx)
+        self.assertIn("backup-20260902-090000-abcdef.tar.gz", md)
+
     def test_same_name_logicals_show_their_own_verdicts(self):
         """两个同名逻辑 skill(不同内容/实例)必须各自显示自己的审查结论。"""
         from scripts.report import render_html
