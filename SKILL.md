@@ -33,7 +33,7 @@ version: 2.1.0
 | `data/value-reviews.json` | 大模型价值审查结论台账(verdict/理由/替代/损失/证据/置信度/内容指纹) |
 | `data/reputation.json` | GitHub 仓库证据缓存(stars/forks/归档/推送时间;失败保留旧缓存并标 stale) |
 | `data/change-plans/` | 不可变变更计划(plan/digest,30 分钟过期,只读文件) |
-| `data/staging/` | 固定候选更新暂存(按内容哈希命名,安检通过后才能应用) |
+| 系统缓存目录 `skill-keeper/staging/` | 固定候选更新暂存(按内容哈希命名,安检通过后才能应用)。**绝不放仓库 `data/` 内**——ZCode 的已安装技能面板会顺着 `~/.agents/skills/skill-keeper` 符号链接递归扫描,把候选树当技能重复列出(macOS 在 `~/Library/Caches/skill-keeper/staging`,可用 `SKILL_KEEPER_STAGING` 覆盖) |
 | `data/vetted.json` | (v1 遗留)安检台账;迁移后降级 needs-recheck,新安检结论记入 value-reviews.json 的 safety 字段 |
 | `data/self-built.txt` | 自建 skill 白名单(受保护清单),一行一个目录名 |
 | `data/groups.json` | 分组配置(组名 → 目录名列表);用户想调整分组就改它,改完重扫 |
@@ -67,6 +67,7 @@ python3 ~/skill-keeper/scripts/scan.py
 - **按客户端的重复加载**:按各客户端真实加载拓扑(见下)统计同名多份,逐个 🟡 报告;Haha 的镜像双载聚合为一条
 - **插件版本去重**:插件缓存里同插件多版本并存时只有最高版本参与加载,旧版本记缓存残留(info,不占上下文)
 - **应用内置技能扩散**:builtin-app 技能出现在共享库会被所有客户端加载,🟡 提示收回所属客户端
+- **嵌套技能树**:技能目录内部(深度≥2)再有 SKILL.md 时报警——递归扫描的客户端面板(如 ZCode 已安装技能页)会把它们当独立技能重复列出
 
 ### 2. 第三方价值审查队列(扫描后先做)
 
@@ -150,6 +151,6 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
 - ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`(智谱 autoglm 技能放在这里,只给 ZCode 加载)。
 - **Codex:2026-08-25 起的桌面版自动导入外部 Agent 技能库 `~/.agents/skills`**——共享库里有什么,Codex 就整体加载什么;再叠加自身 `~/.codex/skills`、`~/.codex/skills/.system`(内置)与插件缓存。往共享库加东西前要想清楚 Codex 也会带上。
 - Claude Code 读 `~/.claude/skills`(目录本体真实,条目为逐项指向 `~/.agents/skills` 的符号链接),不读共享库;Codex CLI 旧版读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
-- Haha(存在 `~/.claude/cc-haha` 时)同时读 Claude 目录与共享库——镜像同名条目会双份,机制固有;Cindy 是共享库+Codex 目录的只读投影。
+- Haha(存在 `~/.claude/cc-haha` 时)与 Claude Code 同源,只读 `~/.claude/skills` 镜像(2026-09-02 按 Haha traces 核实,不直接读共享库);Cindy 是共享库+Codex 目录的只读投影;WorkBuddy/Ego/Accio 只读各自目录。
 - 每个客户端插件缓存只加载各插件的最高版本,旧版本目录是残留,不占上下文。
 - 每个 skill 常驻上下文的是 name+description;SKILL.md 全文在触发时才加载。**目标态:一个客户端内一个名字只有一份;应用专属技能只留在所属客户端;共享库只放真正的通用技能。**

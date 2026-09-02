@@ -24,6 +24,20 @@ from scripts.core.provenance import classify_provenance, load_user_config  # noq
 from scripts.scan import parse_frontmatter                              # noqa: E402
 
 
+def staging_root_for(output_path=None):
+    """候选暂存根。绝不能落在任何客户端会递归扫描的技能目录下——2026-09-02 实测,
+    ZCode 的「已安装技能」面板会顺着 ~/.agents/skills/skill-keeper 符号链接递归扫描,
+    把仓库 data/staging 里的候选树当技能重复列出(aihot/brainstorming 各出现两次)。
+    默认放系统缓存目录;测试用 SKILL_KEEPER_STAGING 指向临时目录。"""
+    env = os.environ.get("SKILL_KEEPER_STAGING")
+    if env:
+        return Path(env)
+    home = Path(os.path.expanduser("~"))
+    if sys.platform == "darwin":
+        return home / "Library/Caches/skill-keeper/staging"
+    return home / ".cache/skill-keeper/staging"
+
+
 def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):
     """把固定 commit 的完整候选树放入 staging(按内容哈希命名,天然不可变)。
 
@@ -91,12 +105,13 @@ def _pick_instance(inventory, logical):
     return cands[0] if cands else None
 
 
-def check(inventory, data_dir, output_path, gh_runner=None):
+def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
     """产出 v2 updates 结构(不落盘);网络只在本地内容可核实时才会发起。"""
     gh_runner = gh_runner or gh_cli_runner()
     known_sources = load_user_config(data_dir)
     receipts = build_receipts(inventory)
     reputation_path = Path(output_path).parent / "reputation.json"
+    staging_root = Path(staging_root) if staging_root else staging_root_for(output_path)
 
     differs, up_to_date, skipped = [], [], []
     staged_this_run = []
@@ -140,7 +155,6 @@ def check(inventory, data_dir, output_path, gh_runner=None):
         if not commit_sha:
             skipped.append({"name": name, "reason": "无法确定上游 commit,拒绝猜测"})
             continue
-        staging_root = reputation_path.parent / "staging"
         staged = stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner)
         if not staged.get("ok"):
             skipped.append({"name": name, "reason": "候选树拉取失败({})".format(staged.get("error"))})
@@ -174,11 +188,26 @@ def check(inventory, data_dir, output_path, gh_runner=None):
                         "status": status, "note": note,
                         "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
                         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S")})
-    # 循环结束后统一清理:只删没有任何待更新项引用的候选目录
+    # 循环结束后统一清理:既不被本次 differs 引用、也不被上次结果引用的候选一律清掉。
+    # 旧版只清"本次暂存"的目录,应用过/失效的历史候选会永远留在暂存根
+    # (2026-09-02 曾因此把 data/staging 里的候选树泄进 ZCode 技能面板)。
     referenced = {str(Path(d["staging_path"])) for d in differs}
+    try:
+        prev, _ = load_json_checked(Path(output_path), {})
+        for d in ((prev or {}).get("differs") or []):
+            if d.get("staging_path"):
+                referenced.add(str(Path(d["staging_path"])))
+    except (OSError, ValueError, TypeError):
+        pass
     for staging_path in staged_this_run:
         if str(staging_path) not in referenced:
             shutil.rmtree(staging_path, ignore_errors=True)
+    try:
+        for child in Path(staging_root).iterdir():
+            if str(child) not in referenced:
+                shutil.rmtree(child, ignore_errors=True)
+    except OSError:
+        pass
     return {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "differs": differs, "up_to_date": up_to_date, "skipped": skipped}
 

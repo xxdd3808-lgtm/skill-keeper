@@ -83,13 +83,37 @@ class CheckUpdatesStagingTests(unittest.TestCase):
             (data / "known-sources.json").write_text(json.dumps(
                 {"dupe": {"type": "github", "repo": "example/dupe",
                           "path": "skills/dupe/SKILL.md"}}), encoding="utf-8")
-            result = check(two_copy_inventory(home), data, data / "updates.json", head_gh())
+            result = check(two_copy_inventory(home), data, data / "updates.json", head_gh(),
+                           staging_root=home / "staging")
             names = [d["name"] for d in result["differs"]]
             self.assertEqual(names, ["dupe"], "只有过期副本进入 differs(最新副本不算差异)")
             staging = Path(result["differs"][0]["staging_path"])
             self.assertTrue(staging.is_dir(),
                             "候选 staging 目录不得被另一个逻辑的最新检查误删")
             self.assertTrue((staging / "SKILL.md").exists())
+
+    def test_stale_leftover_candidates_are_swept(self):
+        """历史残留清扫:暂存根里不再被任何 differs 引用的候选必须清掉。"""
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td)
+            data = home / "data"
+            data.mkdir()
+            (data / "known-sources.json").write_text(json.dumps(
+                {"dupe": {"type": "github", "repo": "example/dupe",
+                          "path": "skills/dupe/SKILL.md"}}), encoding="utf-8")
+            stale = home / "staging/cand-deadbeef0000"
+            write_skill(stale, "dupe", description="leftover")
+            fresh2 = home / "staging/cand-0123456789ab"
+            write_skill(fresh2, "dupe", description="pending")
+            (data / "updates.json").write_text(json.dumps({"differs": [
+                {"name": "dupe", "staging_path": str(fresh2)}]}), encoding="utf-8")
+            result = check(two_copy_inventory(home), data, data / "updates.json", head_gh(),
+                           staging_root=home / "staging")
+            self.assertFalse(stale.exists(), "无引用的历史候选必须被清扫")
+            self.assertTrue((home / "staging").is_dir())
+            # 被本次 differs 引用的候选仍在
+            kept = Path(result["differs"][0]["staging_path"])
+            self.assertTrue(kept.is_dir())
 
 
 if __name__ == "__main__":

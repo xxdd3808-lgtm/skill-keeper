@@ -345,6 +345,23 @@ def _client_load_stats(instances, locations):
     return stats
 
 
+def _nested_skill_trees(inst, max_depth=4, limit=5):
+    """技能目录内部(深度≥2)还藏着多少 SKILL.md——递归扫描的客户端面板会把它们
+    当独立技能列出来(2026-09-02 实测:ZCode 已安装技能页会顺着符号链接扫进仓库 data/)。
+    返回相对路径列表(最多 limit 条,另给总数)。"""
+    hits = []
+    root = inst["real_path"]
+    base_depth = root.rstrip(os.sep).count(os.sep)
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules")]
+        depth = dirpath.rstrip(os.sep).count(os.sep) - base_depth
+        if depth >= max_depth:
+            dirnames[:] = []
+        if depth >= 1 and "SKILL.md" in filenames:
+            hits.append(os.path.relpath(dirpath, root))
+    return hits[:limit], len(hits)
+
+
 def _structural_findings(instances, locations, data_dir):
     """按客户端加载拓扑查重复加载;链接漂移;插件旧版本残留;应用内置技能扩散。"""
     findings = []
@@ -386,6 +403,25 @@ def _structural_findings(instances, locations, data_dir):
             "stale-plugin-version", "info", i,
             f"插件 {i.get('plugin_name')} 旧版本 {i.get('plugin_version')} 残留缓存"
             f"(客户端只加载最高版本,不占上下文;清理请在所属客户端操作)"))
+
+    # 技能目录内部嵌套技能树:递归扫描的客户端面板(如 ZCode 已安装技能页)会全部列出,
+    # 造成"同名两份"的假重复——2026-09-02 的 data/staging 泄漏即此类。
+    # 单棵嵌套多为有意的子技能设计(如 workctl/workctl-operator),记 info;
+    # 多棵嵌套(候选/缓存泄漏的典型形态)记 yellow。同一真实路径只报一次。
+    seen_real = set()
+    for inst in instances:
+        if not inst["is_skill"] or inst["real_path"] in seen_real:
+            continue
+        seen_real.add(inst["real_path"])
+        sample, total = _nested_skill_trees(inst)
+        if not total:
+            continue
+        sev = "yellow" if total > 1 else "info"
+        extra = "" if total > 1 else "(若为有意的子技能设计,可忽略或加 ignore)"
+        findings.append(_finding(
+            "nested-skill-tree", sev, inst,
+            f"技能目录内嵌套 {total} 棵技能树(如 {('、'.join(sample))[:120]})"
+            f"——递归扫描的客户端面板会把它们当独立技能重复列出{extra}"))
 
     # 应用内置技能(builtin-app)出现在共享库 → 会被所有读共享库的客户端加载
     ks = load_json_checked(Path(data_dir) / "known-sources.json", {})[0]

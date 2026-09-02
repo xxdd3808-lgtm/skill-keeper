@@ -1,6 +1,7 @@
 """通用位置:共享 skill 库、Ego、工作区位置、Claude Code 用户/插件缓存与 Haha 包装器。
 
-Haha 规则:存在启动器或 ~/.claude/cc-haha 配置时,只给 Claude/shared 位置加 alias,
+Haha 规则:存在启动器或 ~/.claude/cc-haha 配置时,只给 Claude 位置加 alias
+(2026-09-02 按 Haha traces 核实:Haha 走标准 ~/.claude/skills 镜像,不直接读共享库),
 绝不新建物理位置、绝不读取配置内容(env/token 一律不碰)。
 """
 import os
@@ -19,7 +20,7 @@ def haha_installed(home: Path) -> bool:
 def client_load_aliases(home: Path):
     """底层客户端 → 复用它的包装客户端列表(加载拓扑,不算重复安装)。"""
     if haha_installed(home):
-        return {"claude-code": ["haha"], "shared": ["haha"]}
+        return {"claude-code": ["haha"]}
     return {}
 
 

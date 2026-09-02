@@ -166,7 +166,9 @@ class ClientLoadModelTests(unittest.TestCase):
                             for f in inv["findings"]),
                         "应用内置技能进入共享库必须报 builtin-app-spread")
 
-    def test_haha_wrapper_double_load_aggregated(self):
+    def test_haha_follows_claude_mirror_without_phantom_dups(self):
+        """2026-09-02 按 Haha traces 核实:Haha 走 ~/.claude/skills 镜像,不直接读共享库——
+        加载模型不得再把共享库算进 Haha(那会把镜像符号链接虚报成双份)。"""
         from scripts.scan import build_inventory
         home = temp_home(self)
         data = home / "data"
@@ -177,10 +179,50 @@ class ClientLoadModelTests(unittest.TestCase):
         os.symlink(home / ".agents/skills/mirror-tool", claude / "mirror-tool")
         (home / ".claude/cc-haha").mkdir(parents=True)
         inv = build_inventory(home, data)
-        wrapper = [f for f in inv["findings"] if f["code"] == "wrapper-double-load"]
-        self.assertEqual(len(wrapper), 1, "Haha 双载聚合为一条,不逐个刷屏")
-        self.assertIn("1 个同名技能", wrapper[0]["message"])
-        self.assertEqual(inv["client_load"]["haha"]["duplicates"], ["mirror-tool"])
+        self.assertFalse([f for f in inv["findings"] if f["code"] == "wrapper-double-load"],
+                         "Haha 不读共享库,镜像符号链接不算双份")
+        self.assertEqual(inv["client_load"]["haha"]["duplicates"], [])
+        self.assertEqual(inv["client_load"]["haha"]["entries"],
+                         inv["client_load"]["claude-code"]["entries"])
+
+    def test_wrapper_double_load_aggregates_for_shared_alias(self):
+        """真正同时读 Claude 目录与共享库的包装客户端(未来出现时):聚合为一条,不刷屏。"""
+        from scripts.scan import _structural_findings
+        home = temp_home(self)
+        shared = write_skill(home / ".agents/skills", "mirror-tool", description="shared")
+        mirror = home / ".claude/skills/mirror-tool"
+        mirror.parent.mkdir(parents=True, exist_ok=True)
+        os.symlink(shared, mirror)
+        inst = {"instance_id": "i1", "location_id": "shared", "client": "shared",
+                "kind": "user", "logical_name": "mirror-tool", "is_skill": True,
+                "is_symlink": False, "tree_hash": "t1", "display_path": "~/.agents/skills/x",
+                "directory_name": "mirror-tool", "real_path": str(shared)}
+        mirror_inst = dict(inst, instance_id="i2", location_id="claude-user",
+                           client="claude-code", is_symlink=True,
+                           display_path="~/.claude/skills/x", real_path=str(shared))
+        locations = [
+            {"location_id": "shared", "client": "shared", "aliases": ["haha"],
+             "path": str(home / ".agents/skills"), "kind": "user", "mutable": True, "evidence": []},
+            {"location_id": "claude-user", "client": "claude-code", "aliases": ["haha"],
+             "path": str(home / ".claude/skills"), "kind": "user", "mutable": True, "evidence": []},
+        ]
+        findings = _structural_findings([inst, mirror_inst], locations, home / "data")
+        wrapper = [f for f in findings if f["code"] == "wrapper-double-load"]
+        self.assertEqual(len(wrapper), 1)
+
+    def test_nested_skill_tree_inside_skill_dir_is_flagged(self):
+        """技能目录内部嵌套技能树(如仓库 data/staging 候选)会被递归扫描的客户端面板
+        当独立技能重复列出——必须检出(2026-09-02 ZCode 面板 aihot/brainstorming 双条)。"""
+        from scripts.scan import build_inventory
+        home = temp_home(self)
+        data = home / "data"
+        data.mkdir(parents=True, exist_ok=True)
+        root = write_skill(home / ".agents/skills", "repo-tool", description="repo")
+        write_skill(root / "data/staging/cand-abc123", "aihot", description="staged copy")
+        inv = build_inventory(home, data)
+        nested = [f for f in inv["findings"] if f["code"] == "nested-skill-tree"]
+        self.assertEqual(len(nested), 1, "嵌套技能树必须报 nested-skill-tree")
+        self.assertIn("staging", nested[0]["message"])
 
 
 if __name__ == "__main__":
