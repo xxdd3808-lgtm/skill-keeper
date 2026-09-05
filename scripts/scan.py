@@ -18,6 +18,7 @@ from scripts.core.clients import load_rules  # noqa: E402
 from scripts.core.fingerprint import FingerprintError, instance_id, tree_hash  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked, redact_secrets  # noqa: E402
 from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
+from scripts.core.platform import is_absolute_path  # noqa: E402
 from scripts.core.runtime import default_data_dir  # noqa: E402
 
 HOME = os.path.expanduser("~")
@@ -278,7 +279,7 @@ def _extra_locations(data_dir: Path):
         if not isinstance(mutable, bool):
             issues.append({"code": "bad-client-locations", "detail": f"{loc_id}: mutable 必须是布尔"})
             continue
-        if not path.startswith("/"):
+        if not is_absolute_path(path):
             issues.append({"code": "bad-client-locations", "detail": f"{loc_id}: path 必须是绝对路径"})
             continue
         if Path(path).is_dir():

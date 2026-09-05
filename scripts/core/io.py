@@ -4,12 +4,13 @@
 既不返回值,也不进入错误信息。
 """
 import errno
-import fcntl
 import json
 import os
 import tempfile
 from contextlib import contextmanager
 from typing import Optional, Tuple
+
+from . import platform as platform_tools
 
 # 客户端配置中的敏感字段名(小写比较);这些字段的值永远不读取、不返回、不进错误信息
 SECRET_FIELD_NAMES = {
@@ -91,7 +92,12 @@ def read_json_fields(path, allowed):
 
 
 class FileLock:
-    """基于 fcntl.flock 的互斥文件锁(非阻塞获取,拿不到立刻抛错,防止两个窗口同时变更)。"""
+    """互斥文件锁(Task 2 起 POSIX/Windows 双后端,见 core/platform.py)。
+
+    非阻塞获取:拿不到立刻抛 BlockingIOError,防止两个窗口同时变更;
+    进程正常/异常退出时 OS 自动释放 fd 锁,锁文件本身绝不静默清除
+    (中断恢复由事务状态负责,见 core/transactions.py)。
+    """
 
     def __init__(self, path):
         self.path = os.fspath(path)
@@ -101,12 +107,10 @@ class FileLock:
         os.makedirs(os.path.dirname(os.path.abspath(self.path)) or ".", exist_ok=True)
         fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o644)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as e:
+            platform_tools.try_lock_exclusive(fd)
+        except BlockingIOError as e:
             os.close(fd)
-            if e.errno in (errno.EACCES, errno.EAGAIN):
-                raise BlockingIOError("另一个 skill-keeper 变更正在进行,请稍后再试") from e
-            raise
+            raise BlockingIOError("另一个 skill-keeper 变更正在进行,请稍后再试") from e
         os.write(fd, str(os.getpid()).encode())
         self._fd = fd
         return self
@@ -114,7 +118,7 @@ class FileLock:
     def release(self):
         if self._fd is not None:
             try:
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
+                platform_tools.unlock_fd(self._fd)
             finally:
                 os.close(self._fd)
                 self._fd = None

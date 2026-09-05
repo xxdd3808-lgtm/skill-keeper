@@ -2,9 +2,14 @@
 
 所有备份恢复/候选落地要写真实文件系统的地方都必须经过这里;
 绝不允许用 resolve() 把越界输入"洗白"成合法路径,只能原样拒绝。
+归档成员路径永远是 POSIX `/`;Windows 盘符组件(如 `C:`)即使是"相对"外形
+也一律拒绝 —— 不能借相对路径形态把盘符路径带进归档。
 """
 import os
+import re
 from pathlib import Path
+
+_DRIVE_COMPONENT_RE = re.compile(r"^[A-Za-z]:$")
 
 
 class PathScopeError(ValueError):
@@ -14,7 +19,8 @@ class PathScopeError(ValueError):
 def validate_relative_path(value):
     """校验并返回规范路径组件元组。
 
-    拒绝:非字符串、空路径、绝对路径、反斜杠、控制字符、空组件、`.`、`..`。
+    拒绝:非字符串、空路径、绝对路径、反斜杠、控制字符、空组件、`.`、`..`
+    以及 Windows 盘符组件(`C:`)。
     """
     if not isinstance(value, str) or not value or value.startswith("/"):
         raise PathScopeError("路径必须是非空相对路径: {!r}".format(str(value)[:80]))
@@ -25,7 +31,14 @@ def validate_relative_path(value):
     parts = tuple(value.split("/"))
     if any(p in ("", ".", "..") for p in parts):
         raise PathScopeError("路径组件不得为空、. 或 ..: {!r}".format(value[:80]))
+    if any(_DRIVE_COMPONENT_RE.fullmatch(p) for p in parts):
+        raise PathScopeError("路径组件不得是 Windows 盘符: {!r}".format(value[:80]))
     return parts
+
+
+# 显式别名:备份/恢复调用点的可读名称;与 validate_relative_path 永远同一实现,
+# 归档边界(POSIX `/`、拒绝反斜杠/盘符/绝对/`.`/`..`)不得被任何跨平台辅助放松。
+validate_archive_member_path = validate_relative_path
 
 
 def confined_destination(root, relative) -> Path:

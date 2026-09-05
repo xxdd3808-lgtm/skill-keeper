@@ -20,20 +20,8 @@ if str(BASE) not in sys.path:
 
 from scripts import __version__                    # noqa: E402
 from scripts.core.io import load_json_checked      # noqa: E402
+from scripts.core.platform import lock_backend_name  # noqa: E402
 from scripts.core.runtime import RuntimePaths      # noqa: E402
-
-
-def _lock_backend():
-    try:
-        import fcntl  # noqa: F401
-        return "fcntl"
-    except ImportError:
-        pass
-    try:
-        import msvcrt  # noqa: F401
-        return "msvcrt"
-    except ImportError:
-        return "none"
 
 
 def _registered_locations(data_dir):
@@ -53,7 +41,7 @@ def cmd_doctor(as_json=False):
         "python": platform.python_version(),
         "layout": paths.layout,
         "paths": paths.to_dict(),
-        "lock_backend": _lock_backend(),
+        "lock_backend": lock_backend_name(),
         "registered_locations": _registered_locations(paths.data_dir),
         "repo_root": str(BASE),
     }
