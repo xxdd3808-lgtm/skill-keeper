@@ -25,6 +25,13 @@
   列出放在 `~/.agents/skills` 的全部逻辑 Skill 及其价值结论、其他占用客户端与
   plan 入口(HTML/Markdown 双通道);安装实例明细的客户端列改为友好标签
   (shared→共享库)。用户反馈驱动:该事实此前只藏在明细表 client 列里。
+- **2026-09-05 运维记事**:ego-browser 共享库快捷方式(`~/.agents/skills/ego-browser`,
+  2026-09-03 建)经用户确认摘除——ZCode/Codex 自带浏览器控制不需要加载它;
+  实体保留于 `~/.local/share/ego/ego-skills`,Haha/WorkBuddy/Accio 的直连快捷方式保留。
+  防线按设计拒绝 builtin-app 删除计划(实体与快捷方式不区分),按手册走符号链接
+  手工修;恢复命令 `ln -s /Users/bt/.local/share/ego/ego-skills ~/.agents/skills/ego-browser`。
+  摘除后 ZCode 45→44、Codex 69→68,builtin-app-spread 黄灯消除。引擎空档
+  (builtin-app 散布快捷方式无法走正规收回流程)记入 AGENTS.md 候选改进。
 
 ## 历史教训(规则来源)
 
