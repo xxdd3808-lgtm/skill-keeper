@@ -217,6 +217,7 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
         note = "" if status != "local-custom" else "本地版本更高,保留本地"
         differs.append({"name": name, "instance_id": inst["instance_id"], "repo": repo,
                         "commit_sha": commit_sha, "candidate_hash": candidate_hash,
+                        "source_dir": source_dir,
                         "staging_path": str(staging_path),
                         "local_hash": local_hash, "local_version": lv, "candidate_version": cv,
                         "status": status, "note": note,

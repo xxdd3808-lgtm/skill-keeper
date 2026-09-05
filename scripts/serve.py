@@ -58,6 +58,11 @@ class ServiceContext:
             lock_path=self.data_dir / ".change.lock",
             load_inventory=self._load_inventory)
         self.process_lock = threading.Lock()
+        from scripts.core.runtime import RuntimePaths
+        from scripts.core.service import AppService
+        paths = RuntimePaths(home=self.home, data_dir=self.data_dir,
+                             backup_dir=self.backup_dir)
+        self.service = AppService(paths)
 
     def _load_inventory(self):
         inv, issues = load_json_checked(self.data_dir / "inventory.json", {})
@@ -118,20 +123,30 @@ def _plan_update_from_updates(ctx, body, known=None):
         raise ChangeError("该实例没有已暂存的候选更新(先跑 check_updates)")
     snapshot = {"instance_id": iid, "staging_path": hit["staging_path"],
                 "candidate_hash": hit.get("candidate_hash"), "repo": hit.get("repo"),
-                "source": "github", "source_dir": "skills/" + str(hit.get("name")),
+                "source": "github", "source_dir": hit.get("source_dir") or "",
                 "commit_sha": hit.get("commit_sha")}
     return create_update_plan(iid, snapshot, ctx._load_inventory(), ctx.engine.plans_dir,
                               known_sources=known)
 
 
 def _handle_apply(ctx, body):
+    """执行计划并发布新快照(F08):文件事务成功与报告刷新失败用 snapshot_status 区分。"""
     plan_id = str(body.get("plan_id") or "")
     digest = str(body.get("digest") or "")
-    with ctx.process_lock:
-        result = apply_plan(plan_id, digest, body.get("confirm"), ctx.engine)
-    return {"ok": True, "message": "已执行: " + result.get("action", ""),
-            "backup": os.path.basename(str(result.get("backup_path") or "")),
-            "plan_id": plan_id}
+    result = ctx.service.apply_action(plan_id, digest, body.get("confirm"),
+                                      accept_warning=body.get("accept_warning") is True)
+    payload = {"ok": True,
+               "message": result.get("message") or "已执行",
+               "backup": os.path.basename(str(result.get("backup_path") or "")),
+               "backup_id": result.get("backup_id"),
+               "transaction_status": result.get("transaction_status"),
+               "result_hashes": result.get("result_hashes"),
+               "snapshot_status": result.get("snapshot_status"),
+               "snapshot_id": result.get("snapshot_id"),
+               "plan_id": plan_id}
+    if result.get("audit_pending"):
+        payload["audit_pending"] = True
+    return payload
 
 
 def _build_handler(ctx, token):

@@ -241,11 +241,35 @@ def _repo_card(view, inst):
     return "；".join(parts)
 
 
+def _repo_root():
+    """运行时解析的真实项目根(F08:不再输出被引号包死、无法展开的 ~ 路径)。"""
+    return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+
+def _manage_entry():
+    """仓库相对入口(F08):相对路径在仓库根可直接运行,示例报告也不泄漏个人路径。"""
+    return os.path.join("scripts", "manage.py")
+
+
 def _safe_plan_cmd(iid):
-    """静态报告里可复制的安全命令:可移植路径 + 只含 instance_id,绝不含目录名或绝对个人路径。"""
-    return shlex.join(["python3", "~/skill-keeper/scripts/remove_skill.py",
-                       "plan", "--instance-id", str(iid),
+    """静态报告里可复制的安全命令:在仓库根运行;只含 instance_id,绝不含目录名。
+
+    F08 修复:旧版 shlex.join 里写死 "~/skill-keeper/...",~ 被整体引号包住
+    无法展开,复制出来的命令不可运行。"""
+    return shlex.join(["python3", _manage_entry(),
+                       "plan", "remove", "--instance-id", str(iid),
                        "--reason", "报告建议,请补充或修改理由"])
+
+
+def static_restore_cmd(backup_id):
+    """恢复按钮在静态模式的等价命令(F08:此前复制到剪贴板却没有任何命令)。"""
+    return shlex.join(["python3", _manage_entry(),
+                       "plan", "restore", "--backup-id", str(backup_id)])
+
+
+def static_command_hint():
+    """自检用:静态模式必须能给出可运行的命令示例(在仓库根运行)。"""
+    return _safe_plan_cmd("0" * 20)
 
 
 # ────────────────────────── 卡片/按钮(HTML) ──────────────────────────
@@ -628,9 +652,13 @@ def render_html(inv, last=None, ctx=None):
     extras = []
     if view["backups"]:
         bk_rows = "".join(
-            '<p>• <code>{}</code>({} KB · {}) {}</p>'.format(
-                esc(b["name"]), b.get("kb", "?"), esc(b.get("ts", "")),
-                btn("♻️ 恢复", "restore", {"backup": b["name"]}, "btn-ghost"))
+            '<p>• <code>{}</code>({} KB · {} · {}){} {}</p>'.format(
+                esc(b["filename"]), b.get("kb", "?"), esc(b.get("ts", "")),
+                esc(b.get("verification_status") or "未校验"),
+                ' <span style="color:#b45309">⚠损坏</span>' if b.get("verification_status") == "failed" else "",
+                btn("♻️ 恢复", "restore", {"backup": b["backup_id"]}, "btn-ghost"),
+                btn("📋 命令", "copy", {"cmd": static_restore_cmd(b["backup_id"])},
+                    "btn-ghost"))
             for b in view["backups"])
         extras.append('<details><summary><b>♻️ 备份(恢复走两阶段计划,冲突不覆盖)</b></summary>'
                       '<div class="body">{}</div></details>'.format(bk_rows))
@@ -779,20 +807,35 @@ def render_md(inv, last=None, ctx=None):
     if view["backups"]:
         L += ["", "## 四、备份(恢复走两阶段计划,冲突不覆盖)"]
         for b in view["backups"]:
-            L.append("- {}({} KB · {})".format(b["name"], b.get("kb", "?"), b.get("ts", "")))
+            L.append("- {}({} KB · {} · {})".format(
+            b["filename"], b.get("kb", "?"), b.get("ts", ""),
+            b.get("verification_status") or "未校验"))
     L += ["", "> 一键操作:`{}`;所有变更走 计划→确认→备份→执行→验证,永不自动执行。".format(SERVE_HINT)]
     return "\n".join(L), view
 
 
 def backups_list():
+    """备份行统一 {backup_id, filename, path, kb, ts, verification_status}。
+
+    API/命令一律使用 backup_id(不含前后缀);F08 修复:此前把整文件名当 id
+    传给 API,底层再拼 backup-<id>.tar.gz 造成双重前后缀,恢复按钮必失败。"""
     backups = Path(BASE) / "backups"
     if not backups.is_dir():
         return []
+    from scripts.core.backup import BackupError, verify_backup
     out = []
     for f in sorted(backups.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
         if f.name.startswith("backup-") and f.name.endswith(".tar.gz"):
-            out.append({"name": f.name, "kb": round(f.stat().st_size / 1024, 1),
-                        "ts": time.strftime("%Y-%m-%d %H:%M", time.localtime(f.stat().st_mtime))})
+            backup_id = f.name[len("backup-"):-len(".tar.gz")]
+            try:
+                info = verify_backup(f)
+                status = "ok" if info.get("ok") else "failed"
+            except BackupError:
+                status = "failed"
+            out.append({"backup_id": backup_id, "filename": f.name, "path": str(f),
+                        "kb": round(f.stat().st_size / 1024, 1),
+                        "ts": time.strftime("%Y-%m-%d %H:%M", time.localtime(f.stat().st_mtime)),
+                        "verification_status": status})
     return out[:30]
 
 

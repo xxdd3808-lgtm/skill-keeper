@@ -52,8 +52,12 @@ class ReportV2Tests(unittest.TestCase):
         真实备份列表就 KeyError,网页版从 9-01 起一直渲染失败而测试全绿——
         因为测试从未传过 ctx.backups。备份区必须在 HTML 与 Markdown 双通道有覆盖。"""
         from scripts.report import render_html, render_md
-        ctx = {"backups": [{"name": "backup-20260902-090000-abcdef.tar.gz",
-                            "kb": 12, "ts": "2026-09-02 09:00:00"}]}
+        # F08:行结构改为 backup_id + filename;恢复按钮带 backup_id 而非文件名
+        ctx = {"backups": [{"backup_id": "20260902-090000-abcdef",
+                            "filename": "backup-20260902-090000-abcdef.tar.gz",
+                            "path": "/fixture/backups/backup-20260902-090000-abcdef.tar.gz",
+                            "kb": 12, "ts": "2026-09-02 09:00:00",
+                            "verification_status": "ok"}]}
         html = render_html(v2_report_fixture(), None, ctx)
         self.assertIn("backup-20260902-090000-abcdef.tar.gz", html)
         self.assertIn("12 KB", html)
