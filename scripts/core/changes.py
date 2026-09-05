@@ -26,6 +26,8 @@ from .fingerprint import tree_hash
 from .io import FileLock, atomic_write_json
 from .models import ChangePlan
 from .policy import check_action, load_policy
+from . import transactions as _txn
+from .transactions import read_transaction  # noqa: F401  (引擎统一入口,供 CLI/API 使用)
 
 PLAN_TTL_SECONDS = 30 * 60
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -456,10 +458,222 @@ def _remove_entity(path):
         raise ChangeError("目标不存在或类型未知,停止执行: " + str(path))
 
 
-def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
-    """执行不可变计划:锁 → 前置校验 → 备份 → 执行 → 验证(失败自动回滚)→ 审计。
+def _hash_entity_path(path, kind):
+    """按实体类型计算落盘摘要;与备份合同一致(dir/symlink→树摘要,file→内容摘要)。"""
+    from .backup import _chunked_sha256_file
+    path = str(path)
+    if kind == "file":
+        return _chunked_sha256_file(path)
+    if kind == "symlink":
+        return tree_hash(os.path.realpath(path))
+    return tree_hash(path)
 
-    update 动作要求候选已安检(verdict=safe;warning 需要第二次明确确认)。
+
+def _entity_kind(inst):
+    if inst.get("is_symlink"):
+        return "symlink"
+    if os.path.isfile(inst["path"]) and not os.path.isdir(inst["path"]):
+        return "file"
+    return "dir"
+
+
+def _commit_state(context, state, result_hashes):
+    """提交点:此后文件事务成功,附属状态(审计/报告)失败不得盲目回滚。"""
+    state["phase"] = "committed"
+    state["result"] = {"status": "committed", "result_hashes": result_hashes}
+    _txn.write_transaction(context, state)
+
+
+def _record_problems(context, state, problems, phase_rolled="rolled-back"):
+    state["phase"] = phase_rolled if not problems else "recovery-required"
+    state["cleanup_pending"] = sorted(set(state.get("cleanup_pending", []) + problems))
+    _txn.write_transaction(context, state)
+
+
+def _cleanup_holdings(context, state):
+    """清理本事务的保管目录;失败进入 cleanup_pending,不影响"已提交"事实。"""
+    import shutil as _shutil
+    pending = list(state.get("cleanup_pending", []))
+    paths = [t["holding_path"] for t in state.get("targets", []) if t.get("holding_path")]
+    if state.get("candidate_holding"):
+        paths.append(state["candidate_holding"])
+    for p in paths:
+        if not os.path.lexists(p):
+            continue
+        try:
+            if os.path.islink(p) or os.path.isfile(p):
+                os.remove(p)
+            else:
+                _shutil.rmtree(p)
+        except OSError:
+            if p not in pending:
+                pending.append(p)
+    state["cleanup_pending"] = pending
+    _txn.write_transaction(context, state)
+
+
+def _undo_remove(state):
+    """删除回滚:把保管中的原实体移回原位并核对哈希;返回问题清单(空=完全恢复)。
+
+    两遍处理:先全部移回(链接目标的校验依赖其正本回位),再统一校验哈希。
+    """
+    problems = []
+    for t in reversed(state["targets"]):
+        src, holding = t["path"], t.get("holding_path")
+        if holding and os.path.lexists(holding):
+            if os.path.lexists(src):
+                problems.append(src + "(原位已被占用,保管内容保留)")
+                continue
+            os.rename(holding, src)
+            _txn.fsync_dir(os.path.dirname(src))
+            t["moved"] = False
+    for t in state["targets"]:
+        src = t["path"]
+        if not os.path.lexists(src):
+            problems.append(src + "(原位与保管处都不存在,需从备份恢复)")
+            continue
+        try:
+            if _hash_entity_path(src, t["kind"]) != t["original_hash"]:
+                problems.append(src + "(回滚后哈希不一致)")
+        except (NotADirectoryError, OSError):
+            problems.append(src + "(回滚后不可读)")
+    return problems
+
+
+def _undo_update(state):
+    """更新回滚:新候选挪开(绝不激活),旧版本回原位并核对哈希。"""
+    import shutil as _shutil
+    t = state["targets"][0]
+    target, old_holding = t["path"], t.get("holding_path")
+    new_holding = state.get("candidate_holding")
+    problems = []
+    if t.get("published") or (old_holding and not os.path.lexists(old_holding)
+                              and os.path.lexists(target)):
+        # 新内容在位:挪到候选保管位(工具暂存内容,可直接清理)
+        if os.path.lexists(target) and new_holding:
+            try:
+                if os.path.islink(new_holding) or os.path.isfile(new_holding):
+                    os.remove(new_holding)
+                elif os.path.lexists(new_holding):
+                    _shutil.rmtree(new_holding)
+                os.rename(target, new_holding)
+                t["published"] = False
+            except OSError:
+                problems.append(target + "(新内容挪让失败)")
+    if old_holding and os.path.lexists(old_holding):
+        if os.path.lexists(target):
+            problems.append(target + "(原位被占用,旧版本保留在保管处)")
+        else:
+            os.rename(old_holding, target)
+            _txn.fsync_dir(os.path.dirname(target))
+            t["moved"] = False
+            try:
+                if _hash_entity_path(target, t["kind"]) != t["original_hash"]:
+                    problems.append(target + "(回滚后哈希不一致)")
+            except (NotADirectoryError, OSError):
+                problems.append(target + "(回滚后不可读)")
+    elif not os.path.lexists(target):
+        problems.append(target + "(原位与保管处都不存在,需从备份恢复)")
+    if new_holding and os.path.lexists(new_holding):
+        try:
+            if os.path.islink(new_holding) or os.path.isfile(new_holding):
+                os.remove(new_holding)
+            else:
+                _shutil.rmtree(new_holding)
+        except OSError:
+            problems.append(new_holding + "(候选残留清理失败)")
+    return problems
+
+
+def _undo_restore(state):
+    """恢复回滚/中断恢复:只撤销本事务发布的实体(哈希与备份一致才动,保留陌生内容)。"""
+    import shutil as _shutil
+    problems = []
+    for t in reversed(state["targets"]):
+        p = t["path"]
+        if not os.path.lexists(p):
+            continue
+        try:
+            actual = _hash_entity_path(p, t["kind"])
+        except (NotADirectoryError, OSError):
+            problems.append(p + "(不可读)")
+            continue
+        if actual != t.get("expected_hash"):
+            problems.append(p + "(内容与备份不符,疑似非本事务产物,保留)")
+            continue
+        try:
+            if os.path.islink(p) or os.path.isfile(p):
+                os.remove(p)
+            else:
+                _shutil.rmtree(p)
+            _txn.fsync_dir(os.path.dirname(p))
+            t["published"] = False
+        except OSError:
+            problems.append(p + "(撤销失败)")
+    return problems
+
+
+def _settle(context, state, undo_fn):
+    problems = undo_fn(state)
+    _record_problems(context, state, problems)
+
+
+def _rollback_status(plan_id, context, state=None):
+    try:
+        s = state if state is not None else _txn.read_transaction(plan_id, context)
+    except _txn.TransactionError:
+        return None
+    if not s:
+        return None
+    return {"rolled-back": "restored", "recovery-required": "recovery-required"}.get(
+        s.get("phase"))
+
+
+def _append_audit_safe(event, context, state):
+    try:
+        append_audit(event, context.audit_path)
+    except OSError:
+        # 审计写不出:事务文件保留事实与待补写状态,不谎报失败也不丢事件
+        if state is not None:
+            state["audit_pending"] = True
+            _txn.write_transaction(context, state)
+
+
+def recover_transaction(plan_id, context) -> dict:
+    """把已授权事务恢复到原状态:只撤销本事务落地的对象,绝不激活新候选。
+
+    对象冲突时保留实体并标 recovery-required(阻止后续相关写操作);审计记录恢复结果。
+    """
+    row = _load_plan(plan_id, context)  # 授权依据;过期不影响恢复(恢复只回退,不前进)
+    try:
+        state = _txn.read_transaction(plan_id, context)
+    except _txn.TransactionError as e:
+        raise ChangeError(str(e))
+    if state is None:
+        raise ChangeError("该计划没有事务记录,无需恢复")
+    if state.get("phase") in ("prepared", "mutating", "rolling-back", "recovery-required"):
+        undo = {"remove": _undo_remove, "update": _undo_update,
+                "restore": _undo_restore}[state.get("action")]
+        problems = undo(state)
+        _record_problems(context, state, problems)
+        append_audit({"action": str(state.get("action")), "plan_id": str(plan_id),
+                      "status": "recovered" if not problems else "recovery-required",
+                      "rollback_status": "restored" if not problems else "recovery-required",
+                      "backup_id": state.get("backup_id"),
+                      "reason": "recover_transaction: " + str(state.get("reason") or "")},
+                     context.audit_path)
+    elif state.get("phase") == "committed":
+        _cleanup_holdings(context, state)  # 已提交:只清理保管残留,不做物理恢复
+    return state
+
+
+def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
+    """执行不可变计划:锁 → 事务状态 → 备份 → 受控移动 → 验证(失败恢复原状)→ 提交 → 审计。
+
+    - 已提交计划重放返回已知结果(already_applied),不再发生物理变更;
+    - 中断的未完成事务拒绝执行,先 recover_transaction 恢复原状;
+    - update 要求候选已安检(safe;warning 需第二次明确确认);
+    - 提交点之后的审计失败标注 audit_pending,不谎报失败。
     """
     if confirm is not True:
         raise ChangeError("缺少明确确认(confirm 必须是布尔 true)")
@@ -468,8 +682,7 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         raise ChangeError("digest 不一致:必须使用生成计划时输出的摘要,逐字匹配")
     if row.get("expires_at", "") < time.strftime("%Y-%m-%d %H:%M:%S"):
         raise ChangeError("计划已过期(30 分钟有效),请重新生成")
-    if row.get("action") not in ("remove", "update", "restore"):
-        raise ChangeError("未知动作: " + str(row.get("action")))
+    action = row.get("action")
 
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     if context.load_inventory is None:
@@ -481,13 +694,16 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
     except (BlockingIOError, OSError):
         raise LockBusy("另一个 skill-keeper 变更正在进行,请稍后再试")
     audit_event = {
-        "action": str(row.get("action")), "target_ids": list(row.get("target_ids", [])),
-        "plan_id": str(row.get("plan_id")), "reason": str(row.get("reason") or row.get("summary", "")),
+        "action": str(action), "target_ids": list(row.get("target_ids", [])),
+        "plan_id": str(row.get("plan_id")),
+        "reason": str(row.get("reason") or row.get("summary", "")),
+        "recommendation_id": str(row.get("recommendation_id") or ""),
         "started_at": started, "status": "failed", "error": None, "rollback_status": None,
         "backup_id": None,
     }
+    state = None
     try:
-        # 互斥范围内重读 inventory 与权威策略(F04):执行期看到的必须与计划共用同一策略
+        # 互斥范围内重读 inventory 与权威策略(F04):执行期与计划共用同一策略
         try:
             inventory = context.load_inventory()
         except Exception as e:
@@ -498,21 +714,49 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
                                    for i in (policy.get("issues") or []))
             raise ChangeError("保护策略配置损坏,拒绝执行写操作,请先修复 data 目录配置: "
                               + reason_text)
-        if row.get("action") == "restore":
-            # 恢复的目标通常不存在,不做存在性前置校验;备份本身就是 precondition
+        # 事务断点检查(F03):同一计划不得发生第二次物理变更
+        try:
+            prior = _txn.read_transaction(plan_id, context)
+        except _txn.TransactionError as e:
+            raise ChangeError("事务状态损坏,拒绝执行,请先人工检查 data/transactions: " + str(e))
+        if prior is not None:
+            phase = prior.get("phase")
+            if phase == "committed":
+                result = dict(prior.get("result") or {})
+                result.update({"already_applied": True, "transaction_status": "committed",
+                               "plan_id": str(plan_id)})
+                return result
+            if phase == "rolled-back":
+                raise ChangeError("该计划已回滚(结果已知),不能重复执行;如需重做请重新生成计划")
+            raise ChangeError("检测到未完成事务(phase={}),请先运行恢复接口 recover_transaction('{}')"
+                              .format(phase, plan_id))
+
+        if action == "restore":
+            # 恢复的目标通常不存在,不做存在性前置校验;备份绑定本身就是 precondition
             _policy_check_restore_targets(row, inventory, policy)
-            plan = ChangePlan.from_dict(row)
-            _execute_restore(row, inventory, context)
+            state = _prepare_restore_state(row, inventory, context)
+            audit_event["backup_id"] = state["backup_id"]
+            audit_event["expected_hash"] = json.dumps(
+                {t["instance_id"]: "" for t in state["targets"]},
+                ensure_ascii=False, sort_keys=True)
+            result_hashes = _execute_restore(row, inventory, context, state)
             audit_event["status"] = "success"
-            audit_event["resulting_hash"] = str(dict(row.get("preconditions", [])).get("backup_id"))
-            append_audit(audit_event, context.audit_path)
-            return {"ok": True, "action": "restore", "backup_id": audit_event["resulting_hash"],
-                    "plan_id": row.get("plan_id")}
+            audit_event["resulting_hash"] = json.dumps(result_hashes,
+                                                       ensure_ascii=False, sort_keys=True)
+            result = {"ok": True, "action": "restore", "backup_id": state["backup_id"],
+                      "transaction_status": "committed", "result_hashes": result_hashes,
+                      "plan_id": str(plan_id),
+                      "restored": [t["path"] for t in state["targets"]]}
+            _append_audit_safe(audit_event, context, state)
+            if state.get("audit_pending"):
+                result["audit_pending"] = True
+            return result
+
         _check_preconditions(row, inventory, policy)
         by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
         targets = [by_id[i] for i in row.get("target_ids", [])]
         candidate_hash = None
-        if row.get("action") == "update":
+        if action == "update":
             pre = dict(row.get("preconditions", []))
             candidate_hash = str(pre.get("candidate_hash") or "")
             staging = Path(str(pre.get("staging_path") or ""))
@@ -525,8 +769,6 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
             if staged_now != candidate_hash:
                 raise ChangeError("候选 staging 在安检后被改动过,拒绝应用,请重新生成计划")
             vet = _load_vet(row.get("plan_id"), context, candidate_hash)
-            if vet.get("verdict") == "danger":
-                raise ChangeError("候选安检结论为 danger,禁止应用")
             if vet.get("verdict") == "warning" and accept_warning is not True:
                 raise ChangeError("候选安检为 warning,需要对风险做第二次明确确认才能应用")
         plan = ChangePlan.from_dict(row)
@@ -534,38 +776,57 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         if not verify_backup(backup["path"]).get("ok"):
             raise ChangeError("备份自检失败,已中止(未改动任何内容)")
         audit_event["backup_id"] = backup["backup_id"]
-        if row.get("action") == "update":
-            _execute_update(row, targets, backup, context, candidate_hash)
+
+        # 事务状态(prepared):崩溃后凭保管路径 + 实体哈希恢复,不猜目录名
+        txn_targets = []
+        for inst in targets:
+            txn_targets.append({
+                "instance_id": str(inst["instance_id"]), "path": str(inst["path"]),
+                "kind": _entity_kind(inst),
+                "original_hash": str(inst.get("tree_hash") or ""),
+                "holding_path": _txn.holding_path(os.path.dirname(inst["path"]), plan_id,
+                                                  str(inst["instance_id"])[:8]),
+                "moved": False, "published": False})
+        candidate_holding = None
+        if action == "update":
+            candidate_holding = _txn.holding_path(os.path.dirname(targets[0]["path"]),
+                                                  plan_id, "cand")
+        state = _txn.new_state(row, action, txn_targets, backup_id=backup["backup_id"],
+                               candidate_hash=candidate_hash,
+                               candidate_holding=candidate_holding)
+        _txn.write_transaction(context, state)
+        expected = {t["instance_id"]: t["original_hash"] for t in txn_targets}
+        if action == "update":
+            result_hashes = _execute_update(row, targets, context, state)
         else:
-            _execute_remove(row, targets, context)
+            result_hashes = _execute_remove(row, context, state)
+        # 提交点之后:附属状态失败只标注,不盲目回滚
         audit_event["status"] = "success"
-        audit_event["resulting_hash"] = backup["backup_id"]
-        append_audit(audit_event, context.audit_path)
-        return {"ok": True, "action": audit_event["action"], "backup_id": backup["backup_id"],
-                "backup_path": backup["path"], "removed": [i["path"] for i in targets],
-                "plan_id": row.get("plan_id")}
-    except _RollbackDone as e:
-        audit_event["error"] = str(e)
-        audit_event["rollback_status"] = "restored"
-        append_audit(audit_event, context.audit_path)
-        raise ChangeError(str(e))
+        audit_event["expected_hash"] = json.dumps(expected, ensure_ascii=False, sort_keys=True)
+        audit_event["resulting_hash"] = json.dumps(result_hashes,
+                                                   ensure_ascii=False, sort_keys=True)
+        result = {"ok": True, "action": action, "backup_id": backup["backup_id"],
+                  "backup_path": backup["path"], "transaction_status": "committed",
+                  "result_hashes": result_hashes, "plan_id": str(plan_id),
+                  "removed": [i["path"] for i in targets] if action == "remove" else []}
+        _append_audit_safe(audit_event, context, state)
+        if state.get("audit_pending"):
+            result["audit_pending"] = True
+        return result
     except ChangeError as e:
         audit_event["error"] = str(e)
-        rollback_status = None
-        if audit_event["backup_id"] and row.get("action") == "remove":
-            try:
-                restore_backup(_find_backup(context.backup_dir, audit_event["backup_id"]),
-                               inventory.get("locations", []))
-                rollback_status = "restored"
-            except Exception as re:
-                rollback_status = "failed: " + type(re).__name__
-        audit_event["rollback_status"] = rollback_status
-        append_audit(audit_event, context.audit_path)
+        audit_event["rollback_status"] = _rollback_status(plan_id, context, state)
+        _append_audit_safe(audit_event, context, state)
         raise
+    except _txn.TransactionError as e:
+        audit_event["error"] = "TransactionError: " + str(e)
+        audit_event["rollback_status"] = None
+        append_audit(audit_event, context.audit_path)
+        raise ChangeError("事务状态损坏,拒绝执行,请先人工检查 data/transactions: " + str(e))
     except Exception as e:
         audit_event["error"] = type(e).__name__ + ": " + str(e)[:200]
-        audit_event["rollback_status"] = "failed: " + type(e).__name__
-        append_audit(audit_event, context.audit_path)
+        audit_event["rollback_status"] = _rollback_status(plan_id, context, state)
+        _append_audit_safe(audit_event, context, state)
         raise ChangeError("变更失败已中止: " + type(e).__name__)
     finally:
         lock.release()
@@ -589,24 +850,10 @@ def _policy_check_restore_targets(row, inventory, policy):
             raise ChangeError("恢复执行期策略复核未通过: " + str(verdict.get("message")))
 
 
-class _RollbackDone(Exception):
-    """update 交换已发生但验证失败;旧版本已换回,审计记 restored。"""
-
-
-def _execute_remove(row, targets, context):
-    for inst in targets:
-        _remove_entity(inst["path"])
-    if context.verify_after_apply is not None:
-        ok = context.verify_after_apply()
-    else:
-        ok = all(not os.path.lexists(i["path"]) for i in targets)
-    if not ok:
-        raise ChangeError("删除后验证失败,自动回滚")
-
-
-def _execute_restore(row, inventory, context):
-    """按计划恢复备份:先重新核对归档内容绑定,目标已存在则冲突失败;恢复后逐实体校验摘要。"""
-    from .backup import BackupError, restore_backup, verify_backup
+def _prepare_restore_state(row, inventory, context) -> dict:
+    """恢复动作的事务准备:重新核对归档绑定,把目标实体清单写入事务状态。"""
+    from .backup import BackupError, verify_backup
+    from .paths import PathScopeError, confined_destination
     pre = dict(row.get("preconditions", []))
     backup_path = str(pre.get("backup_path") or "")
     if not os.path.isfile(backup_path):
@@ -621,64 +868,134 @@ def _execute_restore(row, inventory, context):
     if str(info.get("archive_sha256")) != str(pre.get("archive_sha256")):
         raise ChangeError("备份归档与计划确认时的内容不一致(archive_sha256 不符),"
                           "拒绝执行,请重新生成恢复计划")
-    if _restore_targets_document((info.get("manifest") or {}).get("entries", [])) \
-            != str(pre.get("restore_targets")):
+    entries = (info.get("manifest") or {}).get("entries", [])
+    if _restore_targets_document(entries) != str(pre.get("restore_targets")):
         raise ChangeError("备份目标集合与计划确认时的不一致,拒绝执行,请重新生成恢复计划")
-    result = restore_backup(backup_path, inventory.get("locations", []), conflict="fail")
-    if context.verify_after_apply is not None and not context.verify_after_apply():
-        raise ChangeError("恢复后验证失败")
-    return result
+    loc_map = {str(l.get("location_id")): l.get("path")
+               for l in inventory.get("locations", [])}
+    txn_targets = []
+    for e in entries:
+        root = loc_map.get(str(e.get("location_id")))
+        if not root:
+            raise ChangeError("备份位置未登记,无法恢复: " + str(e.get("location_id")))
+        try:
+            dest = confined_destination(root, str(e["original_relative_path"]))
+        except PathScopeError as exc:
+            raise ChangeError("恢复目标越界,拒绝落地: " + str(exc))
+        txn_targets.append({"instance_id": str(e["instance_id"]), "path": str(dest),
+                            "kind": str(e.get("type")),
+                            "expected_hash": str(e.get("tree_hash")),
+                            "published": False})
+    state = _txn.new_state(row, "restore", txn_targets, backup_id=str(pre.get("backup_id")))
+    _txn.write_transaction(context, state)
+    return state
 
 
-def _execute_update(row, targets, backup, context, candidate_hash):
+def _execute_restore(row, inventory, context, state):
+    """恢复执行:冲突不覆盖;失败撤销本事务已发布实体,回到"目标不存在"的原状态。"""
+    pre = dict(row.get("preconditions", []))
+    backup_path = str(pre.get("backup_path") or "")
+    state["phase"] = "mutating"
+    _txn.write_transaction(context, state)
+    try:
+        restore_backup(backup_path, inventory.get("locations", []), conflict="fail")
+        ok = True
+        if context.verify_after_apply is not None:
+            try:
+                ok = context.verify_after_apply()
+            except Exception:
+                ok = False  # 验证异常与 False 同责
+        if not ok:
+            raise ChangeError("恢复后验证失败")
+    except BaseException:
+        _settle(context, state, _undo_restore)
+        raise
+    result_hashes = {}
+    for t in state["targets"]:
+        t["published"] = True
+        try:
+            result_hashes[t["instance_id"]] = _hash_entity_path(t["path"], t["kind"])
+        except (NotADirectoryError, OSError):
+            result_hashes[t["instance_id"]] = ""
+    _commit_state(context, state, result_hashes)
+    return result_hashes
+
+
+def _execute_remove(row, context, state):
+    """删除 = 原实体移入同目录事务保管(原子 rename),全部完成并验证后提交,再清理保管。"""
+    state["phase"] = "mutating"
+    _txn.write_transaction(context, state)
+    try:
+        for t in state["targets"]:
+            src = t["path"]
+            if os.path.lexists(src):
+                os.rename(src, t["holding_path"])
+                _txn.fsync_dir(os.path.dirname(src))
+                t["moved"] = True
+                _txn.write_transaction(context, state)
+        leftovers = [t["path"] for t in state["targets"] if os.path.lexists(t["path"])]
+        if leftovers:
+            raise ChangeError("仍有目标未移走,回滚: " + ", ".join(leftovers))
+        ok = True
+        if context.verify_after_apply is not None:
+            try:
+                ok = context.verify_after_apply()
+            except Exception:
+                ok = False  # 验证异常与 False 同责
+        if not ok:
+            raise ChangeError("删除后验证失败,自动回滚")
+    except BaseException:
+        _settle(context, state, _undo_remove)
+        raise
+    result_hashes = {t["instance_id"]: "" for t in state["targets"]}
+    _commit_state(context, state, result_hashes)
+    _cleanup_holdings(context, state)
+    return result_hashes
+
+
+def _execute_update(row, targets, context, state):
+    """更新 = 候选物化到目标同目录 → 旧版本移入保管 → 候选就位;失败旧版本回原位。"""
     import shutil as _shutil
     pre = dict(row.get("preconditions", []))
     staging = Path(str(pre.get("staging_path")))
-    inst = targets[0]
-    target = Path(inst["path"])
-    parent = target.parent
-    backup_id = str(backup["backup_id"])
-    tmp = parent / (target.name + ".staging-tmp-" + backup_id)
-    rollback = parent / (target.name + ".rollback-" + backup_id)
-    for p in (tmp, rollback):
-        if p.is_symlink() or p.is_file():
-            p.unlink()
-        elif p.exists():
-            _shutil.rmtree(p)
+    t = state["targets"][0]
+    target = Path(t["path"])
+    new_holding = Path(state["candidate_holding"])
+    state["phase"] = "mutating"
+    _txn.write_transaction(context, state)
     try:
         # 跨文件系统安全:先把候选物化到目标同目录(同一文件系统),再原子切换
-        _shutil.copytree(staging, tmp, symlinks=True)
-        if tree_hash(tmp) != candidate_hash:
+        if new_holding.is_symlink() or new_holding.is_file():
+            new_holding.unlink()
+        elif new_holding.exists():
+            _shutil.rmtree(new_holding)
+        _shutil.copytree(staging, new_holding, symlinks=True)
+        if tree_hash(new_holding) != state["candidate_hash"]:
             raise ChangeError("候选物化后摘要不符,已中止")
-        swapped = False
-        try:
-            os.rename(target, rollback)
-            swapped = True
-            os.rename(tmp, target)
-        except OSError as e:
-            if swapped:  # 换回旧版本
-                _shutil.rmtree(target, ignore_errors=True)
-                os.rename(rollback, target)
-            raise _RollbackDone("更新交换失败({}),保留原版本".format(type(e).__name__))
-        try:
-            ok = (context.verify_after_apply() if context.verify_after_apply is not None
-                  else tree_hash(target) == candidate_hash)
-        except Exception:
-            # 验证器自身崩溃与"返回 False"同责:换回旧版本,不留新内容在位
-            ok = False
-        if not ok:
-            _shutil.rmtree(target, ignore_errors=True)
-            os.rename(rollback, target)
-            raise _RollbackDone("更新后验证失败,已回滚到旧版本")
-        _shutil.rmtree(rollback, ignore_errors=True)
-    except _RollbackDone:
+        os.rename(target, t["holding_path"])
+        _txn.fsync_dir(target.parent)
+        t["moved"] = True
+        _txn.write_transaction(context, state)
+        os.rename(new_holding, target)
+        _txn.fsync_dir(target.parent)
+        t["published"] = True
+        _txn.write_transaction(context, state)
+        disk_ok = tree_hash(target) == state["candidate_hash"]  # 引擎自身落盘校验,回调绕不过
+        biz_ok = True
+        if context.verify_after_apply is not None:
+            try:
+                biz_ok = context.verify_after_apply()
+            except Exception:
+                biz_ok = False  # 验证异常与 False 同责
+        if not (disk_ok and biz_ok):
+            raise ChangeError("更新后验证失败,已回滚到旧版本")
+    except BaseException:
+        _settle(context, state, _undo_update)
         raise
-    except ChangeError:
-        _shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    except OSError as e:
-        _shutil.rmtree(tmp, ignore_errors=True)
-        raise ChangeError("更新失败已中止: " + type(e).__name__)
+    result_hashes = {t["instance_id"]: state["candidate_hash"]}
+    _commit_state(context, state, result_hashes)
+    _cleanup_holdings(context, state)
+    return result_hashes
 
 
 def _find_backup(backup_dir, backup_id):
