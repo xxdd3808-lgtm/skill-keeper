@@ -29,7 +29,7 @@
   2026-09-03 建)经用户确认摘除——ZCode/Codex 自带浏览器控制不需要加载它;
   实体保留于 `~/.local/share/ego/ego-skills`,Haha/WorkBuddy/Accio 的直连快捷方式保留。
   防线按设计拒绝 builtin-app 删除计划(实体与快捷方式不区分),按手册走符号链接
-  手工修;恢复命令 `ln -s /Users/bt/.local/share/ego/ego-skills ~/.agents/skills/ego-browser`。
+  手工修;恢复命令 `ln -s ~/.local/share/ego/ego-skills ~/.agents/skills/ego-browser`。
   摘除后 ZCode 45→44、Codex 69→68,builtin-app-spread 黄灯消除。引擎空档
   (builtin-app 散布快捷方式无法走正规收回流程)记入 AGENTS.md 候选改进。
 
