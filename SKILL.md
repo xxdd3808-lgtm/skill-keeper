@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 3.1.1
+version: 4.0.0
 ---
 
 # skill-keeper · 本地 Skill 管家(v2)
@@ -132,6 +132,30 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
 给用户:操作结果 + 剩余总数 + 新发现的问题。**汇报正文必须带两个可点的入口**,别让用户去文件夹里翻:
 - **HTML 报告**:贴 `data/report.html` 的完整 file:// 链接(file:// 里不能写 `~`,用户名段按本机实际路径拼上),或直接 `open ~/skill-keeper/data/report.html` 当场弹出浏览器;
 - **一键操作入口**:后台起 `python3 ~/skill-keeper/scripts/report.py --serve`,把打印出的带 token 完整 URL 原样贴进对话,用户点开就是能直接点按钮的报告;并提示 macOS 可随时双击 `~/skill-keeper/启动技能报告.command` 再开。
+
+## 未知客户端通用流程(任意 Agent/大模型,无需项目加适配器)
+
+遇到上面没列出的客户端(任何操作系统)时,大模型就是"运行时位置适配器":你只需要提供**客户端名 + 本机 Skill 根目录**,skill-keeper 在本机自行完成全部确认与盘点。声明默认只读、仅用于本次扫描、不单独持久化、不上传。
+
+1. **识别环境**:当前操作系统、正在工作的客户端(名字用客户端自己的标识,如 `my-agent`,只允许字母数字与 `._-`)。
+2. **找根目录**:依据客户端文档、只读地查看其配置,或可用的本机工具,找出它实际读取 skill 的目录(可多个)。
+3. **交给扫描器**(三选一):
+   ```bash
+   python3 ~/skill-keeper/scripts/scan.py --root my-agent=~/.my-agent/skills          # 单根直传,可重复
+   python3 ~/skill-keeper/scripts/scan.py --locations-json /tmp/decl.json --json      # 声明文件
+   python3 ~/skill-keeper/scripts/scan.py --locations-json - --json                   # stdin 声明
+   ```
+
+   stdin/文件声明的字段白名单(其余字段一律被拒,包括 mutable/instance_id/tree_hash/命令/网址/秘密字段):
+   ```json
+   {"schema_version": 1, "client": "my-agent", "observed_by": "model",
+    "complete": false,
+    "roots": [{"path": "~/.my-agent/skills", "scope": "user", "load_state": "reported"}]}
+   ```
+   限额:总输入 ≤64 KiB、roots ≤32、字符串 ≤4 KiB;`load_state` 只允许 `reported`。
+4. **不知道就说不知道**:找不到或不确定的根,`complete` 保持 `false`;**禁止猜路径、禁止修改客户端配置、禁止拿 Home 目录或系统目录凑数**。声明指向本机不存在的目录会记黄灯(model-root-missing),不会被当作空位置扫描成功。
+5. **看结果**:自报客户端的实例与已知客户端一起进 inventory 和报告,客户端列标注"客户端自报";其位置内部的同名重复会以"等待本地确认"口径报告;同一真实路径若已被适配器/本地配置登记,本机事实优先,声明副本自动丢弃。**临时声明的实例永远不可变,没有任何删除/更新入口**。
+6. **长期管理**:用户确认该根要长期盘点时,把目录登记进 `data/client-locations.json`(参照 `data/client-locations.example.json`)。只有用户本地明确登记 `mutable: true` 的位置才可能进入 计划→确认→备份→事务 的变更闭环;模型声明本身永远不能开通写权限。
 
 ## 分组维护
 

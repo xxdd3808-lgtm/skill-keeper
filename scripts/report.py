@@ -75,6 +75,17 @@ def fmt_source(source):
     return label + suffix
 
 
+def _is_model_reported(inst):
+    """模型位置声明产生的实例:证据里带 model-declaration,展示时永远标"客户端自报"。"""
+    return "model-declaration" in (inst.get("evidence") or [])
+
+
+def client_display(inst):
+    """客户端展示名;模型自报客户端追加标注,绝不冒充精确适配器事实。"""
+    base = CLIENT_LABELS_EXT.get(inst.get("client"), inst.get("client")) or ""
+    return base + ("(客户端自报)" if _is_model_reported(inst) else "")
+
+
 def classify_instance(inst, self_built, known=None):
     """报告分类:客户端自带/插件 → 受保护;自建/应用内置白名单 → 受保护;其余第三方。"""
     if inst.get("kind") in ("builtin", "plugin-cache"):
@@ -716,7 +727,7 @@ def render_html(inv, last=None, ctx=None):
                 ' <span class="badge">受保护</span>' if cls == "protected" else "",
                 esc(grp),
                 esc(inst.get("function") or ""),
-                esc(CLIENT_LABELS_EXT.get(inst.get("client"), inst.get("client")) or ""),
+                esc(client_display(inst)),
                 esc(inst.get("kind") or ""), findings_badges(view, inst), action))
     table_sec = (
         '<details id="instance-details"><summary><b>📋 安装实例明细</b>'
@@ -923,7 +934,7 @@ def render_md(inv, last=None, ctx=None):
         L.append("| {}{} | {} | {} | {} |".format(
             inst.get("logical_name"),
             "(受保护)" if cls == "protected" else "",
-            CLIENT_LABELS_EXT.get(inst.get("client"), inst.get("client")),
+            client_display(inst),
             inst.get("kind"), health))
     if view["backups"]:
         L += ["", "## 四、备份(恢复走两阶段计划,冲突不覆盖)"]

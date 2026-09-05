@@ -5,8 +5,9 @@
 - 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
 - 开工基线(实测):HEAD `f858d2ba89d82acc93bcd78e30f3bc6ac1b24b04`,Python 3.9.6,分支 case1,verify 233 项 0 失败 0 skipped;工作树原有三份计划文档(untracked,随 Task 0 入库)。
 - 零退化合同:tests/fixtures/private-v311/(完全虚构,含 shared/Codex/WorkBuddy/Ego、自建、builtin owner、符号链接、重复加载、审查、备份、旧 CLI)+ tests/test_private_compatibility.py(9 项)。v4 各任务必须保持全绿。
-- 测试入口:`python3 scripts/verify.py`(Task 2 后 271 项 / 0 失败 / 0 skipped)。
+- 测试入口:`python3 scripts/verify.py`(Task 3 后 291 项 / 0 失败 / 0 skipped;阶段 A 七模块 58 项)。
 - BLOCKED.md:无。
+- Task 3 要点:scripts/core/location_input.py(parse_declaration/parse_cli_roots,白名单 schema_version/client/observed_by/complete/roots[path/scope/load_state];64KiB/32根/4KiB字符串/6层嵌套/UTF-8;load_state 只认 reported;错误只回显键名不回显值);scan.py --root/--locations-json FILE|- 接线(拒绝发生在扫描与落盘之前;stdin 按 64KiB+1 读取);_model_locations 产 mutable=False Location(证据 model-declaration/scope/load-state),与已有位置按真实路径去重、本机事实优先;缺失根记黄灯 model-root-missing;_structural_findings 为自报客户端补 duplicate-load("等待本地确认"口径);observation.observed_scope 记 model_roots/model_inputs_complete;report.py client_display() 明细行加"(客户端自报)";SKILL.md 增"未知客户端通用流程"章节(version 4.0.0,test_migrations_docs 版本断言随升级更新);临时声明零持久化、零变更入口(测试锁定)。
 - Task 2 要点:scripts/core/platform.py(lock_backend_name/try_lock_exclusive/unlock_fd/is_absolute_path,fcntl 与 msvcrt 延迟导入);io.FileLock 改走 platform(接口/非阻塞语义不变,锁文件绝不静默清除);paths.validate_relative_path 增加盘符组件拒绝(`C:` 即使相对外形也拒),validate_archive_member_path 是其显式别名(assertIs 锁死同一实现);scan._extra_locations 改 os.path.isabs 原生判断;锁竞争测试用真实双进程(clean 模式经 stdin 放行避免释放竞态;crash 模式 os._exit(3) 验证 OS 释放 + 锁文件保留);AST 检查全 scripts/ 无顶层无条件 fcntl/msvcrt 导入、backup/transactions/changes/staging 不碰 platform 辅助。
 - Task 1 要点:scripts/cli.py 统一命令(scan/report/manage/doctor,手动分发直传参数——argparse REMAINDER 有吞参缺陷,勿改回子解析器);runtime.py 增 detect_repo_layout/default_layout_dirs/default_data_dir(优先级:显式参数>env>可识别旧仓库运行态>新默认 ~/.skill-keeper/{data,cache/staging,backups});scan/report/manage 主入口改 main(argv=None) 返回码;remove_skill/serve/check_updates/value_review 数据目录共用同一解析链;pyproject.toml PEP 621(version 动态读 scripts.__version__;本地 setuptools 58 不支持 PEP 621,构建隔离下安装正常);安装烟测走 python -m venv + pip install .(需网络取构建后端,装好完全离线)。
 
@@ -16,8 +17,8 @@
 |---|---|---|
 | Task 0 冻结私人版零退化合同 | 完成 | 5bfb7fd |
 | Task 1 统一安装、CLI 和运行态 | 完成 | 3095bc5 |
-| Task 2 最小跨平台底座 | 完成 | 本提交(2026-09-05) |
-| Task 3 模型位置声明与未知客户端盘点 | 未开始 | |
+| Task 2 最小跨平台底座 | 完成 | 0113cef |
+| Task 3 模型位置声明与未知客户端盘点(阶段 A 达成) | 完成 | 本提交(2026-09-05) |
 | Task 4 apply 前真实目标预检 | 未开始 | |
 | Task 5 CI、文档与最终验收 | 未开始 | |
 

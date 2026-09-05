@@ -5,6 +5,11 @@
 未设置时用项目 data/。schema 见 scripts/core/models.py,v2 结构:
   locations(位置)/ instances(物理实例)/ logical_skills(逻辑身份)
   / findings(结构化健康问题)/ config_issues(配置问题)
+
+Task 3 起,未知客户端可由模型提供位置声明(只读、仅本次、不持久化):
+  scan.py --root CLIENT=PATH            单根直传
+  scan.py --locations-json FILE|-       声明文件或 stdin(字段白名单见 core/location_input.py)
+临时声明产生的实例永远不可变,不提供任何变更入口;长期管理请写 client-locations.json。
 """
 import json, os, re, shutil, sys, time
 from pathlib import Path
@@ -17,6 +22,8 @@ from scripts.core.clients import discover_locations, discover_skill_roots  # noq
 from scripts.core.clients import load_rules  # noqa: E402
 from scripts.core.fingerprint import FingerprintError, instance_id, tree_hash  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked, redact_secrets  # noqa: E402
+from scripts.core.location_input import (LocationInputError, MAX_DECL_BYTES,  # noqa: E402
+                                         parse_cli_roots, parse_declaration)
 from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
 from scripts.core.platform import is_absolute_path  # noqa: E402
 from scripts.core.runtime import default_data_dir  # noqa: E402
@@ -495,6 +502,27 @@ def _structural_findings(instances, locations, data_dir):
                 "ignored": False, "related_ids": [i["instance_id"] for i in insts[1:]],
             })
 
+    # 模型自报客户端(无适配器):其声明根内部的同名重复仍要可见,
+    # 但口径是"客户端自报",等待本地确认;绝不冒充精确加载事实。
+    known_clients = set(CLIENT_LABELS)
+    model_clients = sorted({l["client"] for l in locations
+                            if "model-declaration" in (l.get("evidence") or [])
+                            and l["client"] not in known_clients})
+    for client in model_clients:
+        loc_ids = {l["location_id"] for l in locations if l["client"] == client}
+        for name in sorted({n for n, v in by_name.items()
+                            if len([i for i in v if i["location_id"] in loc_ids]) > 1}):
+            insts = [i for i in by_name[name] if i["location_id"] in loc_ids]
+            locs = "、".join(i["display_path"].rsplit("/", 1)[0] for i in insts)
+            findings.append({
+                "code": "duplicate-load", "severity": "yellow",
+                "instance_id": insts[0]["instance_id"],
+                "skill": name, "location_id": insts[0]["location_id"],
+                "message": f"自报客户端 {client} 同名 {len(insts)} 份:{locs}"
+                           f"(位置来自模型声明,等待本地确认)",
+                "ignored": False, "related_ids": [i["instance_id"] for i in insts[1:]],
+            })
+
     # Haha:同时读 Claude 目录与共享库,镜像同名会双份——聚合为一条,不逐个刷屏
     haha_ids = {l["location_id"] for l in locations if _location_in_client(l, "haha")}
     haha_dups = sorted(n for n, v in by_name.items()
@@ -606,7 +634,29 @@ def _need_vet(instances, data_dir):
     return sorted(out)
 
 
-def build_inventory(home, data_dir, workspace=None) -> dict:
+def _model_locations(model_roots, home):
+    """模型临时位置声明 → Location 行(mutable 恒为 False)。
+
+    只在本函数把声明路径变成扫描目标;声明解析本身(location_input)不打开任何文件。
+    目录不存在的声明进 findings(model-root-missing),绝不当作空位置扫描成功。
+    """
+    rows, misses = [], []
+    for root in model_roots or []:
+        real = os.path.realpath(root["path"])
+        if not os.path.isdir(real) or real == os.path.realpath(str(home)):
+            misses.append({"client": root["client"],
+                           "display": _display_path(root["path"], home)})
+            continue
+        loc_id = "model-{}-{}".format(root["client"],
+                                      instance_id("model", root["client"], real)[:8])
+        rows.append(Location(
+            loc_id, root["client"], real, "user", False,
+            ("model-declaration", "scope:" + root["scope"],
+             "load-state:" + root["load_state"])))
+    return rows, misses
+
+
+def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
     """聚合全部客户端位置 → inventory v2 dict(只读;不写任何文件)。
 
     workspace=None 表示全局上下文(不选中任何项目);传入项目路径时,该工作区
@@ -618,6 +668,20 @@ def build_inventory(home, data_dir, workspace=None) -> dict:
     locations = discover_locations(home, data_dir)
     extra, config_issues = _extra_locations(data_dir)
     locations = sorted(_dedupe(locations + extra), key=lambda x: x.location_id)
+
+    # Task 3:模型临时位置声明 —— 只读、不可变;与已有位置按真实路径去重,
+    # 本机事实优先(适配器/client-locations 命中的路径不再接受声明副本)。
+    model_rows, model_misses = _model_locations(model_roots, home)
+    existing_real = {os.path.realpath(l.path) for l in locations}
+    model_seen = set()
+    model_deduped = []
+    for row in model_rows:
+        real = os.path.realpath(row.path)
+        if real in existing_real or real in model_seen:
+            continue
+        model_seen.add(real)
+        model_deduped.append(row)
+    locations = sorted(_dedupe(locations + model_deduped), key=lambda x: x.location_id)
 
     instances, findings = [], []
     obs_issues = []
@@ -641,6 +705,13 @@ def build_inventory(home, data_dir, workspace=None) -> dict:
                                        "instance_id": inst["instance_id"],
                                        "path": inst.get("display_path")})
     findings.extend(_structural_findings(instances, [l.to_dict() for l in locations], data_dir))
+    for miss in model_misses:
+        findings.append({
+            "code": "model-root-missing", "severity": "yellow", "instance_id": "-",
+            "skill": miss["client"], "location_id": "-",
+            "message": "自报客户端 {} 声明的根目录本机不存在: {}(等待模型或用户复核)".format(
+                miss["client"], miss["display"]),
+            "ignored": False})
     _apply_ignore(findings, data_dir)
     logical = _build_logical_skills(instances)
     client_load = _client_load_stats(instances, [l.to_dict() for l in locations])
@@ -664,6 +735,9 @@ def build_inventory(home, data_dir, workspace=None) -> dict:
             "workspace": os.path.abspath(str(workspace)) if workspace else None,
             "locations": len(locations),
             "instances": len(instances),
+            "model_roots": len(model_deduped),
+            "model_inputs_complete": bool(model_roots) and all(
+                r.get("complete") for r in (model_roots or [])),
         },
         "rule_version": load_rules.RULE_VERSION,
         "load_contexts": load_contexts,
@@ -732,17 +806,72 @@ def _summary_rows(inv):
     return red, yellow, dup, len([f for f in inv["findings"] if f["ignored"]])
 
 
+def _collect_model_inputs(argv):
+    """解析 --root CLIENT=PATH 与 --locations-json FILE|-;返回 normalized model_roots。
+
+    只读文本;拒绝发生在任何扫描/落盘之前。声明经 stdin("-")时按 64KiB 上限读取。
+    """
+    pairs, decl_source = [], None
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--root":
+            i += 1
+            if i >= len(argv):
+                raise LocationInputError("--root 缺少 CLIENT=PATH 值")
+            pairs.append(argv[i])
+        elif arg.startswith("--root="):
+            pairs.append(arg.split("=", 1)[1])
+        elif arg == "--locations-json":
+            i += 1
+            if i >= len(argv):
+                raise LocationInputError("--locations-json 缺少 FILE 或 -")
+            decl_source = argv[i]
+        elif arg.startswith("--locations-json="):
+            decl_source = arg.split("=", 1)[1]
+        i += 1
+
+    roots = parse_cli_roots(pairs) if pairs else []
+    if decl_source is not None:
+        if decl_source == "-":
+            decl = parse_declaration(sys.stdin.buffer.read(MAX_DECL_BYTES + 1))
+        else:
+            try:
+                raw = Path(decl_source).read_bytes()
+            except OSError:
+                raise LocationInputError("声明文件无法读取")
+            decl = parse_declaration(raw)
+        for root in decl["roots"]:
+            roots.append({"client": decl["client"], "path": root["path"],
+                          "scope": root["scope"], "load_state": root["load_state"],
+                          "complete": decl["complete"]})
+    if len(roots) > 32:
+        raise LocationInputError("模型位置根总数超过 32 个上限")
+    for root in roots:
+        root.setdefault("complete", False)
+    return roots
+
+
 def main(argv=None):
     argv = list(sys.argv[1:]) if argv is None else list(argv)
     if "--help" in argv or "-h" in argv:
         print(__doc__)
-        print("用法: scan.py [--json]  (--json: 机器可读输出,退出码 0=健康 1=有红色问题)")
+        print("用法: scan.py [--json] [--root CLIENT=PATH ...] "
+              "[--locations-json FILE|-]")
+        print("  --json: 机器可读输出,退出码 0=健康 1=有红色问题 2=运行失败/观察不完整")
+        print("  --root/--locations-json: 模型提供的临时位置声明(只读,仅本次扫描,不持久化)")
         print("环境变量: SKILL_KEEPER_DATA 可覆盖数据目录(测试/多环境)")
         return 0
+    try:
+        model_roots = _collect_model_inputs(argv)
+    except LocationInputError as e:
+        print(json.dumps({"ok": False, "error": "位置声明被拒绝: {}".format(e)},
+                         ensure_ascii=False))
+        return 2
     home = Path(os.path.expanduser("~"))
     ddir = data_dir()
     try:
-        inv = build_inventory(home, ddir)
+        inv = build_inventory(home, ddir, model_roots=model_roots or None)
     except InventoryError as e:
         print(json.dumps({"operational_ok": False, "error": str(e)}, ensure_ascii=False))
         return 2
