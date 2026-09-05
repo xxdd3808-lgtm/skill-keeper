@@ -78,7 +78,7 @@ class MigrationDocsTests(unittest.TestCase):
         skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("version: 2.1.1", skill)
+        self.assertIn("version: 3.0.0", skill)  # F11:版本字段必须与项目状态一致(2.1.1 已过期)
         for client in ("ZCode", "Codex", "Accio", "WorkBuddy", "Claude Code", "Haha", "Cindy"):
             self.assertIn(client, readme, "README 必须列出支持的客户端:" + client)
             self.assertIn(client, agents, "AGENTS 必须列出支持的客户端:" + client)

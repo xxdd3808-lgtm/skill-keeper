@@ -12,9 +12,13 @@ python3 scripts/report.py --serve          # 交互报告:plan/apply 两阶段�
 python3 scripts/check_updates.py           # 完整树 vs 固定候选树比对(只读)→ 暂存候选 + data/updates.json
 python3 scripts/value_review.py queue      # 生成第三方价值审查队列(只读)
 python3 scripts/value_review.py record --file <review.json> --model <模型名>   # 审查记账
-python3 scripts/remove_skill.py plan --instance-id <id> --reason <理由>        # 生成不可变删除计划
-python3 scripts/remove_skill.py apply <plan_id> --digest <digest> --confirm   # 确认执行(先备份,失败回滚)
+python3 scripts/manage.py plan remove/update/restore --json                   # 计划(与网页共用 service 层)
+python3 scripts/manage.py apply <plan_id> --digest <digest> --confirm --json  # 确认执行(备份+事务+可恢复)
+python3 scripts/manage.py status/recover <plan_id> --json                     # 事务状态 / 中断恢复
 python3 scripts/make_sample_report.py      # 固定虚构 fixture → examples/report-sample.html
+python3 scripts/verify.py                  # 验收入口:unittest 实际结果,0 失败 0 跳过才算过
+
+当前版本 3.0.0(2026-09-05 可信性优化,F01–F11,详见 docs/architecture.md 与 PROGRESS.md)。
 ```
 
 退出码约定:scan / report / check_updates 的 `--json` 模式,0=健康/无差异,1=有红色问题/有差异;remove_skill 旧式目录名用法一律退出 2 并打印迁移说明。

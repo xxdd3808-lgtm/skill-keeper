@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 2.1.1
+version: 3.0.0
 ---
 
 # skill-keeper · 本地 Skill 管家(v2)
@@ -112,8 +112,9 @@ python3 ~/skill-keeper/scripts/check_updates.py
 
 - **删除**(两阶段,不接受目录名):
   ```bash
-  python3 ~/skill-keeper/scripts/remove_skill.py plan --instance-id <instance_id> --reason <理由>
-  python3 ~/skill-keeper/scripts/remove_skill.py apply <plan_id> --digest <digest> --confirm
+  python3 ~/skill-keeper/scripts/manage.py plan remove --instance-id <instance_id> --reason <理由> --json
+  python3 ~/skill-keeper/scripts/manage.py apply <plan_id> --digest <digest> --confirm --json
+  python3 ~/skill-keeper/scripts/manage.py recover <plan_id> --json   # 中断事务恢复
   ```
   计划 30 分钟过期;执行 = 互斥锁 → 前置校验(目标指纹未变)→ 创建并验证备份 → 精确删除 → 验证(失败自动回滚)→ 审计。旧式 `remove_skill.py <目录名>` 只打印迁移说明并退出 2,绝不删除。
 - **更新**:check_updates 暂存候选 → 安检通过后在交互报告里生成 update 计划并确认执行;skills.sh 来源没有 commit SHA 时,候选本身的完整文件集和哈希就是不可变对象,应用阶段绝不重新下载。

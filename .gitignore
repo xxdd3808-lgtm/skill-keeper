@@ -12,6 +12,8 @@ data/review-queue.json
 data/value-reviews.json
 data/change-plans/
 data/transactions/
+data/client-locations.json
+data/updates-last.json
 data/staging/
 data/.change.lock
 data/audit-v2.jsonl

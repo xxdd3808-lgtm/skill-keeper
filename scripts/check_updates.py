@@ -198,8 +198,9 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
         candidate_hash = staged["candidate_hash"]
         candidate_manifest = tree_manifest(staging_path)
         try:
-            candidate_version = fm_version(open(staging_path / "SKILL.md", encoding="utf-8",
-                                                errors="ignore").read())
+            with open(staging_path / "SKILL.md", encoding="utf-8",
+                      errors="ignore") as _fm:
+                candidate_version = fm_version(_fm.read())
         except OSError:
             candidate_version = ""
         if candidate_hash == local_hash:

@@ -48,8 +48,12 @@
 
 ```bash
 # 删除:两阶段,不接受目录名
-python3 ~/skill-keeper/scripts/remove_skill.py plan --instance-id <instance_id> --reason <理由>
-python3 ~/skill-keeper/scripts/remove_skill.py apply <plan_id> --digest <digest> --confirm
+cd ~/skill-keeper
+python3 scripts/manage.py plan remove --instance-id <instance_id> --reason <理由> --json
+python3 scripts/manage.py apply <plan_id> --digest <digest> --confirm --json
+python3 scripts/manage.py status <plan_id> --json      # 查看计划/事务状态
+python3 scripts/manage.py recover <plan_id> --json     # 恢复中断事务的原状态
+python3 scripts/verify.py                              # 全量验收入口(0 失败 0 跳过)
 ```
 
 - 计划不可变、30 分钟过期;执行 = 互斥锁 → 目标指纹复核 → 创建并验证备份(带 manifest,含位置/链接/权限/完整树摘要)→ 精确删除 → 验证(失败自动从备份恢复)→ 审计
