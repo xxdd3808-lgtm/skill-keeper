@@ -1,5 +1,5 @@
-# BLOCKED — skill-keeper 可信性优化
+# BLOCKED — skill-keeper v4 精简开源泛化
 
-（当前无阻塞项。按任务书要求：无问题也写“无”。）
+(按任务书要求:无问题也写"无"。)
 
 无

@@ -1,0 +1,15 @@
+{
+  "_comment": "完全虚构的来源台账,仅用于冻结测试;不含任何真实技能或仓库",
+  "builtin-widget": {
+    "type": "builtin-app",
+    "owner": "ego",
+    "note": "虚构应用 EgoTool 的内置技能",
+    "_confirmed_at": "2026-09-05"
+  },
+  "codex-extra": {
+    "type": "github",
+    "repo": "example-fictitious/codex-extra",
+    "path": "skills/codex-extra",
+    "_confirmed_at": "2026-09-05"
+  }
+}

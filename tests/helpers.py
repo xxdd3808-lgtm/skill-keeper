@@ -113,3 +113,21 @@ def build_multi_client_paths(testcase):
     """返回 (home, data_dir) 二元组,方便 build_inventory(home, data_dir) 直接消费。"""
     home = build_multi_client_home(testcase)
     return home, home / "project-data"
+
+
+PRIVATE_V311_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "private-v311"
+
+
+def copy_private_v311_fixture(testcase):
+    """Task 0 零退化合同:把完全虚构的 private-v311 fixture 复制到临时目录。
+
+    返回 (home, data);symlinks=True 保留 wb-link/wb-drift 相对符号链接。
+    fixture 内容全部虚构(见 fixtures/private-v311/README.md)。
+    """
+    td = temp_home(testcase, prefix="sk-v311-")
+    home = td / "home"
+    data = td / "data"
+    shutil.copytree(PRIVATE_V311_FIXTURE / "home", home, symlinks=True)
+    shutil.copytree(PRIVATE_V311_FIXTURE / "data", data)
+    testcase.addCleanup(shutil.rmtree, td, ignore_errors=True)
+    return home, data
