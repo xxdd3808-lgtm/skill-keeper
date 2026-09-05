@@ -5,6 +5,12 @@ on:
     branches: ["**"]
   pull_request:
 
+# Windows runner 的默认控制台编码是 cp1252:子进程/验收器输出中文会直接
+# UnicodeEncodeError;UTF-8 模式同时让 subprocess text=True 按 UTF-8 解码。
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: "1"
+
 jobs:
   ubuntu-py38:
     name: Ubuntu / Python 3.8

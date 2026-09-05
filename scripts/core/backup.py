@@ -286,7 +286,8 @@ def create_backup(plan, inventory, backup_dir):
                     info.mtime = int(time.time())
                     t.addfile(info, io.BytesIO(data))
                     n_files += 1
-        with open(tmp_path, "rb") as f:
+        with open(tmp_path, "r+b") as f:
+            # Windows 的 FlushFileBuffers 要求写句柄:只读句柄 fsync 会 EBADF(Errno 9)
             os.fsync(f.fileno())
         os.replace(tmp_path, final_path)
     except (tarfile.TarError, OSError) as e:

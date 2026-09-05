@@ -105,16 +105,16 @@ class FetchContractTests(unittest.TestCase):
             "content": b64(b"---\nname: rooty\ndescription: root demo\n---\nbody\n"),
             "encoding": "base64"}
         with tempfile.TemporaryDirectory() as td:
-            r = fetch_skill_tree("x/y", "", "fixed-sha", Path(td) / "r", FakeGh(good | {
-                "repos/x/y/git/trees/fixed-sha?recursive=1": {"tree": root_rows}}))
+            r = fetch_skill_tree("x/y", "", "fixed-sha", Path(td) / "r", FakeGh({**good, **{
+                "repos/x/y/git/trees/fixed-sha?recursive=1": {"tree": root_rows}}}))
             self.assertTrue(r["ok"], r)
             self.assertEqual(r["source_dir"], "")
             self.assertTrue((Path(td) / "r/SKILL.md").is_file())
         bad = {"repos/x/y/git/blobs/r1": {"content": b64(b"no frontmatter here"),
                                           "encoding": "base64"}}
         with tempfile.TemporaryDirectory() as td:
-            r = fetch_skill_tree("x/y", "", "fixed-sha", Path(td) / "r2", FakeGh(bad | {
-                "repos/x/y/git/trees/fixed-sha?recursive=1": {"tree": root_rows}}))
+            r = fetch_skill_tree("x/y", "", "fixed-sha", Path(td) / "r2", FakeGh({**bad, **{
+                "repos/x/y/git/trees/fixed-sha?recursive=1": {"tree": root_rows}}}))
             self.assertFalse(r["ok"])
             self.assertEqual(r["error"], "invalid-frontmatter")
 

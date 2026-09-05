@@ -230,13 +230,27 @@ class PrivateCompatibilityTests(unittest.TestCase):
         self.assertEqual([x["rollback_status"] for x in audit], [None, None, None])
 
     def test_repo_runtime_layout_frozen(self):
-        """仓库内 data/backups 兼容布局:默认 = 仓库;SKILL_KEEPER_DATA 覆盖后备份跟 data 走。"""
+        """data/backups 兼容布局:真实 v2/v3 运行态 → 仓库布局;全新 checkout → 新默认。
+
+        断言随本仓库实际状态分支(私人部署=old-repo 时冻结仓库布局;
+        CI 新 clone=new 时冻结 ~/.skill-keeper),两种分支都不允许回归。
+        """
         from scripts.scan import data_dir as scan_data_dir
+        from scripts.core.runtime import detect_repo_layout
+        layout = detect_repo_layout(BASE)
         with mock.patch.dict(os.environ, {}, clear=True):
             paths = RuntimePaths()
-            self.assertEqual(paths.data_dir, BASE / "data")
-            self.assertEqual(paths.backup_dir, BASE / "backups")
-            self.assertEqual(scan_data_dir(), Path(BASE) / "data")
+            self.assertEqual(paths.layout, layout)
+            if layout == "old-repo":
+                self.assertEqual(paths.data_dir, BASE / "data")
+                self.assertEqual(paths.backup_dir, BASE / "backups")
+                self.assertEqual(scan_data_dir(), Path(BASE) / "data")
+            else:
+                self.assertEqual(paths.data_dir, paths.home / ".skill-keeper" / "data")
+                self.assertEqual(paths.backup_dir,
+                                 paths.home / ".skill-keeper" / "backups")
+                self.assertEqual(scan_data_dir(),
+                                 paths.home / ".skill-keeper" / "data")
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.dict(os.environ, {"SKILL_KEEPER_DATA": td}, clear=True):
                 paths = RuntimePaths()
