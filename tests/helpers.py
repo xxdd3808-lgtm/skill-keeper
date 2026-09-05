@@ -130,29 +130,38 @@ def copy_private_v311_fixture(testcase):
     data = td / "data"
     shutil.copytree(PRIVATE_V311_FIXTURE / "home", home, symlinks=True)
     shutil.copytree(PRIVATE_V311_FIXTURE / "data", data)
-    # Windows checkout 常把仓库 symlink 物化成只含目标的普通文本文件,且对
-    # "相对路径 + 正斜杠"的链接目标解析不可靠:这里一律删除重建——Windows 用
-    # 本机路径形态(自动为绝对目标),POSIX 保持相对目标;并自检可解析。
+    # Windows checkout 的链接形态不可控(普通文本文件,或相对目标的真符号链接
+    # —— follow-stat 会 Access denied):一律按"链接/文件"安全删除后重建。
+    # Windows 用原生目录联接 junction(绝对目标,无需特权,CPython islink 认它);
+    # POSIX 保持仓库相对目标。重建后自检可解析,失败带组件级诊断。
     for rel, target in ((".workbuddy/skills/wb-link", "../../.agents/skills/shared-alpha"),
                         (".workbuddy/skills/wb-drift", "../staging/shared-beta-v2")):
         link = home / rel
-        if link.is_symlink() or link.exists():
-            if link.is_dir() and not link.is_symlink():
-                shutil.rmtree(link)
-            else:
+        try:
+            if link.is_symlink():
                 link.unlink()
+            elif link.is_dir():
+                shutil.rmtree(link)
+            elif link.exists():
+                link.unlink()
+        except OSError:
+            try:
+                link.unlink()
+            except OSError:
+                pass
         if os.name == "nt":
-            final_target = os.path.abspath(link.parent / target)
+            import subprocess
+            final_target = os.path.realpath(str(link.parent) + os.sep
+                                            + target.replace("/", os.sep))
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(link), final_target],
+                           check=True, capture_output=True)
         else:
             final_target = target
-        os.symlink(final_target, str(link), target_is_directory=True)
-        if not link.exists():
-            probe, cur = [], link.parent
-            for part in Path(target).parts:
-                cur = cur / part
-                probe.append("{}={}".format(part, cur.exists()))
+            os.symlink(final_target, str(link), target_is_directory=True)
+        if not (os.path.islink(str(link)) and os.path.isdir(str(link))):
             raise AssertionError(
-                "fixture 链接重建后悬空: {} -> {}(readlink={},组件 {})".format(
-                    link, final_target, os.readlink(str(link)), " ".join(probe)))
+                "fixture 链接重建后不可解析: {} -> {}(islink={},isdir={})".format(
+                    link, final_target, os.path.islink(str(link)),
+                    os.path.isdir(str(link))))
     testcase.addCleanup(shutil.rmtree, td, ignore_errors=True)
     return home, data

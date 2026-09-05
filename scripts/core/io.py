@@ -48,8 +48,11 @@ def redact_secrets(value):
 
 
 def replace_atomic(tmp, path, attempts=5, delay=0.05):
-    """os.replace 原子改名;Windows 上对刚落盘文件的瞬时占用(Defender/索引器
-    WinError 5)做短退避重试,其余错误立即上抛。"""
+    """os.replace 原子改名;Windows 上两类已知 PermissionError 自动恢复:
+    - 目标文件带只读属性(如 write_plan 的 0o444 不可变计划):POSIX rename
+      从不管目标权限,Windows 却拒绝覆盖 —— 先摘掉只读位再重试;
+    - 新落盘文件的瞬时占用(Defender/索引器):短退避重试。
+    其余错误立即上抛。"""
     last = None
     for attempt in range(attempts):
         try:
@@ -57,6 +60,10 @@ def replace_atomic(tmp, path, attempts=5, delay=0.05):
             return
         except PermissionError as e:
             last = e
+            try:
+                os.chmod(path, 0o644)
+            except OSError:
+                pass
             time.sleep(delay * (attempt + 1))
     raise last
 

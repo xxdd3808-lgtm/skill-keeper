@@ -403,9 +403,10 @@ class RestoreCleanupContractTests(unittest.TestCase):
         saved = create_backup(env.plan, env.inventory, env.backup_dir)
         env.remove_targets()
         if os.name == "nt":
-            # NTFS 目录只读属性不阻止创建:用真实 ACL 拒绝写入(不阻塞清理)
+            # deny 全部权限 (F):mkdtemp(创建子目录)需要 AD,只 deny (WD) 挡不住;
+            # 全拒绝后 mkdtemp 必定失败,注入确定生效
             import subprocess
-            subprocess.run(["icacls", str(env.claude_root), "/deny", "*S-1-1-0:(WD)"],
+            subprocess.run(["icacls", str(env.claude_root), "/deny", "*S-1-1-0:(F)"],
                            check=True, capture_output=True)
             self.addCleanup(lambda: subprocess.run(
                 ["icacls", str(env.claude_root), "/reset"], capture_output=True))
@@ -415,6 +416,10 @@ class RestoreCleanupContractTests(unittest.TestCase):
         with self.assertRaises(BackupError):
             restore_backup(Path(saved["path"]), env.locations)
         self.assertFalse(env.demo.exists(), "已落地的第一个实体必须撤销")
+        if os.name == "nt":
+            # 先还原 ACL 再检查目录内容(被 deny 时 listdir 本身会被拒)
+            subprocess.run(["icacls", str(env.claude_root), "/reset"],
+                           check=True, capture_output=True)
         self.assertEqual(os.listdir(env.claude_root), [], "失败根目录不留半成品")
         home = env.backup_dir.parent
         for dirpath, dirnames, _ in os.walk(home):
