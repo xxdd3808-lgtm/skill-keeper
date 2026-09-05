@@ -21,14 +21,14 @@ python3 scripts/manage.py status/recover <plan_id> --json                     # 
 python3 scripts/make_sample_report.py      # 固定虚构 fixture → examples/report-sample.html
 python3 scripts/verify.py                  # 验收入口:unittest 实际结果,0 失败 0 跳过才算过
 
-当前版本 3.0.0(2026-09-05 可信性优化,F01–F11,详见 docs/architecture.md 与 PROGRESS.md)。
+当前版本 4.0.0(2026-09-05 精简开源泛化:三平台安装、统一 CLI、模型位置声明、apply 前目标预检;详见 docs/architecture.md 与 PROGRESS.md)。
 ```
 
-退出码约定:scan / report / check_updates 的 `--json` 模式,0=健康/无差异,1=有红色问题/有差异;remove_skill 旧式目录名用法一律退出 2 并打印迁移说明。
+退出码约定:scan / report / check_updates 的 `--json` 模式,0=健康/无差异,1=有红色问题/有差异,2=运行失败或观察不完整;remove_skill 旧式目录名用法一律退出 2 并打印迁移说明。
 
 ## 技术栈
 
-纯 Python 3.8+ 标准库;可选 PyYAML(仅影响 frontmatter 的 yaml-validation 展示,不影响核心字段)、gh CLI(GitHub 证据与候选拉取,可缺席并降级)。无构建步骤、无第三方依赖。`unittest` 全量测试:`python3 -m unittest discover -s tests`(全部使用临时 HOME fixture)。
+纯 Python 3.8+ 标准库;可选 PyYAML(仅影响 frontmatter 的 yaml-validation 展示,不影响核心字段)、gh CLI(GitHub 证据与候选拉取,可缺席并降级)。运行时零第三方依赖;`pip install .` 可装为统一命令 `skill-keeper`(构建依赖只在安装期使用)。`unittest` 全量测试:`python3 scripts/verify.py`(0 失败 0 跳过 + v3.1.1 原测试 ID 基线不减少)。CI:Ubuntu 3.8 / Ubuntu / macOS / Windows 四个 job(`.github/workflows/ci.yml`)。
 
 ## 目录与约定
 
@@ -50,4 +50,5 @@ python3 scripts/verify.py                  # 验收入口:unittest 实际结果,
 - v3.0.0(2026-09-05):**可信性与性能优化(F01–F11)**——备份/恢复合同测试与路径边界、执行两阶段策略复核(known_sources 损坏拒写、调用传参只增不减保护)、持结事务状态机(中断可恢复)、观察完整性(不完整即 exit 2 且禁变更)、审查结论有效性(内容/替代/政策变化自动过期)、暂存所有权与引用 GC、GitHub 树严格拉取、`manage.py` 统一 CLI、重叠索引复用(SKILL.md 读取 12800→80、相似对评分 259120→3160)、`verify.py` 验收入口;报告备份区改用 backup_id 恢复、静态命令仓库相对化。230 项测试。
 - v3.1.0(2026-09-05):**报告共享库视图**——顶部「📂 共享库」指标直达专属区块,列出放在 `~/.agents/skills` 的全部逻辑 Skill 及其价值结论、其他占用客户端与 plan 入口(HTML/Markdown 双通道);安装实例明细客户端列改友好标签(shared→共享库)。用户反馈驱动:该事实此前只藏在明细表 client 列。231 项测试。
 - v3.1.1(2026-09-05):**builtin-app 散布收回通道**——known-sources 的 builtin-app 条目可选登记 `owner`(所属客户端);策略按住址细分:owner 位置的正本删除/更新照旧拒绝,非所属位置的散布快捷方式允许走正规 remove(plan→确认→备份→事务→审计),update/位置缺失/未登记 owner 照旧拒绝。起因:ego-browser 共享库快捷方式正规收回被防线一刀切拒绝,只能手工修。233 项测试。
+- v4.0.0(2026-09-05):**精简开源泛化(Task 0–5)**——①可安装:`pyproject.toml`(PEP 621,Python ≥3.8,console script `skill-keeper`),统一 CLI(scan/report/manage/doctor),新安装运行态统一 `~/.skill-keeper/{data,cache,backups}`,解析优先级 显式参数>env>可识别旧仓库运行态(v2/v3 标记)>新默认,零自动迁移;②跨平台底座:`scripts/core/platform.py`(fcntl/msvcrt 延迟锁后端、原生绝对路径判断),归档成员路径仍严格 POSIX(新增盘符组件拒绝),全 scripts/ 无顶层无条件平台导入;③模型位置声明:`--root CLIENT=PATH` / `--locations-json FILE|-`(白名单+限额,load_state 只认 reported,解析不打开文件、错误不回显值),临时声明只读不持久化,policy+service 两层拒绝变更,SKILL.md 写入未知客户端通用流程;④apply 前真实目标预检:`scripts/core/preflight.py` 在目标同目录验证创建/rename/replace/fsync 并清理(无能力快照,每次 apply 重新验证),失败在备份与移动前中止;⑤CI 四 job(Ubuntu 3.8/主力、macOS、Windows)+ SECURITY.md;verify.py 增加 v3.1.1 原 233 项测试 ID 基线不减少、安装 smoke、恶意声明与模型不可写探针、tracked 文件个人路径/秘密扫描。303 项测试,0 skipped。
 - 候选改进:更多客户端目录适配(可用 `data/client-locations.json` 登记,或增删 `scripts/core/clients/` 适配器)、报告主题、按需增量扫描、skills.sh 市场真实下载量接入、Haha 双载的镜像策略、扫描未知应用残留技能目录(如本次 `~/.openclaw-autoclaw` 在卸载后不可见,靠外部比对才发现)。

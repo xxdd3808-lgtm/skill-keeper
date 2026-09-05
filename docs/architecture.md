@@ -1,28 +1,58 @@
-# skill-keeper 现行架构与规则(2026-09-05 优化后)
+# skill-keeper 现行架构与规则(v4,2026-09-05 开源泛化后)
 
 历史事实见 [changes.md](changes.md);原始 v2 设计见
 [../superpowers/specs/](superpowers/specs/) 下 2026-08-31 设计文档(其中"计划中"
-的表述不代表已实现,以本文件为准)。
+的表述不代表已实现,以本文件为准);v4 精简泛化设计见
+[../superpowers/specs/2026-09-05-skill-keeper-open-source-design.md](../superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。
 
 ## 入口
 
 | 入口 | 用途 |
 |---|---|
-| `python3 scripts/scan.py` | 只读盘点 → `data/inventory.json`(+ observation/content_status) |
+| `skill-keeper`(console script)/ `python3 -m scripts.cli` | 统一 CLI:scan / report / manage / doctor(参数与 scripts/*.py 一致,原样透传) |
+| `python3 scripts/scan.py [--root C=P] [--locations-json FILE\|-]` | 只读盘点 → `data/inventory.json`(+ observation/content_status);模型位置声明见下 |
 | `python3 scripts/report.py [--serve]` | v2 价值报告 / 本地交互服务(127.0.0.1+token) |
 | `python3 scripts/check_updates.py` | 只读:本地树 vs 固定 commit 候选树 → `data/updates.json` |
 | `python3 scripts/value_review.py queue/record` | 第三方价值审查队列与记账(台账持锁) |
 | `python3 scripts/manage.py plan/apply/status/recover/rescan` | 管理 CLI(与网页共用 service 层) |
 | `python3 scripts/remove_skill.py` | 旧入口;目录名用法一律退出 2 |
-| `python3 scripts/verify.py` | 验收入口:unittest 实际结果,0 失败 0 跳过才通过 |
+| `python3 scripts/verify.py` | 验收入口:unittest 实际结果 + v3.1.1 原测试 ID 基线 + 安装 smoke + 恶意声明/模型不可写/个人路径秘密扫描,0 失败 0 跳过才通过 |
+
+## 位置声明(模型 = 运行时位置适配器,v4)
+
+未知客户端不需要适配器:模型提交 `--root CLIENT=PATH` 或声明 JSON(白名单
+schema_version / client / observed_by / complete / roots[path/scope/load_state];
+限额 64KiB / 32 根 / 4KiB 字符串 / 6 层 / UTF-8;load_state 只认 reported)。
+`scripts/core/location_input.py` 只做纯文本校验——拒绝发生在任何扫描与落盘之前,
+错误不回显字段值,解析阶段不打开任何文件。`scan.py` 把声明转成 mutable=False、
+证据 `model-declaration` 的 Location:与既有位置按真实路径去重(本机事实优先),
+缺失根记黄灯 `model-root-missing`,自报客户端的同名重复按"等待本地确认"口径报告。
+临时声明只读、不持久化;policy(`check_action` reason_code=model-declared-location)
+与 service(`plan_action` 预拒)两层都没有变更入口;只有用户本地
+`client-locations.json` 显式 `mutable: true` 的位置才可能进变更闭环。
 
 ## 路径解析(RuntimePaths)
 
-优先级:**显式参数 > 环境变量(SKILL_KEEPER_DATA / SKILL_KEEPER_STAGING)> 兼容默认**。
-CLI/API/报告共用同一解析;子进程环境被钉死(SKILL_KEEPER_DATA/STAGING/HOME),
-禁止回到真实 HOME。默认数据目录 `项目/data`,备份 `项目/backups`(兼容既有布局);
-候选暂存默认系统缓存(macOS `~/Library/Caches/skill-keeper/staging`),绝不放进任何
-客户端会递归扫描的技能目录。
+优先级:**显式参数 > 环境变量(SKILL_KEEPER_DATA / SKILL_KEEPER_STAGING)>
+可识别旧仓库运行态(仓库 data/ 有 v2/v3 真实标记)> 新统一默认
+`~/.skill-keeper/{data,cache/staging,backups}`**。旧仓库布局同时沿用仓库 backups
+与平台缓存暂存(私人部署零迁移);CLI/API/报告共用同一解析;子进程环境被钉死
+(SKILL_KEEPER_DATA/STAGING/HOME),禁止回到真实 HOME。
+
+## 跨平台底座(scripts/core/platform.py)
+
+- 锁后端延迟选择:POSIX fcntl.flock / Windows msvcrt.locking,FileLock/change_lock
+  接口与非阻塞语义不变;锁文件绝不静默清除,中断恢复归事务状态;
+- 本机绝对路径判断 `is_absolute_path` = 运行系统原生规则(POSIX `/`;Windows
+  drive/UNC),只用于位置登记;归档成员路径仍走 `paths.validate_archive_member_path`
+  (POSIX `/`,拒绝反斜杠/盘符/绝对/`.`/`..`),备份恢复绝不借道本机判断。
+
+## apply 前真实目标预检(scripts/core/preflight.py)
+
+每次 apply(删除/更新/恢复)在取得锁后、备份与任何移动之前,对每个目标同目录
+用工具自有唯一临时对象真实验证 mkdir/写+fsync/同目录 rename/文件 replace/父目录
+fsync,并全部清理(清理不干净同样拒绝);不建能力快照、不维护 OS 支持表——
+网络盘、权限变化和陈旧结论每次都被重新验证,失败在改动任何目标前中止。
 
 ## 执行策略(唯一的许可判定)
 
