@@ -109,6 +109,14 @@ def check_action(action, target, location, policy) -> dict:
                            "移除登记并重新盘点,再生成计划", policy_hash)
         advice = client_managed_advice(prov)
         if advice:
+            # builtin-app 散布收回口子(2026-09-05):登记了 owner 且实例位于
+            # 非所属客户端位置(散布快捷方式)时,允许走正规 remove 收回。
+            # owner 位置的正本、未登记 owner、update、位置缺失一律照旧拒绝。
+            owner = str(prov.get("owner") or "")
+            if (action == "remove" and str(prov.get("type")) == "builtin-app" and owner):
+                loc_client = str((location or {}).get("client") or "")
+                if loc_client and loc_client != owner:
+                    return _allowed(policy_hash)
             return _denied("client-managed:" + str(prov.get("type")),
                            "该 Skill 由所属客户端托管: " + advice, policy_hash)
         return _denied("protected:" + str(prov.get("type")),

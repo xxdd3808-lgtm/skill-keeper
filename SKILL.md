@@ -1,7 +1,7 @@
 ---
 name: skill-keeper
 description: 本地 agent skill 管家。对全部本地 skill 做全量盘点——每个 skill 的功能、来源(GitHub/skills.sh/国内注册表/随应用/自建)、配套客户端(ZCode/Claude Code/Codex/Ego/插件),检测重复加载、遮蔽副本、悬空链接、损坏 frontmatter 等健康问题,并在用户确认后执行带备份的更新/删除/修复。当用户说"梳理skill""skill体检""skill审计""skill报告""skill管家""哪些skill会加载""这个skill哪来的""skill删掉/更新"时使用。
-version: 3.1.0
+version: 3.1.1
 ---
 
 # skill-keeper · 本地 Skill 管家(v2)
@@ -14,7 +14,7 @@ version: 3.1.0
 
 1. **扫描、报告、更新检查、审查队列都是只读的**;**删除/更新/恢复必须先 plan、再由用户确认 digest 后 apply**,任意目录名/路径一律不是合法目标。
 2. **任何删除/更新前强制创建并验证备份**(带 manifest 的新格式,含位置、链接、权限与完整树摘要,存 `backups/`);验证失败自动回滚;恢复走两阶段计划,冲突不覆盖。
-3. **自建 skill 与客户端自带/插件内容受保护**:不进入第三方价值审查;自建白名单(`data/self-built.txt`)之外的名称前缀、frontmatter 自述都不能换取免检。保护以 `data/` 权威配置为准,**计划生成与执行两阶段各复核一次**——计划后新登记的保护(builtin-app/自建)、实例 mutable 翻转、实体形态或位置根变化都会让旧计划拒绝执行;`known-sources.json` 损坏时拒绝一切写操作;调用参数里传其他来源表不能削弱权威保护。
+3. **自建 skill 与客户端自带/插件内容受保护**:不进入第三方价值审查;自建白名单(`data/self-built.txt`)之外的名称前缀、frontmatter 自述都不能换取免检。保护以 `data/` 权威配置为准,**计划生成与执行两阶段各复核一次**——计划后新登记的保护(builtin-app/自建)、实例 mutable 翻转、实体形态或位置根变化都会让旧计划拒绝执行;`known-sources.json` 损坏时拒绝一切写操作;调用参数里传其他来源表不能削弱权威保护。builtin-app 条目可选登记 `owner`(所属客户端):正本(owner 位置)的删除/更新一律拒绝;非所属位置的散布快捷方式允许走正规 plan/apply 删除收回。
 4. 不修改任何客户端插件缓存与客户端管理的目录;客户端配置只按字段白名单读取,token/key/cookie/env 一律不碰。
 5. 一切操作后重跑 `scan.py` 刷新 `data/inventory.json`;所有动作(成功/失败/回滚)记入 `data/audit-v2.jsonl`。
 6. **GitHub 星数是仓库热度,不等于该 Skill 的真实使用人数**;热度、维护、来源任何单一因素都不能自动触发删除;系统永不自动删除。

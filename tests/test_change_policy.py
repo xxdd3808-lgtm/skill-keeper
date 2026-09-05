@@ -135,6 +135,39 @@ class ApplyTimePolicyTests(unittest.TestCase):
         unknown = check_action("explode", inst, loc, policy)
         self.assertFalse(unknown["allowed"])
 
+    def test_builtin_app_owner_allows_spread_alias_removal_only(self):
+        """builtin-app 保护按住址细分(2026-09-05 用户拍板):known-sources 登记
+        owner 后,位于非所属客户端位置的散布快捷方式允许走正规 remove 收回;
+        owner 位置的正本、未登记 owner 的条目、update 动作、位置缺失——照旧拒绝。
+        """
+        env = change_env(self)
+        inst = env.inventory["instances"][0]
+        loc = env.inventory["locations"][0]
+        self.assertEqual(loc["client"], "shared", "fixture 位置应是非所属位置")
+        register(env, {"demo": {"type": "builtin-app", "owner": "ego"}})
+        policy = load_policy(env.data)
+        spread = check_action("remove", inst, loc, policy)
+        self.assertTrue(spread["allowed"], "登记 owner 后散布快捷方式应允许正规收回")
+        entity = check_action("remove", inst, dict(loc, client="ego"), policy)
+        self.assertFalse(entity["allowed"], "owner 位置的正本必须继续拒绝")
+        register(env, {"demo": {"type": "builtin-app"}})
+        unowned = check_action("remove", inst, loc, load_policy(env.data))
+        self.assertFalse(unowned["allowed"], "未登记 owner 照旧一刀切拒绝")
+        register(env, {"demo": {"type": "builtin-app", "owner": "ego"}})
+        policy = load_policy(env.data)
+        upd = check_action("update", inst, loc, policy)
+        self.assertFalse(upd["allowed"], "update 不享受散布收回口子")
+        no_loc = check_action("remove", inst, None, policy)
+        self.assertFalse(no_loc["allowed"], "位置缺失无法判定住址,保守拒绝")
+
+    def test_remove_plan_accepts_registered_spread_alias(self):
+        """端到端:登记 owner 后,散布快捷方式的删除计划可以正常生成
+        (修复前 builtin-app 一刀切拒绝,正规收回通道走不通)。"""
+        env = change_env(self)
+        register(env, {"demo": {"type": "builtin-app", "owner": "ego"}})
+        plan = env.remove_plan()
+        self.assertTrue(plan.plan_id)
+
 
 class CandidateVetContractTests(unittest.TestCase):
     def test_unknown_vet_verdict_never_activates_candidate(self):

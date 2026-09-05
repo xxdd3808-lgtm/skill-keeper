@@ -1,6 +1,20 @@
 {
-  "_comment": "已核实的上游来源(v2)。key=本地目录名或稳定 instance ID。type: github|skills.sh|registry-*|skillhub(known-sources 只登记第三方来源;自建一律写 self-built.txt,客户端自带由适配器回执证明)。path=上游仓库内 SKILL.md 相对路径(供 check_updates.py 定位完整候选树)。这里的条目=你亲自核实过的高置信来源;frontmatter homepage 和搜索结果只是候选,不要未经核实写进来。",
-  "pdf":          {"type": "github", "repo": "anthropics/skills", "path": "skills/pdf/SKILL.md"},
-  "find-skills":  {"type": "skills.sh", "repo": "vercel-labs/agent-skills", "path": null},
-  "some-builtin": {"type": "builtin-app", "repo": null, "path": null, "note": "随应用自带,不建议手动动"}
+  "_comment": "已核实的上游来源(v2)。key=本地目录名或稳定 instance ID。type: github|skills.sh|registry-*|skillhub(known-sources 只登记第三方来源;自建一律写 self-built.txt,客户端自带由适配器回执证明)。path=上游仓库内 SKILL.md 相对路径(供 check_updates.py 定位完整候选树)。这里的条目=你亲自核实过的高置信来源;frontmatter homepage 和搜索结果只是候选,不要未经核实写进来。 builtin-app 条目可选登记 owner(所属客户端 id):删除计划在 owner 位置一律拒绝;非所属位置的散布快捷方式允许走正规 plan/apply 收回。",
+  "pdf": {
+    "type": "github",
+    "repo": "anthropics/skills",
+    "path": "skills/pdf/SKILL.md"
+  },
+  "find-skills": {
+    "type": "skills.sh",
+    "repo": "vercel-labs/agent-skills",
+    "path": null
+  },
+  "some-builtin": {
+    "type": "builtin-app",
+    "repo": null,
+    "path": null,
+    "note": "随应用自带,不建议手动动",
+    "owner": "some-app"
+  }
 }

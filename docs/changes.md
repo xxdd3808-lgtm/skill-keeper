@@ -32,6 +32,12 @@
   手工修;恢复命令 `ln -s ~/.local/share/ego/ego-skills ~/.agents/skills/ego-browser`。
   摘除后 ZCode 45→44、Codex 69→68,builtin-app-spread 黄灯消除。引擎空档
   (builtin-app 散布快捷方式无法走正规收回流程)记入 AGENTS.md 候选改进。
+- **v3.1.1(2026-09-05)**:补上 builtin-app 散布收回通道——known-sources 的
+  builtin-app 条目可选登记 `owner`(所属客户端);`check_action` 按住址细分:
+  owner 位置的正本删除/更新照旧拒绝,非所属位置的散布快捷方式允许走正规
+  remove(计划→确认→备份→事务→审计),update 与位置缺失照旧拒绝,未登记
+  owner 的条目行为不变。ego-browser 已登记 owner:ego。回归测试锁定五种情形
+  (散布放行/正本拒绝/未登记拒绝/update 拒绝/无位置拒绝)+ 端到端计划测试。
 
 ## 历史教训(规则来源)
 

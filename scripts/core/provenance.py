@@ -79,6 +79,9 @@ def classify_provenance(instance, receipts=None, known_sources=None):
         if ks.get("_confirmed_at"):
             ev.append("confirmed:" + str(ks["_confirmed_at"]))
         return {"class": "protected", "type": ks["type"], "repo": None, "path": None,
+                # builtin-app 可选登记 owner(所属客户端);policy 用它区分
+                # 正本(所属位置,拒绝)与散布快捷方式(非所属位置,允许正规收回)
+                "owner": ks.get("owner"),
                 "confidence": "high", "evidence": ev, "review_required": False}
 
     receipt = receipts.get(iid) or receipts.get(directory)

@@ -29,8 +29,9 @@ CLI/API/报告共用同一解析;子进程环境被钉死(SKILL_KEEPER_DATA/STAG
 - `policy.load_policy`:以 data 目录的 `known-sources.json` + `self-built.txt` 为权威;
   可选文件**不存在 ≠ 损坏**;已存在但损坏 → 拒绝一切写操作,不降级为空保护表。
 - `policy.check_action`:计划与执行两个阶段各跑一次;自建默认拒绝删除/更新;
-  builtin-app 等客户端托管身份给出处置建议后拒绝;调用方传入的 known_sources
-  只能叠加保护。
+  builtin-app 等客户端托管身份给出处置建议后拒绝(builtin-app 条目可选登记 `owner`:
+  owner 位置的正本照旧拒绝;非所属位置的散布快捷方式允许正规 remove 收回,
+  update 不享受口子,位置缺失保守拒绝);调用方传入的 known_sources 只能叠加保护。
 - `policy.validate_candidate_vet`:安检载入只认 safe|warning,证据必须非空字符串
   列表,plan_id + candidate_hash 双绑定。
 
