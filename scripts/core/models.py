@@ -72,6 +72,8 @@ class ChangePlan:
     digest: str
     created_at: str
     expires_at: str
+    reason: str = ""                 # 用户理由(正式入计划,digest 覆盖)
+    recommendation_id: str = ""      # 价值审查推荐记录 ID(可选)
 
     def to_dict(self):
         row = asdict(self)
@@ -84,4 +86,6 @@ class ChangePlan:
         data = dict(row)
         data["target_ids"] = tuple(data.get("target_ids", ()))
         data["preconditions"] = tuple(tuple(x) for x in data.get("preconditions", ()))
+        data.setdefault("reason", "")
+        data.setdefault("recommendation_id", "")
         return cls(**data)

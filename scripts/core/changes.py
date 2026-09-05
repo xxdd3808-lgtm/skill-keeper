@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import shutil
 import time
@@ -24,6 +25,7 @@ from .backup import create_backup, restore_backup, verify_backup
 from .fingerprint import tree_hash
 from .io import FileLock, atomic_write_json
 from .models import ChangePlan
+from .policy import check_action, load_policy
 
 PLAN_TTL_SECONDS = 30 * 60
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -49,9 +51,17 @@ class ChangeContext:
     verify_after_apply: Optional[Callable] = None
 
 
+# digest 兼容归一化:值为默认值的字段在计算摘要前剔除,
+# 保证旧格式计划(无 reason/recommendation_id)的 digest 校验不受新字段影响
+_DIGEST_DEFAULT_FIELDS = {"reason": "", "recommendation_id": ""}
+
+
 def plan_digest(row) -> str:
     """计划摘要 = 规范化 JSON(不含 digest 字段本身)的 SHA-256。"""
     body = {k: v for k, v in row.items() if k != "digest"}
+    for key, default in _DIGEST_DEFAULT_FIELDS.items():
+        if body.get(key, default) == default:
+            body.pop(key, None)
     return hashlib.sha256(json.dumps(body, ensure_ascii=False, sort_keys=True,
                                      separators=(",", ":")).encode("utf-8")).hexdigest()
 
@@ -77,7 +87,7 @@ def _validate_instance_id(raw) -> str:
 
 
 def _client_managed_refusal(inst, known_sources):
-    """用户登记为 builtin-app 的 skill 由所属客户端托管:拒绝单独删除/更新计划。"""
+    """兼容保留:直接给出客户端托管拒绝文案(策略接入前的旧入口)。"""
     if not known_sources:
         return None
     from .provenance import classify_provenance, client_managed_advice
@@ -90,33 +100,41 @@ def _client_managed_refusal(inst, known_sources):
     return None
 
 
-def _known_sources_or_load(known_sources, plans_dir):
-    """known_sources 未传时从 plans_dir 的父目录(即 data_dir)自行加载来源白名单。
+def _policy_for(plans_dir, known_sources=None):
+    """加载 data_dir 权威策略;调用方传入的 known_sources 只能叠加保护,不能削弱权威配置。
 
-    2026-09-02 复盘:外部 Agent 绕过 CLI 直接调 create_remove_plan 并省略
-    known_sources,导致 builtin-app 保护(删除计划直接拒绝)没有生效,autoglm
-    五件套被当作 AutoClaw 残留删除(有备份,后端服务确已消亡,无功能损失)。
-    防线必须默认在位:调用方想忘都忘不了(显式传 falsy 视同未提供,不许空表跳过保护)。"""
-    if not known_sources:
-        from .provenance import load_user_config
-        known_sources = load_user_config(Path(plans_dir).parent)
-    return known_sources
+    2026-09-02 复盘:外部 Agent 绕过 CLI 直调并省略 known_sources 曾绕过 builtin-app
+    保护。防线必须默认在位:权威配置损坏时直接拒绝写操作,传 falsy 视同未提供。
+    """
+    from .policy import load_policy
+    policy = load_policy(Path(plans_dir).parent)
+    if known_sources:
+        merged = dict(known_sources)
+        merged.update(policy.get("known_sources") or {})
+        policy = dict(policy, known_sources=merged)
+    return policy
+
+
+def _refuse_or_none(verdict):
+    if verdict.get("allowed"):
+        return None
+    return "{}({})".format(verdict.get("message"), verdict.get("reason_code"))
 
 
 def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir,
                        known_sources=None) -> ChangePlan:
     """生成固定候选更新计划:precondition 同时绑定本地 hash、来源、commit、候选 hash 与 staging 路径。"""
-    known_sources = _known_sources_or_load(known_sources, plans_dir)
+    policy = _policy_for(plans_dir, known_sources)
     iid = _validate_instance_id(instance_id)
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
+    loc_by_id = {l.get("location_id"): l for l in inventory.get("locations", [])}
     inst = by_id.get(iid)
     if not inst:
         raise ChangeError("instance_id 不在当前 inventory 中(先重跑 scan.py): " + iid)
-    if not inst.get("mutable"):
-        raise ChangeError("实例不可变(客户端自带/插件缓存),拒绝更新: " + iid)
-    refusal = _client_managed_refusal(inst, known_sources)
+    refusal = _refuse_or_none(check_action("update", inst, loc_by_id.get(inst.get("location_id")),
+                                           policy))
     if refusal:
-        raise ChangeError("该 Skill 由所属客户端托管,不能单独更新: " + refusal)
+        raise ChangeError("拒绝生成更新计划: " + refusal)
     snap = candidate_snapshot or {}
     if str(snap.get("instance_id")) != iid:
         raise ChangeError("候选快照与目标实例不一致")
@@ -144,6 +162,10 @@ def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir,
     preconditions = [
         ("tree_hash:" + iid, local_hash),
         ("path:" + iid, os.path.abspath(inst["path"])),
+        ("is_symlink:" + iid, "1" if inst.get("is_symlink") else "0"),
+        ("root_real:" + iid,
+         os.path.realpath(loc_by_id[inst.get("location_id")]["path"])
+         if inst.get("location_id") in loc_by_id else ""),
         ("candidate_hash", candidate_hash),
         ("staging_path", os.path.abspath(staging)),
         ("repo", repo),
@@ -229,8 +251,11 @@ def record_candidate_vet(plan_id, candidate_hash, verdict, evidence, plans_dir=N
         raise ChangeError("安检对象必须是计划绑定的当前候选 hash")
     if verdict not in VET_VERDICTS:
         raise ChangeError("verdict 必须是 safe|warning;判危(danger)候选直接废弃,重新生成候选后再安检")
+    evidence = [str(e).strip() for e in (evidence or [])]
+    if not any(evidence):
+        raise ChangeError("安检证据不能为空:至少给出一条可核查依据(来源/阅读记录/对比结论)")
     record = {"plan_id": str(plan_id), "candidate_hash": str(candidate_hash),
-              "verdict": verdict, "evidence": [str(e) for e in (evidence or [])],
+              "verdict": verdict, "evidence": evidence,
               "vetted_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     atomic_write_json(vet_path(plan_id, plans_dir), record)
     return record
@@ -244,15 +269,20 @@ def _load_vet(plan_id, context, candidate_hash):
         vet = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         raise ChangeError("安检记录损坏")
-    if str(vet.get("candidate_hash")) != str(candidate_hash):
-        raise ChangeError("安检记录与候选不匹配,重新安检")
-    return vet
+    from .policy import PolicyError, validate_candidate_vet
+    try:
+        return validate_candidate_vet(vet, plan_id, candidate_hash)
+    except PolicyError as e:
+        raise ChangeError(str(e))
 
 
 def create_remove_plan(instance_ids, inventory, reason, plans_dir,
-                       known_sources=None) -> ChangePlan:
-    """为可变实例生成不可变删除计划;目标不存在/不可变/路径越界/客户端托管都直接拒绝。"""
-    known_sources = _known_sources_or_load(known_sources, plans_dir)
+                       known_sources=None, recommendation_id=None) -> ChangePlan:
+    """为可变实例生成不可变删除计划;目标不存在/不可变/路径越界/保护身份都直接拒绝。
+
+    用户理由与(可选)价值审查推荐记录 ID 正式保存在计划中,digest 覆盖它们。
+    """
+    policy = _policy_for(plans_dir, known_sources)
     if not isinstance(reason, str) or not reason.strip():
         raise ChangeError("必须给出删除理由(写给自己和审计看的)")
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
@@ -263,21 +293,20 @@ def create_remove_plan(instance_ids, inventory, reason, plans_dir,
         inst = by_id.get(iid)
         if not inst:
             raise ChangeError("instance_id 不在当前 inventory 中(先重跑 scan.py): " + iid)
-        if not inst.get("mutable"):
-            raise ChangeError("实例不可变(客户端自带/插件缓存),拒绝删除: " + iid)
-        refusal = _client_managed_refusal(inst, known_sources)
+        refusal = _refuse_or_none(check_action("remove", inst,
+                                               loc_by_id.get(inst.get("location_id")), policy))
         if refusal:
-            raise ChangeError("该 Skill 由所属客户端托管,不能单独删除: " + refusal)
+            raise ChangeError("拒绝生成删除计划: " + refusal)
         loc = loc_by_id.get(inst.get("location_id"))
-        if not loc or not loc.get("mutable"):
-            raise ChangeError("实例所属位置不可变,拒绝删除: " + iid)
+        if not loc:
+            raise ChangeError("实例位置不在 inventory 中,拒绝生成计划: " + iid)
         root = os.path.realpath(loc["path"])
         parent = os.path.realpath(os.path.dirname(inst["path"]))
         if parent != root and not parent.startswith(root + os.sep):
             raise ChangeError("实例路径越出位置根目录,拒绝生成计划: " + iid)
         if not inst.get("tree_hash"):
             raise ChangeError("实例缺少完整内容指纹,先重跑 scan.py: " + iid)
-        targets.append(inst)
+        targets.append((inst, loc))
 
     if not targets:
         raise ChangeError("计划没有目标")
@@ -285,21 +314,72 @@ def create_remove_plan(instance_ids, inventory, reason, plans_dir,
     expires = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + PLAN_TTL_SECONDS))
     plan_id = "plan-" + time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(4)
     preconditions = []
-    for inst in targets:
+    for inst, loc in targets:
         preconditions.append(("tree_hash:" + inst["instance_id"], inst["tree_hash"]))
         preconditions.append(("path:" + inst["instance_id"], os.path.abspath(inst["path"])))
-    names = ", ".join(str(i.get("logical_name") or i.get("directory_name")) for i in targets)
+        preconditions.append(("is_symlink:" + inst["instance_id"],
+                              "1" if inst.get("is_symlink") else "0"))
+        preconditions.append(("root_real:" + inst["instance_id"], os.path.realpath(loc["path"])))
+    names = ", ".join(str(i.get("logical_name") or i.get("directory_name")) for i, _ in targets)
     plan = ChangePlan(
         plan_id=plan_id, action="remove",
-        target_ids=tuple(str(i["instance_id"]) for i in targets),
+        target_ids=tuple(str(i["instance_id"]) for i, _ in targets),
         preconditions=tuple(preconditions),
         summary="删除 {} 个 skill 实例({});先备份,失败自动回滚".format(len(targets), names),
-        digest="", created_at=now, expires_at=expires)
+        digest="", created_at=now, expires_at=expires,
+        reason=reason.strip(), recommendation_id=str(recommendation_id or ""))
     row = plan.to_dict()
     row["digest"] = plan_digest(row)
     plan = ChangePlan.from_dict(row)
     write_plan(plan, plans_dir)
     return plan
+
+
+_PLAN_PRECONDITION_KEY_RE = re.compile(
+    r"^(tree_hash:[0-9a-f]{20}|path:[0-9a-f]{20}|is_symlink:[0-9a-f]{20}"
+    r"|root_real:[0-9a-f]{20}|candidate_hash|staging_path"
+    r"|repo|commit_sha|backup_id|backup_path|archive_sha256|restore_targets)$")
+
+
+def _validate_plan_row(row) -> dict:
+    """计划文件的结构合同(F04):任何字段错位、目标夹带路径、未知前置键都直接拒绝。"""
+    if not isinstance(row, dict):
+        raise ChangeError("计划文件不是 JSON 对象")
+    pid = row.get("plan_id")
+    if not isinstance(pid, str) or not pid.startswith("plan-"):
+        raise ChangeError("计划 plan_id 非法")
+    action = row.get("action")
+    if action not in ("remove", "update", "restore"):
+        raise ChangeError("未知动作: " + str(action))
+    target_ids = row.get("target_ids")
+    if not isinstance(target_ids, list) or not target_ids:
+        raise ChangeError("计划没有目标")
+    seen = set()
+    for raw in target_ids:
+        text = str(raw)
+        if len(text) != 20 or any(c not in "0123456789abcdef" for c in text):
+            raise ChangeError("计划目标必须是稳定 instance ID,拒绝路径或目录名: " + text[:40])
+        if text in seen:
+            raise ChangeError("计划目标重复: " + text)
+        seen.add(text)
+    preconditions = row.get("preconditions")
+    if not isinstance(preconditions, list):
+        raise ChangeError("计划缺少前置条件")
+    keys = set()
+    for pair in preconditions:
+        if (not isinstance(pair, (list, tuple)) or len(pair) != 2
+                or not all(isinstance(x, (str, int, float)) for x in pair)):
+            raise ChangeError("计划前置条件格式非法")
+        key = str(pair[0])
+        if not _PLAN_PRECONDITION_KEY_RE.match(key):
+            raise ChangeError("计划前置键未知或非法: " + key[:40])
+        if key in keys:
+            raise ChangeError("计划前置键重复: " + key)
+        keys.add(key)
+    for field in ("created_at", "expires_at", "summary", "digest"):
+        if not isinstance(row.get(field), str) or not row[field]:
+            raise ChangeError("计划缺少字段: " + field)
+    return row
 
 
 def _load_plan(plan_id, context) -> dict:
@@ -310,21 +390,49 @@ def _load_plan(plan_id, context) -> dict:
         row = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         raise ChangeError("计划文件损坏")
+    row = _validate_plan_row(row)
     if row.get("digest") != plan_digest(row):
         raise ChangeError("计划文件被改动过,digest 不符,拒绝执行")
     return row
 
 
-def _check_preconditions(row, inventory):
+def _check_preconditions(row, inventory, policy):
     from .fingerprint import tree_hash
+    from .paths import PathScopeError, confined_destination
     by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
+    loc_by_id = {l.get("location_id"): l for l in inventory.get("locations", [])}
     pre = dict(row.get("preconditions", []))
+    action = row.get("action")
     for iid in row.get("target_ids", []):
         inst = by_id.get(iid)
         if not inst:
             raise ChangeError("目标实例已不在当前 inventory(先重跑 scan.py 再重新计划): " + str(iid))
+        verdict = check_action(action, inst, loc_by_id.get(inst.get("location_id")), policy)
+        if not verdict.get("allowed"):
+            raise ChangeError("执行期策略复核未通过({}): {}".format(
+                verdict.get("reason_code"), verdict.get("message")))
         if pre.get("path:" + iid) and os.path.abspath(pre["path:" + iid]) != os.path.abspath(inst["path"]):
             raise ChangeError("目标路径与计划不一致: " + str(iid))
+        # 实体形态核对:同内容但目录被换成符号链接(或反之)时,确认对象已与计划不同
+        want_link = pre.get("is_symlink:" + iid)
+        if want_link is not None and bool(int(want_link)) != os.path.islink(inst["path"]):
+            raise ChangeError("实体形态与计划不一致(目录/符号链接变化),拒绝执行,请重新计划: "
+                              + str(iid))
+        if bool(inst.get("is_symlink")) != os.path.islink(inst["path"]):
+            raise ChangeError("实体形态与 inventory 记录不一致,拒绝执行,请重新盘点: " + str(iid))
+        # 位置根核对:计划后根目录被换成指向别处的符号链接必须重新计划
+        root_real = pre.get("root_real:" + iid)
+        loc = loc_by_id.get(inst.get("location_id"))
+        if root_real and loc and os.path.realpath(loc["path"]) != root_real:
+            raise ChangeError("位置根目录与计划不一致(可能被换成符号链接),拒绝执行,请重新计划: "
+                              + str(iid))
+        # 父目录归属核对:位置根到目标的父链不得穿出根或经过符号链接
+        if loc:
+            try:
+                confined_destination(loc["path"],
+                                     os.path.relpath(inst["path"], loc["path"]))
+            except (PathScopeError, ValueError) as e:
+                raise ChangeError("目标父目录归属核验失败,拒绝执行,请重新计划: " + str(e))
         expected = pre.get("tree_hash:" + iid)
         # TOCTOU 防护:重新计算磁盘上的真实指纹,而不是信任计划生成时的快照
         content_root = (os.path.realpath(inst["path"]) if inst.get("is_symlink")
@@ -366,10 +474,6 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     if context.load_inventory is None:
         raise ChangeError("变更环境缺少 inventory 提供者")
-    try:
-        inventory = context.load_inventory()
-    except Exception as e:
-        raise ChangeError("读取 inventory 失败: " + type(e).__name__)
 
     lock = FileLock(context.lock_path)
     try:
@@ -378,13 +482,25 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         raise LockBusy("另一个 skill-keeper 变更正在进行,请稍后再试")
     audit_event = {
         "action": str(row.get("action")), "target_ids": list(row.get("target_ids", [])),
-        "plan_id": str(row.get("plan_id")), "reason": str(row.get("summary", "")),
+        "plan_id": str(row.get("plan_id")), "reason": str(row.get("reason") or row.get("summary", "")),
         "started_at": started, "status": "failed", "error": None, "rollback_status": None,
         "backup_id": None,
     }
     try:
+        # 互斥范围内重读 inventory 与权威策略(F04):执行期看到的必须与计划共用同一策略
+        try:
+            inventory = context.load_inventory()
+        except Exception as e:
+            raise ChangeError("读取 inventory 失败: " + type(e).__name__)
+        policy = load_policy(context.data_dir)
+        if not policy.get("healthy"):
+            reason_text = ";".join(str(i.get("source")) + ":" + str(i.get("code"))
+                                   for i in (policy.get("issues") or []))
+            raise ChangeError("保护策略配置损坏,拒绝执行写操作,请先修复 data 目录配置: "
+                              + reason_text)
         if row.get("action") == "restore":
             # 恢复的目标通常不存在,不做存在性前置校验;备份本身就是 precondition
+            _policy_check_restore_targets(row, inventory, policy)
             plan = ChangePlan.from_dict(row)
             _execute_restore(row, inventory, context)
             audit_event["status"] = "success"
@@ -392,7 +508,7 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
             append_audit(audit_event, context.audit_path)
             return {"ok": True, "action": "restore", "backup_id": audit_event["resulting_hash"],
                     "plan_id": row.get("plan_id")}
-        _check_preconditions(row, inventory)
+        _check_preconditions(row, inventory, policy)
         by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
         targets = [by_id[i] for i in row.get("target_ids", [])]
         candidate_hash = None
@@ -453,6 +569,24 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         raise ChangeError("变更失败已中止: " + type(e).__name__)
     finally:
         lock.release()
+
+
+def _policy_check_restore_targets(row, inventory, policy):
+    """恢复动作的执行期策略复核:目标位置存在且不可变(客户端托管)时拒绝恢复。"""
+    pre = dict(row.get("preconditions", []))
+    doc = pre.get("restore_targets")
+    if not (isinstance(doc, str) and doc):
+        return  # 绑定缺失由 _execute_restore 拒绝
+    try:
+        rows = json.loads(doc)
+    except ValueError:
+        raise ChangeError("恢复计划目标集合损坏,拒绝执行")
+    loc_by_id = {str(l.get("location_id")): l for l in inventory.get("locations", [])}
+    for t in rows:
+        loc = loc_by_id.get(str(t.get("location_id")))
+        verdict = check_action("restore", {"instance_id": t.get("instance_id")}, loc, policy)
+        if not verdict.get("allowed"):
+            raise ChangeError("恢复执行期策略复核未通过: " + str(verdict.get("message")))
 
 
 class _RollbackDone(Exception):

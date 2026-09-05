@@ -14,7 +14,7 @@ version: 2.1.1
 
 1. **扫描、报告、更新检查、审查队列都是只读的**;**删除/更新/恢复必须先 plan、再由用户确认 digest 后 apply**,任意目录名/路径一律不是合法目标。
 2. **任何删除/更新前强制创建并验证备份**(带 manifest 的新格式,含位置、链接、权限与完整树摘要,存 `backups/`);验证失败自动回滚;恢复走两阶段计划,冲突不覆盖。
-3. **自建 skill 与客户端自带/插件内容受保护**:不进入第三方价值审查;自建白名单(`data/self-built.txt`)之外的名称前缀、frontmatter 自述都不能换取免检。
+3. **自建 skill 与客户端自带/插件内容受保护**:不进入第三方价值审查;自建白名单(`data/self-built.txt`)之外的名称前缀、frontmatter 自述都不能换取免检。保护以 `data/` 权威配置为准,**计划生成与执行两阶段各复核一次**——计划后新登记的保护(builtin-app/自建)、实例 mutable 翻转、实体形态或位置根变化都会让旧计划拒绝执行;`known-sources.json` 损坏时拒绝一切写操作;调用参数里传其他来源表不能削弱权威保护。
 4. 不修改任何客户端插件缓存与客户端管理的目录;客户端配置只按字段白名单读取,token/key/cookie/env 一律不碰。
 5. 一切操作后重跑 `scan.py` 刷新 `data/inventory.json`;所有动作(成功/失败/回滚)记入 `data/audit-v2.jsonl`。
 6. **GitHub 星数是仓库热度,不等于该 Skill 的真实使用人数**;热度、维护、来源任何单一因素都不能自动触发删除;系统永不自动删除。
@@ -33,7 +33,7 @@ version: 2.1.1
 | `data/value-reviews.json` | 大模型价值审查结论台账(verdict/理由/替代/损失/证据/置信度/内容指纹) |
 | `data/reputation.json` | GitHub 仓库证据缓存(stars/forks/归档/推送时间;失败保留旧缓存并标 stale) |
 | `data/change-plans/` | 不可变变更计划(plan/digest,30 分钟过期,只读文件) |
-| 系统缓存目录 `skill-keeper/staging/` | 固定候选更新暂存(按内容哈希命名,安检通过后才能应用)。**绝不放仓库 `data/` 内**——ZCode 的已安装技能面板会顺着 `~/.agents/skills/skill-keeper` 符号链接递归扫描,把候选树当技能重复列出(macOS 在 `~/Library/Caches/skill-keeper/staging`,可用 `SKILL_KEEPER_STAGING` 覆盖) |
+| 系统缓存目录 `skill-keeper/staging/` | 固定候选更新暂存(按内容哈希命名,安检通过后才能应用)。**绝不放仓库 `data/` 内**——ZCode 的已安装技能面板会顺着 `~/.agents/skills/skill-keeper` 符号链接递归扫描,把候选树当技能重复列出(macOS 在 `~/Library/Caches/skill-keeper/staging`,可用 `SKILL_KEEPER_STAGING` 覆盖)。清理只删本工具登记过所有权且无引用的候选;不相关目录、无所有权记录的历史目录一律保留 |
 | `data/vetted.json` | (v1 遗留)安检台账;迁移后降级 needs-recheck,新安检结论记入 value-reviews.json 的 safety 字段 |
 | `data/self-built.txt` | 自建 skill 白名单(受保护清单),一行一个目录名 |
 | `data/groups.json` | 分组配置(组名 → 目录名列表);用户想调整分组就改它,改完重扫 |
@@ -124,7 +124,7 @@ python3 ~/skill-keeper/scripts/check_updates.py
 
 **安检是体检的固定步骤,不是附加项**:只要处理建议区出现「🔍 待安检」(第三方来源(GitHub/skills.sh/SkillHub/来源不明)的 skill 没审过,或安检后内容变过——一键更新后通常触发),本次体检就必须逐个审完,不用等用户点名。
 安检动作 = 按 `skill-vetter` 的四步清单(元数据真伪 → 权限范围 → 危险内容红旗 → 仿冒名)由 AI 逐个审查,产出结论:`safe`(安全)/ `warning`(存疑,说清疑点)/ `danger`(判危,建议删除)。
-v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用 `value_review.py record` 记入 `data/value-reviews.json`,结论绑定完整树指纹;**更新候选安检**用 changes 引擎的 `record_candidate_vet`(verdict=safe 才能应用,warning 需第二次确认,danger 直接废弃)。v1 的 `vetted.json` 迁移后一律降级 needs-recheck,按 skill-vetter 清单重审恢复。**复检时机全自动**:完整树哈希变了(任何脚本、模板、参考文件、链接变化)旧结论自动过期;warning/danger 在报告显著标注,直到复检翻案。
+v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用 `value_review.py record` 记入 `data/value-reviews.json`,结论绑定完整树指纹;**更新候选安检**用 changes 引擎的 `record_candidate_vet`(verdict 只认 safe|warning,证据不能为空;非 safe/warning 的载入值一律拒绝应用,warning 需第二次确认,danger 直接废弃)。v1 的 `vetted.json` 迁移后一律降级 needs-recheck,按 skill-vetter 清单重审恢复。**复检时机全自动**:完整树哈希变了(任何脚本、模板、参考文件、链接变化)旧结论自动过期;warning/danger 在报告显著标注,直到复检翻案。
 
 ### 7. 汇报
 

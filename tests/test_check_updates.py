@@ -93,7 +93,8 @@ class CheckUpdatesStagingTests(unittest.TestCase):
             self.assertTrue((staging / "SKILL.md").exists())
 
     def test_stale_leftover_candidates_are_swept(self):
-        """历史残留清扫:暂存根里不再被任何 differs 引用的候选必须清掉。"""
+        """历史残留清扫:本工具登记所有权且不再被引用的候选必须清掉;
+        无所有权记录的历史目录与不相关目录只能保留(F07 边界,任务 2)。"""
         with tempfile.TemporaryDirectory() as td:
             home = Path(td)
             data = home / "data"
@@ -105,11 +106,20 @@ class CheckUpdatesStagingTests(unittest.TestCase):
             write_skill(stale, "dupe", description="leftover")
             fresh2 = home / "staging/cand-0123456789ab"
             write_skill(fresh2, "dupe", description="pending")
+            from scripts.core.staging import record_ownership
+            record_ownership(home / "staging", stale.name, {"candidate_hash": "d" * 64})
+            record_ownership(home / "staging", fresh2.name, {"candidate_hash": "0" * 64})
+            sentinel = home / "staging/unrelated-user-data"
+            sentinel.mkdir()
+            legacy = home / "staging/cand-oldtool0000"  # 无所有权记录的历史目录
+            legacy.mkdir()
             (data / "updates.json").write_text(json.dumps({"differs": [
                 {"name": "dupe", "staging_path": str(fresh2)}]}), encoding="utf-8")
             result = check(two_copy_inventory(home), data, data / "updates.json", head_gh(),
                            staging_root=home / "staging")
-            self.assertFalse(stale.exists(), "无引用的历史候选必须被清扫")
+            self.assertFalse(stale.exists(), "登记所有且无引用的历史候选必须被清扫")
+            self.assertTrue(sentinel.exists(), "不相关目录绝不能被清扫")
+            self.assertTrue(legacy.exists(), "无所有权记录的历史目录只能保留待清理")
             self.assertTrue((home / "staging").is_dir())
             # 被本次 differs 引用的候选仍在
             kept = Path(result["differs"][0]["staging_path"])

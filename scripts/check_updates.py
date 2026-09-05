@@ -21,6 +21,8 @@ from scripts.core.fingerprint import tree_hash, tree_manifest          # noqa: E
 from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_runner  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
+from scripts.core.staging import (StagingBoundaryError, cleanup_staging,   # noqa: E402
+                                  record_ownership, validate_staging_root)
 from scripts.scan import parse_frontmatter                              # noqa: E402
 
 
@@ -55,6 +57,10 @@ def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):
         shutil.rmtree(tmp, ignore_errors=True)  # 相同候选已存在(内容同哈希)
     else:
         os.replace(tmp, final)
+        # 所有权记录:清理只认本工具登记过的候选(F07 边界)
+        record_ownership(staging_root, final.name,
+                         {"candidate_hash": result["tree_hash"], "repo": repo,
+                          "commit_sha": commit_sha})
     return {"ok": True, "candidate_hash": result["tree_hash"], "staging_path": str(final),
             "files": result["files"], "commit_sha": commit_sha}
 
@@ -112,9 +118,12 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
     receipts = build_receipts(inventory)
     reputation_path = Path(output_path).parent / "reputation.json"
     staging_root = Path(staging_root) if staging_root else staging_root_for(output_path)
+    # F07 边界:暂存根不得落在技能树/数据目录/安装位置内外链里(环境变量覆盖也不行)
+    protected = [str(l.get("path")) for l in inventory.get("locations", []) if l.get("path")]
+    protected.append(str(Path(data_dir).resolve()))
+    staging_root = validate_staging_root(staging_root, protected)
 
     differs, up_to_date, skipped = [], [], []
-    staged_this_run = []
     for logical in inventory.get("logical_skills", []):
         name = logical.get("name") or "?"
         inst = _pick_instance(inventory, logical)
@@ -160,7 +169,6 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
             skipped.append({"name": name, "reason": "候选树拉取失败({})".format(staged.get("error"))})
             continue
         staging_path = Path(staged["staging_path"])
-        staged_this_run.append(staging_path)
         candidate_hash = staged["candidate_hash"]
         candidate_manifest = tree_manifest(staging_path)
         try:
@@ -188,9 +196,9 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
                         "status": status, "note": note,
                         "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
                         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S")})
-    # 循环结束后统一清理:既不被本次 differs 引用、也不被上次结果引用的候选一律清掉。
-    # 旧版只清"本次暂存"的目录,应用过/失效的历史候选会永远留在暂存根
-    # (2026-09-02 曾因此把 data/staging 里的候选树泄进 ZCode 技能面板)。
+    # 循环结束后统一清理:只清"本工具登记所有权且无有效引用"的候选目录。
+    # 不相关目录与无所有权记录的历史目录一律保留(unowned 列表可审查),
+    # 旧版"整个暂存根无引用即删"的行为曾把不相关目录一起清掉,已废弃。
     referenced = {str(Path(d["staging_path"])) for d in differs}
     try:
         prev, _ = load_json_checked(Path(output_path), {})
@@ -199,17 +207,10 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
                 referenced.add(str(Path(d["staging_path"])))
     except (OSError, ValueError, TypeError):
         pass
-    for staging_path in staged_this_run:
-        if str(staging_path) not in referenced:
-            shutil.rmtree(staging_path, ignore_errors=True)
-    try:
-        for child in Path(staging_root).iterdir():
-            if str(child) not in referenced:
-                shutil.rmtree(child, ignore_errors=True)
-    except OSError:
-        pass
+    staging_cleanup = cleanup_staging(staging_root, referenced)
     return {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "differs": differs, "up_to_date": up_to_date, "skipped": skipped}
+            "differs": differs, "up_to_date": up_to_date, "skipped": skipped,
+            "staging_cleanup": {k: staging_cleanup[k] for k in ("removed", "unowned", "errors")}}
 
 
 def main():
@@ -237,7 +238,14 @@ def main():
         print("⏭️ inventory 缺失或为空,先跑 scan.py")
         sys.exit(0)
 
-    result = check(inv, data_dir, output_path)
+    try:
+        result = check(inv, data_dir, output_path)
+    except StagingBoundaryError as e:
+        if args.json:
+            print(json.dumps({"schema_version": 2, "error": "staging-boundary",
+                              "message": str(e)}, ensure_ascii=False))
+        print("⛔ 暂存目录位置不合法,已拒绝检查: {}".format(e))
+        sys.exit(2)
     result["operational_ok"] = True
     atomic_write_json(output_path, result)
 
