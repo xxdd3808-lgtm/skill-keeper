@@ -17,8 +17,8 @@
 | Task 3 事务与中断恢复 F03(阶段A达成) | 完成 | 43d7155 |
 | Task 4 观察完整性 F05 | 完成 | ca1bcc4 |
 | Task 5 审查历史与有效性 F06 | 完成 | 979f2c1 |
-| Task 6 完整候选与缓存生命周期 F07 | 完成 | （见 git log） |
-| Task 7 CLI/API/报告闭环 F08(阶段B) | 未开始 | |
+| Task 6 完整候选与缓存生命周期 F07 | 完成 | 3220ee4 |
+| Task 7 CLI/API/报告闭环 F08(阶段B) | **部分完成** | 5ae20a8(runtime/service/manage/备份按钮/静态命令/快照发布已通;**未完**:报告 JS 的 update 分支、启动器 command 同步、groups.json 视图筛选、HTTP 边界负例测试、浏览器实点验收——阶段B门槛未达成,勿跳) |
 | Task 8 去重计算与外部运行态 F09 F10 | 未开始 | |
 | Task 9 验收入口与文档 F11(阶段C) | 未开始 | |
 
@@ -30,6 +30,7 @@
 - Task 4:fingerprint.py FingerprintError(OSError 子类)+collect_errors 参数+排除目录剪枝;scan.py parse_frontmatter_detailed(嵌套 requires.bins,unsupported 警告码)+实例 content_status+observation{complete,issues,observed_scope,rule_version,load_contexts}+scan --json need_vet 真实+退出码 0/1/2;load_rules.py(规则带来源/日期/范围,RULE_VERSION);observations.py(evaluate_load eligible≠confirmed/load_receipt_evidence 白名单);插件坐标加 marketplace;check_updates 输入缺失退出 2。
 - Task 5:review_state.py(review_dependencies/evaluate_review,REVIEW_POLICY_VERSION);record_review 校验 safety∈safe|warning|danger、reviewer_model 非空、提交 hash 一致、生成 review_snapshot_id+alternatives_state(候选无条目行记 None→evaluate 按 alternative-unverified 过期);value_review record 台账 FileLock+损坏拒写。CONFIDENCE_LEVELS 是 高/中/低(测试别用 medium)。队列/报告共用 evaluate_review 的接线放到 Task 7 报告改造时做(计划允许,不另开任务)。
 - Task 6:github.fetch_skill_tree 重写(truncated/160000/重复路径/链接父级冲突/缺根 SKILL.md/无效 frontmatter 一律拒绝;120000 只落地相对链接串,绝对目标拒绝;100755/100644 权限固定;blob base64 strict+size 校验;source_dir 空串=仓库根;成功返回 source_dir/tree_complete/source_tree_sha/materialization_version);stage_candidate 同名 cand 按完整哈希复核,损坏旁路重物化为 cand-<hash>-<rand>(不覆盖);staging.collect_staging_references(updates+未过期计划 staging_path+活跃事务 candidate_holding)+load_reference_inputs(data 目录读三源);check() GC 引用接上计划/事务;cached_repo_snapshot 加 refresh_status/last_attempt_at(stale 分支)。测试夹具注意:候选树的 SKILL.md 必须有合法 frontmatter(test_provenance_github b3 已修)。
+- Task 7(部分):runtime.py RuntimePaths(参数>env>默认;subprocess_env 钉死 HOME/DATA/STAGING)+publish_snapshot(snapshot_id=inventory mtime-size,失败标 stale);service.py AppService(plan_action/apply_action;apply 后发布快照,committed+snapshot_status=fresh|stale 区分;load_inventory 允许 instances 为空——删光后恢复必需);serve.py _handle_apply 走 service(带 accept_warning/snapshot 字段);report.py backups_list 行={backup_id,filename,path,kb,ts,verification_status},恢复按钮带 backup_id(修复双重前后缀),静态命令用仓库相对 scripts/manage.py(修复 ~/ 被引号包死;示例报告不再泄漏 /Users/ 路径),static_restore_cmd 补恢复命令;check_updates differs 行加 source_dir;manage.py CLI(rescan/plan/apply/status/recover,--json)。测试:tests/test_workflow_contract.py、tests/test_manage_cli.py。**Task 7 剩余**:JS update 分支(生成更新计划+accept_warning 二次确认 UI)、启动技能报告.command 同步、groups.json 分类筛选恢复、HTTP 边界负例(负 Content-Length/非对象/未知路由/Unicode token/超时/关停)、CSP hex→base64、浏览器实点(无浏览器则如实记录未验)。
 
 ## 已知遗留/风险
 
