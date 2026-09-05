@@ -29,6 +29,11 @@ data/workspace-locations.txt
 # 备份(含完整 skill 内容)
 backups/
 
+# 打包产物(pip install 构建期)
+build/
+dist/
+*.egg-info/
+
 # 系统文件
 __pycache__/
 .DS_Store
