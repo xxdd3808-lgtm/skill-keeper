@@ -50,7 +50,8 @@ REPO_SCOPE_NOTE = "GitHub 星数是仓库热度,不等于该 Skill 的真实使�
 
 
 def data_dir():
-    return Path(os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    from scripts.core.runtime import default_data_dir
+    return default_data_dir()
 
 
 def _load(path):
@@ -959,14 +960,14 @@ def backups_list():
     return out[:30]
 
 
-def main():
+def main(argv=None):
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
     ap = argparse.ArgumentParser(description="skill-keeper v2 价值审查报告")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--serve", action="store_true")
-    args, rest = ap.parse_known_args()
+    args, rest = ap.parse_known_args(argv)
     if args.serve:
-        subprocess.run([sys.executable, os.path.join(BASE, "scripts", "serve.py")] + rest)
-        return
+        return subprocess.run([sys.executable, os.path.join(BASE, "scripts", "serve.py")] + rest).returncode
     ddir = data_dir()
     inv = _load(ddir / "inventory.json")
     if not isinstance(inv, dict) or inv.get("schema_version") != 2:
@@ -997,13 +998,13 @@ def main():
             "updates": c["updates"],
             "operational_ok": True, "health_status": inv.get("health_status", "ok"),
         }, ensure_ascii=False, indent=1))
-        sys.exit(1 if c["red"] else 0)
+        return 1 if c["red"] else 0
     print(md)
     (ddir / "report.md").write_text(md + "\n", encoding="utf-8")
     (ddir / "report.html").write_text(render_html(inv, last, ctx), encoding="utf-8")
     print("\n💾 已存:data/report.md + data/report.html(双击浏览器打开;一键操作用 --serve)",
           file=sys.stderr)
-    sys.exit(1 if view["counts"]["red"] else 0)
+    return 1 if view["counts"]["red"] else 0
 
 
 def _self_built(ddir):
@@ -1015,4 +1016,4 @@ def _self_built(ddir):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

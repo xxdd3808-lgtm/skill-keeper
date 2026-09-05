@@ -86,7 +86,7 @@ def _ctx(paths):
     return ChangeContext(load_inventory=None, **paths.engine_kwargs())
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description="skill-keeper 管理 CLI(plan/apply/status/recover/rescan)")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--staging-dir", default=None)
@@ -124,13 +124,13 @@ def main():
     p_scan.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     p_scan.set_defaults(func=cmd_rescan)
 
-    args = ap.parse_args()
+    args = ap.parse_args(list(sys.argv[1:]) if argv is None else list(argv))
     try:
-        sys.exit(args.func(args) or 0)
+        return args.func(args) or 0
     except ChangeError as e:
         _emit({"ok": False, "error": str(e)})
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

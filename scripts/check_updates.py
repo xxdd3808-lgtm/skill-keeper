@@ -21,6 +21,7 @@ from scripts.core.fingerprint import tree_hash, tree_manifest          # noqa: E
 from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_runner  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
+from scripts.core.runtime import default_data_dir                      # noqa: E402
 from scripts.core.staging import (StagingBoundaryError, cleanup_staging,   # noqa: E402
                                   record_ownership, validate_staging_root)
 from scripts.scan import parse_frontmatter                              # noqa: E402
@@ -248,11 +249,12 @@ def main():
     ap = argparse.ArgumentParser(description="与上游比对完整内容树(只读)")
     ap.add_argument("--inventory", default=None, help="inventory v2 JSON 路径(默认 <data>/inventory.json)")
     ap.add_argument("--output", default=None, help="结果缓存路径(默认 <data>/updates.json)")
-    ap.add_argument("--data-dir", default=os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    ap.add_argument("--data-dir", default=None,
+                    help="数据目录(默认 SKILL_KEEPER_DATA,否则旧仓库运行态或 ~/.skill-keeper/data)")
     ap.add_argument("--json", action="store_true", help="机器可读输出;退出码 0=无差异 1=有差异")
     args = ap.parse_args()
 
-    data_dir = Path(args.data_dir)
+    data_dir = Path(args.data_dir) if args.data_dir else default_data_dir()
     inventory_path = Path(args.inventory) if args.inventory else data_dir / "inventory.json"
     output_path = Path(args.output) if args.output else data_dir / "updates.json"
 

@@ -18,6 +18,7 @@ from scripts.core.clients import load_rules  # noqa: E402
 from scripts.core.fingerprint import FingerprintError, instance_id, tree_hash  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked, redact_secrets  # noqa: E402
 from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
+from scripts.core.runtime import default_data_dir  # noqa: E402
 
 HOME = os.path.expanduser("~")
 LOCK_FILE = os.path.join(HOME, ".agents/.skill-lock.json")
@@ -44,7 +45,7 @@ class InventoryError(ValueError):
 
 
 def data_dir():
-    return Path(os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    return default_data_dir()
 
 
 def load_json(p, default):
@@ -730,20 +731,20 @@ def _summary_rows(inv):
     return red, yellow, dup, len([f for f in inv["findings"] if f["ignored"]])
 
 
-def main():
-    argv = sys.argv[1:]
+def main(argv=None):
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
     if "--help" in argv or "-h" in argv:
         print(__doc__)
         print("用法: scan.py [--json]  (--json: 机器可读输出,退出码 0=健康 1=有红色问题)")
         print("环境变量: SKILL_KEEPER_DATA 可覆盖数据目录(测试/多环境)")
-        sys.exit(0)
+        return 0
     home = Path(os.path.expanduser("~"))
     ddir = data_dir()
     try:
         inv = build_inventory(home, ddir)
     except InventoryError as e:
         print(json.dumps({"operational_ok": False, "error": str(e)}, ensure_ascii=False))
-        sys.exit(2)
+        return 2
 
     cur = ddir / "inventory.json"
     ddir.mkdir(parents=True, exist_ok=True)
@@ -768,7 +769,7 @@ def main():
             "observation_issues": obs.get("issues", []),
             "operational_ok": inv["operational_ok"], "health_status": inv["health_status"],
         }, ensure_ascii=False, indent=1))
-        sys.exit(2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0))
+        return 2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0)
 
     print(f"✅ 扫描完成:{inv['total']} 个逻辑 skill / {len(inv['instances'])} 个安装实例 → {cur}")
     print(f"位置:{len(inv['locations'])} 个;" + "、".join(sorted({loc['client'] for loc in inv['locations']})))
@@ -782,8 +783,8 @@ def main():
     if not obs_complete:
         print(f"⚠️ 观察不完整({len(obs.get('issues', []))} 项),相关对象已停用变更入口")
     print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
-    sys.exit(2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0))
+    return 2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

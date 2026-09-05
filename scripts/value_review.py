@@ -24,7 +24,8 @@ from scripts.core.reviews import build_review_queue, record_review  # noqa: E402
 
 
 def default_data_dir():
-    return Path(os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    from scripts.core.runtime import default_data_dir as _resolve
+    return _resolve()
 
 
 def _load_reviews(path):

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill-keeper"
+description = "本地 agent skill 管家:多客户端盘点、健康体检与安全变更闭环"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dynamic = ["version"]
+keywords = ["agent", "skills", "inventory", "backup"]
+
+[project.scripts]
+skill-keeper = "scripts.cli:main"
+
+[tool.setuptools]
+packages = ["scripts", "scripts.core", "scripts.core.clients"]
+
+[tool.setuptools.dynamic]
+version = { attr = "scripts.__version__" }

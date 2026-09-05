@@ -35,6 +35,7 @@ from scripts.core.changes import (ChangeContext, ChangeError, LockBusy,  # noqa:
                                   create_restore_plan, create_update_plan)
 from scripts.core.io import atomic_write_json, load_json_checked   # noqa: E402
 from scripts.core.provenance import load_user_config               # noqa: E402
+from scripts.core.runtime import default_data_dir                  # noqa: E402
 
 MAX_BODY = 64 * 1024
 SERVER_VERSION = "skill-keeper/2.0"
@@ -349,7 +350,7 @@ def create_server(data_dir, home=None, port=0, backup_dir=None):
 def main():
     argv = sys.argv[1:]
     port = int(argv[argv.index("--port") + 1]) if "--port" in argv else 0
-    data_dir = os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data")
+    data_dir = os.environ.get("SKILL_KEEPER_DATA") or str(default_data_dir())
     ok = run_scan_report()
     if not ok:
         print("⚠️ 启动前重扫失败,报告可能不是最新", file=sys.stderr)

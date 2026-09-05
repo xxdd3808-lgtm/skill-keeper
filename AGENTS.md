@@ -5,6 +5,9 @@
 ## 怎么跑
 
 ```bash
+pip install .                              # 可选:安装为统一命令(纯安装期构建依赖,运行时零依赖)
+skill-keeper doctor --json                 # v4 统一 CLI:版本/Python/运行目录/锁后端/已登记位置
+skill-keeper scan --json                   # 统一入口(参数与 scripts/*.py 完全一致)
 python3 scripts/scan.py                    # 多客户端适配器发现 + 完整树指纹 → data/inventory.json(只读)
 python3 scripts/report.py                  # v2 价值审查报告:data/report.md + report.html
 python3 scripts/report.py --serve          # 交互报告:plan/apply 两阶段网页操作(仅 127.0.0.1+token)

@@ -23,18 +23,21 @@ from scripts.core.provenance import load_user_config          # noqa: E402
 
 
 def default_context() -> ChangeContext:
-    data_dir = Path(os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    from scripts.core.runtime import RuntimePaths
+    paths = RuntimePaths()
+    data_dir = Path(paths.data_dir)
     return ChangeContext(
         data_dir=data_dir,
         plans_dir=data_dir / "change-plans",
-        backup_dir=os.path.join(BASE, "backups"),
+        backup_dir=paths.backup_dir,
         audit_path=data_dir / "audit-v2.jsonl",
         lock_path=data_dir / ".change.lock",
         load_inventory=_load_inventory)
 
 
 def _load_inventory():
-    data_dir = Path(os.environ.get("SKILL_KEEPER_DATA") or os.path.join(BASE, "data"))
+    from scripts.core.runtime import RuntimePaths
+    data_dir = Path(RuntimePaths().data_dir)
     inv, issues = load_json_checked(data_dir / "inventory.json", {})
     if issues or not isinstance(inv, dict) or not inv.get("instances"):
         raise ChangeError("inventory 缺失或为空,先跑 scan.py")

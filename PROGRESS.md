@@ -5,15 +5,16 @@
 - 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
 - 开工基线(实测):HEAD `f858d2ba89d82acc93bcd78e30f3bc6ac1b24b04`,Python 3.9.6,分支 case1,verify 233 项 0 失败 0 skipped;工作树原有三份计划文档(untracked,随 Task 0 入库)。
 - 零退化合同:tests/fixtures/private-v311/(完全虚构,含 shared/Codex/WorkBuddy/Ego、自建、builtin owner、符号链接、重复加载、审查、备份、旧 CLI)+ tests/test_private_compatibility.py(9 项)。v4 各任务必须保持全绿。
-- 测试入口:`python3 scripts/verify.py`(Task 0 后 242 项 / 0 失败 / 0 skipped)。
+- 测试入口:`python3 scripts/verify.py`(Task 1 后 256 项 / 0 失败 / 0 skipped)。
 - BLOCKED.md:无。
+- Task 1 要点:scripts/cli.py 统一命令(scan/report/manage/doctor,手动分发直传参数——argparse REMAINDER 有吞参缺陷,勿改回子解析器);runtime.py 增 detect_repo_layout/default_layout_dirs/default_data_dir(优先级:显式参数>env>可识别旧仓库运行态>新默认 ~/.skill-keeper/{data,cache/staging,backups});scan/report/manage 主入口改 main(argv=None) 返回码;remove_skill/serve/check_updates/value_review 数据目录共用同一解析链;pyproject.toml PEP 621(version 动态读 scripts.__version__;本地 setuptools 58 不支持 PEP 621,构建隔离下安装正常);安装烟测走 python -m venv + pip install .(需网络取构建后端,装好完全离线)。
 
 ## 任务状态
 
 | 任务 | 状态 | 提交 |
 |---|---|---|
-| Task 0 冻结私人版零退化合同 | 完成 | 本提交(2026-09-05) |
-| Task 1 统一安装、CLI 和运行态 | 未开始 | |
+| Task 0 冻结私人版零退化合同 | 完成 | 5bfb7fd |
+| Task 1 统一安装、CLI 和运行态 | 完成 | 本提交(2026-09-05) |
 | Task 2 最小跨平台底座 | 未开始 | |
 | Task 3 模型位置声明与未知客户端盘点 | 未开始 | |
 | Task 4 apply 前真实目标预检 | 未开始 | |

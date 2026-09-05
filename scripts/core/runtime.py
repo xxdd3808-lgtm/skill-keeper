@@ -10,22 +10,94 @@ from pathlib import Path
 
 BASE = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
+# 仓库 data/ 里代表"真实 v2/v3 运行态"的标记:只有出现这些才启用旧仓库布局,
+# 新 clone/新安装的空 data/ 目录一律走新统一默认,防止误认。
+REPO_MARKER_FILES = ("inventory.json", "inventory-last.json", "audit-v2.jsonl",
+                     "updates.json", "value-reviews.json")
+REPO_MARKER_DIRS = ("change-plans", "transactions")
+
+
+def detect_repo_layout(base=None) -> str:
+    """base/data 是否为真实 v2/v3 运行态:old-repo(有标记)/ new(无)。"""
+    data = Path(base) / "data" if base is not None else BASE / "data"
+    if not data.is_dir():
+        return "new"
+    if any((data / name).is_file() for name in REPO_MARKER_FILES):
+        return "old-repo"
+    if any((data / name).is_dir() for name in REPO_MARKER_DIRS):
+        return "old-repo"
+    return "new"
+
+
+def _default_staging(home=None):
+    home = Path(home) if home is not None else Path(os.path.expanduser("~"))
+    if sys.platform == "darwin":
+        return home / "Library/Caches/skill-keeper/staging"
+    return home / ".cache/skill-keeper/staging"
+
+
+def default_layout_dirs(base=None, home=None) -> dict:
+    """无显式参数、无环境变量时的默认路径。
+
+    优先级:可识别旧仓库运行态(仓库 data 有 v2/v3 标记 → 沿用仓库布局与平台缓存)
+    > 新统一默认 ~/.skill-keeper/{data,cache/staging,backups}。
+    """
+    base = Path(base) if base is not None else BASE
+    home = Path(home) if home is not None else Path(os.path.expanduser("~"))
+    if detect_repo_layout(base) == "old-repo":
+        return {"layout": "old-repo", "data_dir": base / "data",
+                "staging_dir": _default_staging(home), "backup_dir": base / "backups"}
+    root = home / ".skill-keeper"
+    return {"layout": "new", "data_dir": root / "data",
+            "staging_dir": root / "cache" / "staging", "backup_dir": root / "backups"}
+
+
+def default_data_dir() -> Path:
+    """入口脚本共用的数据目录解析:环境变量 > 布局默认(旧仓库 / 新统一 ~/.skill-keeper)。"""
+    if os.environ.get("SKILL_KEEPER_DATA"):
+        return Path(os.environ["SKILL_KEEPER_DATA"])
+    return default_layout_dirs()["data_dir"]
+
 
 class RuntimePaths:
-    """一次运行的全部路径;所有入口从同一解析函数获得,不从全局 BASE 偷换某一项。"""
+    """一次运行的全部路径;所有入口从同一解析函数获得,不从全局 BASE 偷换某一项。
+
+    解析优先级:显式参数 > 环境变量(SKILL_KEEPER_DATA/SKILL_KEEPER_STAGING)
+    > 可识别旧仓库运行态 > 新统一默认 ~/.skill-keeper。
+    """
 
     def __init__(self, home=None, data_dir=None, staging_dir=None, backup_dir=None):
         self.home = Path(home) if home else Path(os.path.expanduser("~"))
-        self.data_dir = Path(data_dir) if data_dir else Path(
-            os.environ.get("SKILL_KEEPER_DATA") or (BASE / "data"))
-        self.staging_dir = Path(staging_dir) if staging_dir else Path(
-            os.environ.get("SKILL_KEEPER_STAGING") or _default_staging())
+        defaults = None
+        if data_dir:
+            self.data_dir = Path(data_dir)
+            self.layout = "explicit"
+        elif os.environ.get("SKILL_KEEPER_DATA"):
+            self.data_dir = Path(os.environ["SKILL_KEEPER_DATA"])
+            self.layout = "env"
+        else:
+            defaults = default_layout_dirs(BASE, self.home)
+            self.layout = defaults["layout"]
+            self.data_dir = defaults["data_dir"]
+
         if backup_dir:
             self.backup_dir = Path(backup_dir)
+        elif self.layout == "new":
+            self.backup_dir = defaults["backup_dir"]
         elif self.data_dir == BASE / "data":
             self.backup_dir = BASE / "backups"  # 兼容既有真实部署布局
         else:
             self.backup_dir = self.data_dir / "backups"
+
+        if staging_dir:
+            self.staging_dir = Path(staging_dir)
+        elif os.environ.get("SKILL_KEEPER_STAGING"):
+            self.staging_dir = Path(os.environ["SKILL_KEEPER_STAGING"])
+        elif defaults is not None:
+            self.staging_dir = defaults["staging_dir"]
+        else:
+            self.staging_dir = _default_staging(self.home)
+
 
     def engine_kwargs(self):
         """构造 ChangeContext 需要的全部路径(不含可注入函数)。"""
@@ -46,13 +118,6 @@ class RuntimePaths:
     def to_dict(self):
         return {"home": str(self.home), "data_dir": str(self.data_dir),
                 "staging_dir": str(self.staging_dir), "backup_dir": str(self.backup_dir)}
-
-
-def _default_staging():
-    home = Path(os.path.expanduser("~"))
-    if sys.platform == "darwin":
-        return home / "Library/Caches/skill-keeper/staging"
-    return home / ".cache/skill-keeper/staging"
 
 
 def publish_snapshot(paths, timeout=300) -> dict:
