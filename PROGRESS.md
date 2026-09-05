@@ -20,7 +20,7 @@
 | Task 6 完整候选与缓存生命周期 F07 | 完成 | 3220ee4 |
 | Task 7 CLI/API/报告闭环 F08(阶段B) | 基本完成(浏览器实点未验) | 5ae20a8(runtime/service/manage/备份按钮/静态命令/快照发布已通;**未完**:报告 JS 的 update 分支、启动器 command 同步、groups.json 视图筛选、HTTP 边界负例测试、浏览器实点验收——**已完成**:JS update 分支+warning 二次确认+HTTP 边界负例+groups.json 分组列+启动器核验无需改;**唯一未验**:浏览器实际点击验收(本会话未跑,如实记录;CLI/API/静态链路均有测试覆盖)) |
 | Task 8 去重计算与外部运行态 F09 F10 | 完成 | 2979709(读取12800→80,评分259120→3160,基线等价) |
-| Task 9 验收入口与文档 F11(阶段C) | 完成 | verify.py+docs+README/SKILL/AGENTS 同步+示例重生成 |
+| Task 9 验收入口与文档 F11(阶段C) | 完成 | 60bc560 + 230 项 verify 退出 0 |
 
 ## 各任务要点(后续任务要消费的事实)
 
@@ -34,8 +34,8 @@
 
 ## 最终交付记录(2026-09-05)
 
-- 全量:226 项测试 0 失败 0 跳过(python3 scripts/verify.py 退出 0);基线 126 项语义未削弱。
-- 关键红→绿:Task1 恶意 manifest/上限/原子发布 13 红→绿;Task2 apply 期保护翻转 6 项先放行后拒绝;Task3 校验异常丢实体/子进程 77 中断→可恢复;Task6 truncated 候选先放行后拒绝;Task8 计数先 12800/259120 后 80/3160。
+- 全量:230 项测试 0 失败 0 跳过(python3 scripts/verify.py 退出 0);基线 126 项语义未削弱。
+- 关键红→绿:Task1 恶意 manifest/上限/原子发布 13 红→绿;Task2 apply 期保护翻转 6 项先放行后拒绝;Task3 校验异常丢实体/子进程 77 中断→可恢复;Task6 truncated 候选先放行后拒绝;Task8 计数先 12800/259120 后 80/3160;Task9 verify 反向(故意失败/skip-only/空目录)均非 0。
 - 中断恢复证据:tests/test_transaction_recovery.py 三个 os._exit(77) 窗口(删除首目标移走/更新旧目录移走/恢复首实体发布)。
 - 性能前后:见 tests/test_overlap_cost.py 输出与 docs/architecture.md 性能口径。
 - 未验证(如实):浏览器实际点击验收(本会话未执行;CLI/API/静态链路有测试);真实 GitHub 全量下载、真实业务断电恢复未测(协议 fixture 覆盖)。
