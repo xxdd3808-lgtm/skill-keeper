@@ -100,9 +100,15 @@ class ProvenanceGithubTests(unittest.TestCase):
             })
             result = fetch_skill_tree("o/r", "skills/demo", "abc123", Path(td), gh)
             self.assertTrue(result["ok"])
-            self.assertTrue(os.access(Path(td) / "scripts/run.sh", os.X_OK),
-                            "Git 可执行文件落地后必须仍可执行")
-            self.assertFalse(os.access(Path(td) / "SKILL.md", os.X_OK))
+            if os.name == "posix":
+                self.assertTrue(os.access(Path(td) / "scripts/run.sh", os.X_OK),
+                                "Git 可执行文件落地后必须仍可执行")
+                self.assertFalse(os.access(Path(td) / "SKILL.md", os.X_OK))
+            else:
+                # NTFS 无执行位:os.access(X_OK) 恒真,断言落地完整性本身
+                self.assertTrue((Path(td) / "scripts/run.sh").is_file())
+                self.assertEqual((Path(td) / "scripts/run.sh").read_bytes(),
+                                 b"#!/bin/sh\necho hi\n")
 
     def test_self_built_and_receipt_evidence_protect(self):
         row = fake_instance(directory="my-tool")

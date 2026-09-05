@@ -32,8 +32,8 @@ class ParseDeclarationTests(unittest.TestCase):
         self.assertEqual(d["observed_by"], "model")
         self.assertFalse(d["complete"])
         self.assertEqual(len(d["roots"]), 1)
-        self.assertTrue(d["roots"][0]["path"].startswith("/"),
-                        "~ 必须展开为绝对路径")
+        self.assertTrue(os.path.isabs(d["roots"][0]["path"]),
+                        "~ 必须展开为当前系统绝对路径")
         self.assertEqual(d["roots"][0]["load_state"], "reported")
 
     def test_defaults_apply(self):

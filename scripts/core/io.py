@@ -7,6 +7,7 @@ import errno
 import json
 import os
 import tempfile
+import time
 from contextlib import contextmanager
 from typing import Optional, Tuple
 
@@ -46,6 +47,20 @@ def redact_secrets(value):
     return value
 
 
+def replace_atomic(tmp, path, attempts=5, delay=0.05):
+    """os.replace 原子改名;Windows 上对刚落盘文件的瞬时占用(Defender/索引器
+    WinError 5)做短退避重试,其余错误立即上抛。"""
+    last = None
+    for attempt in range(attempts):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError as e:
+            last = e
+            time.sleep(delay * (attempt + 1))
+    raise last
+
+
 def atomic_write_json(path, value) -> None:
     """同目录临时文件 → flush + fsync → os.replace 原子落盘;异常时清理临时文件。"""
     path = os.fspath(path)
@@ -58,7 +73,7 @@ def atomic_write_json(path, value) -> None:
             f.write(payload)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        replace_atomic(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)

@@ -73,16 +73,24 @@ class FingerprintObservationTests(unittest.TestCase):
         skill = write_skill(Path(td) / ".agents/skills", "demo")
         sub = skill / "secret-sub"
         sub.mkdir()
-        (sub / "inner.txt").write_text("x", encoding="utf-8")
-        os.chmod(sub, 0o000)  # 目录不可读
+        inner = sub / "inner.txt"
+        inner.write_text("x", encoding="utf-8")
+        if os.name == "nt":
+            # NTFS 没有 POSIX 权限位:用真实 ACL 拒绝读文件(不阻塞后续删除/清理)
+            subprocess.run(["icacls", str(inner), "/deny", "*S-1-1-0:(R)"],
+                           check=True, capture_output=True)
+            self.addCleanup(lambda: subprocess.run(
+                ["icacls", str(inner), "/reset"], capture_output=True))
+        else:
+            os.chmod(sub, 0o000)  # 目录不可读
 
-        def unlock(path=str(sub)):
-            try:
-                os.chmod(path, 0o755)
-            except OSError:
-                pass  # 临时目录可能已先被清理
+            def unlock(path=str(sub)):
+                try:
+                    os.chmod(path, 0o755)
+                except OSError:
+                    pass  # 临时目录可能已先被清理
 
-        self.addCleanup(unlock)
+            self.addCleanup(unlock)
         return skill
 
     def test_unreadable_subtree_is_structured_not_silent(self):

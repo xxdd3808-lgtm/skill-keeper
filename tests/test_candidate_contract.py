@@ -70,8 +70,13 @@ class FetchContractTests(unittest.TestCase):
             self.assertEqual(result["source_dir"], "skills/demo")
             self.assertEqual(result["source_tree_sha"], "tree-sha-1")
             self.assertTrue(result["materialization_version"])
-            self.assertEqual(os.stat(dest / "run.sh").st_mode & 0o777, 0o755)
-            self.assertEqual(os.stat(dest / "SKILL.md").st_mode & 0o777, 0o644)
+            if os.name == "posix":
+                self.assertEqual(os.stat(dest / "run.sh").st_mode & 0o777, 0o755)
+                self.assertEqual(os.stat(dest / "SKILL.md").st_mode & 0o777, 0o644)
+            else:
+                # NTFS 无执行位:落地完整性用内容断言(模式登记仍在 manifest 里)
+                self.assertTrue((dest / "run.sh").is_file())
+                self.assertTrue((dest / "SKILL.md").is_file())
             self.assertTrue((dest / "link.bin").is_symlink())
             self.assertEqual(os.readlink(dest / "link.bin"), LINK_TARGET)
             self.assertEqual(tree_hash(dest), result["tree_hash"])

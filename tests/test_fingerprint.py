@@ -32,8 +32,10 @@ class FingerprintTests(unittest.TestCase):
             root = Path(td)
             (root / "a").mkdir(); (root / "a" / "SKILL.md").write_text("v1", encoding="utf-8")
             base = tree_hash(root)
-            os.chmod(root / "a" / "SKILL.md", 0o600)
-            self.assertNotEqual(base, tree_hash(root), "权限变化必须改变摘要")
+            if os.name != "nt":
+                # NTFS 无 POSIX 权限位,chmod 是 no-op:权限变化改摘要只在 POSIX 表达
+                os.chmod(root / "a" / "SKILL.md", 0o600)
+                self.assertNotEqual(base, tree_hash(root), "权限变化必须改变摘要")
             (root / "a" / "SKILL.md").rename(root / "a" / "renamed.md")
             self.assertNotEqual(base, tree_hash(root), "相对路径变化必须改变摘要")
 

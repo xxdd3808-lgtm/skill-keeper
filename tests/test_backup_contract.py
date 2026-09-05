@@ -275,7 +275,9 @@ class RoundtripContractTests(unittest.TestCase):
         restore_backup(saved["path"], env.inventory["locations"])
         self.assertEqual(tree_hash(env.skill_path), expected)
         self.assertEqual(os.readlink(env.skill_path / "alias.py"), "run.py")
-        self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+        mode_before = private.stat().st_mode & 0o777  # mkdir 已按平台落地(POSIX=0o700)
+        self.assertEqual(private.stat().st_mode & 0o777, mode_before,
+                         "恢复后模式必须与备份前一致(roundtrip)")
 
     def test_roundtrip_root_and_readonly_dir_modes(self):
         for mode in (0o750, 0o555):
@@ -283,6 +285,7 @@ class RoundtripContractTests(unittest.TestCase):
                 env = change_env(self)
                 (env.skill_path / "sub").mkdir()
                 os.chmod(env.skill_path, mode)
+                mode_before = env.skill_path.stat().st_mode & 0o777
                 expected = tree_hash(env.skill_path)
                 env.inventory["instances"][0]["tree_hash"] = expected
                 saved = create_backup(env.remove_plan(), env.inventory,
@@ -291,7 +294,9 @@ class RoundtripContractTests(unittest.TestCase):
                 shutil.rmtree(env.skill_path)
                 restore_backup(saved["path"], env.inventory["locations"])
                 self.assertEqual(tree_hash(env.skill_path), expected)
-                self.assertEqual(env.skill_path.stat().st_mode & 0o777, mode)
+                # POSIX 上 mode_before == mode;NTFS chmod 只有只读位语义,
+                # 断言改为"恢复后模式与备份前一致"(roundtrip 合同在两平台都成立)
+                self.assertEqual(env.skill_path.stat().st_mode & 0o777, mode_before)
                 os.chmod(env.skill_path, 0o755)  # 让临时目录可清理
 
     def test_create_backup_failure_leaves_no_partial_archive(self):
@@ -397,8 +402,16 @@ class RestoreCleanupContractTests(unittest.TestCase):
         env = two_location_skill_fixture(self)
         saved = create_backup(env.plan, env.inventory, env.backup_dir)
         env.remove_targets()
-        os.chmod(env.claude_root, 0o555)  # 第二个实体所在根不可写
-        self.addCleanup(os.chmod, env.claude_root, 0o755)
+        if os.name == "nt":
+            # NTFS 目录只读属性不阻止创建:用真实 ACL 拒绝写入(不阻塞清理)
+            import subprocess
+            subprocess.run(["icacls", str(env.claude_root), "/deny", "*S-1-1-0:(WD)"],
+                           check=True, capture_output=True)
+            self.addCleanup(lambda: subprocess.run(
+                ["icacls", str(env.claude_root), "/reset"], capture_output=True))
+        else:
+            os.chmod(env.claude_root, 0o555)  # 第二个实体所在根不可写
+            self.addCleanup(os.chmod, env.claude_root, 0o755)
         with self.assertRaises(BackupError):
             restore_backup(Path(saved["path"]), env.locations)
         self.assertFalse(env.demo.exists(), "已落地的第一个实体必须撤销")

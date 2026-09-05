@@ -51,9 +51,10 @@ def head_gh():
 
 def two_copy_inventory(home):
     stale = write_skill(home / ".agents/skills", "dupe", body="v1-local")
-    (stale / "SKILL.md").write_text(STALE_SKILL, encoding="utf-8")
+    # write_bytes:Windows 文本模式会把 \n 翻译成 \r\n,导致与上游候选树假性差异
+    (stale / "SKILL.md").write_bytes(STALE_SKILL.encode("utf-8"))
     fresh = write_skill(home / ".accio/accounts/a/skills", "dupe", body="v2-local")
-    (fresh / "SKILL.md").write_text(HEAD_SKILL, encoding="utf-8")
+    (fresh / "SKILL.md").write_bytes(HEAD_SKILL.encode("utf-8"))
     inst = []
     for iid, path in (("inststale0000000000001", stale), ("instfresh0000000000001", fresh)):
         inst.append({"instance_id": iid, "location_id": "shared" if "agents" in str(path) else "accio-a",

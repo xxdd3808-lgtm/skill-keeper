@@ -130,18 +130,29 @@ def copy_private_v311_fixture(testcase):
     data = td / "data"
     shutil.copytree(PRIVATE_V311_FIXTURE / "home", home, symlinks=True)
     shutil.copytree(PRIVATE_V311_FIXTURE / "data", data)
-    # Windows checkout 常把仓库 symlink 物化成只含目标的普通文本文件。
-    # 在临时 HOME 内重建，避免测试碰真实目录；若平台确实不支持则明确失败。
+    # Windows checkout 常把仓库 symlink 物化成只含目标的普通文本文件,且对
+    # "相对路径 + 正斜杠"的链接目标解析不可靠:这里一律删除重建——Windows 用
+    # 本机路径形态(自动为绝对目标),POSIX 保持相对目标;并自检可解析。
     for rel, target in ((".workbuddy/skills/wb-link", "../../.agents/skills/shared-alpha"),
                         (".workbuddy/skills/wb-drift", "../staging/shared-beta-v2")):
         link = home / rel
-        if link.is_symlink():
-            continue
-        if link.exists():
-            if link.is_dir():
+        if link.is_symlink() or link.exists():
+            if link.is_dir() and not link.is_symlink():
                 shutil.rmtree(link)
             else:
                 link.unlink()
-        os.symlink(target, str(link), target_is_directory=True)
+        if os.name == "nt":
+            final_target = os.path.abspath(link.parent / target)
+        else:
+            final_target = target
+        os.symlink(final_target, str(link), target_is_directory=True)
+        if not link.exists():
+            probe, cur = [], link.parent
+            for part in Path(target).parts:
+                cur = cur / part
+                probe.append("{}={}".format(part, cur.exists()))
+            raise AssertionError(
+                "fixture 链接重建后悬空: {} -> {}(readlink={},组件 {})".format(
+                    link, final_target, os.readlink(str(link)), " ".join(probe)))
     testcase.addCleanup(shutil.rmtree, td, ignore_errors=True)
     return home, data
