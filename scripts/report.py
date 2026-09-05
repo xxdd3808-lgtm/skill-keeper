@@ -645,7 +645,14 @@ def render_html(inv, last=None, ctx=None):
         '且永不自动执行。结论过期会显著标注。</p>{sections}{back}</section>').format(
         note=esc(REPO_SCOPE_NOTE), sections="".join(sections), back=_back_top())
 
-    # 全量明细表
+    # 全量明细表;groups.json 作为分类筛选维度(F08:此前有文件无消费者),
+    # 未登记目录名归入默认组「未分组」;分组不改价值结论与安全状态
+    groups_cfg, _ = load_json_checked(Path(data_dir()) / "groups.json", {})
+    group_of = {}
+    if isinstance(groups_cfg, dict):
+        for grp, names in groups_cfg.items():
+            for n in names if isinstance(names, list) else []:
+                group_of[str(n)] = str(grp)
     rows = []
     for inst in view["inv"].get("instances", []):
         cls, _why = classify_instance(inst, set(), view.get("known"))
@@ -656,17 +663,19 @@ def render_html(inv, last=None, ctx=None):
                                              "name": inst.get("logical_name"),
                                              "cmd": _safe_plan_cmd(inst.get("instance_id"))},
                          "btn-danger")
+        grp = group_of.get(str(inst.get("directory_name")), "未分组")
         rows.append(
-            '<tr id="instance-{}"><td><b>{}</b>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
+            '<tr id="instance-{}"><td><b>{}</b>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
                 esc(inst.get("instance_id")),
                 esc(inst.get("logical_name")),
                 ' <span class="badge">受保护</span>' if cls == "protected" else "",
+                esc(grp),
                 esc(inst.get("function") or ""), esc(inst.get("client") or ""),
                 esc(inst.get("kind") or ""), findings_badges(view, inst), action))
     table_sec = (
         '<details id="instance-details"><summary><b>📋 安装实例明细</b>'
         '<span class="cnt">{} 个实例 / {} 个逻辑 Skill</span></summary>'
-        '<table><tr><th>Skill</th><th>功能</th><th>客户端</th><th>位置类型</th><th>健康</th><th>操作</th></tr>'
+        '<table><tr><th>Skill</th><th>分组</th><th>功能</th><th>客户端</th><th>位置类型</th><th>健康</th><th>操作</th></tr>'
         '{}</table>{}</details>').format(len(view["inv"].get("instances", [])), c["total"],
                                          "".join(rows), _back_top())
 

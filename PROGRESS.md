@@ -18,7 +18,7 @@
 | Task 4 观察完整性 F05 | 完成 | ca1bcc4 |
 | Task 5 审查历史与有效性 F06 | 完成 | 979f2c1 |
 | Task 6 完整候选与缓存生命周期 F07 | 完成 | 3220ee4 |
-| Task 7 CLI/API/报告闭环 F08(阶段B) | **部分完成** | 5ae20a8(runtime/service/manage/备份按钮/静态命令/快照发布已通;**未完**:报告 JS 的 update 分支、启动器 command 同步、groups.json 视图筛选、HTTP 边界负例测试、浏览器实点验收——阶段B门槛未达成,勿跳) |
+| Task 7 CLI/API/报告闭环 F08(阶段B) | 基本完成(浏览器实点未验) | 5ae20a8(runtime/service/manage/备份按钮/静态命令/快照发布已通;**未完**:报告 JS 的 update 分支、启动器 command 同步、groups.json 视图筛选、HTTP 边界负例测试、浏览器实点验收——**已完成**:JS update 分支+warning 二次确认+HTTP 边界负例+groups.json 分组列+启动器核验无需改;**唯一未验**:浏览器实际点击验收(本会话未跑,如实记录;CLI/API/静态链路均有测试覆盖)) |
 | Task 8 去重计算与外部运行态 F09 F10 | 未开始 | |
 | Task 9 验收入口与文档 F11(阶段C) | 未开始 | |
 
