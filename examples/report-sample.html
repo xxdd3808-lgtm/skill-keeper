@@ -104,6 +104,25 @@ document.addEventListener('click',async e=>{
     if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
     return;
   }
+  if(act==='update'){
+    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已安检;计划确认后才会执行)'))return;
+    b.disabled=true;
+    const pr=await post('/api/plan',{action:'update',instance_id:id});
+    if(!pr.j||!pr.j.ok){toast('❌ 生成更新计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
+    const p=pr.j;
+    if(!confirm('更新计划摘要:'+p.summary+'
+确认执行 digest: '+p.digest+'
+(旧版本自动备份;失败自动回滚)')){b.disabled=false;return;}
+    let ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
+    if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('warning')>=0){
+      if(!confirm('候选安检为 warning: '+ar.j.error+'
+确认接受风险并继续?')){b.disabled=false;return;}
+      ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true,accept_warning:true});
+    }
+    toast(ar.j&&ar.j.ok?'✅ 已更新,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
+    if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
+    return;
+  }
   if(act==='ignore'){
     if(!confirm('忽略这个问题?'))return;
     const r=await post('/api/ignore',{name:b.dataset.name,match:b.dataset.match,confirm:true});

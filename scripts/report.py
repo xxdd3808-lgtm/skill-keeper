@@ -417,12 +417,17 @@ def _update_row(view, update):
             changed.append("{} {} 项".format(label, len(diff[key])))
     detail = "；".join(changed) or "检测到完整目录树差异"
     target = "#instance-{}".format(iid) if iid else "#instance-details"
+    btns = ""
+    if iid and update.get("staging_path"):
+        # F08:候选已暂存时提供更新动作;安检 gate 在引擎侧,warning 需二次确认(JS)
+        btns = ' <button class="btn" data-act="update" data-id="{}" data-name="{}">🔄 生成更新计划(先安检)</button>'.format(
+            esc(iid), esc(name))
     return ('<div class="attention-row attention-update">'
             '<div class="attention-head"><b>{}</b><span class="badge badge-yellow">{}</span></div>'
-            '<p>{}</p><p class="mut">{} · {} · <a href="{}" data-jump>定位安装实例</a></p>'
+            '<p>{}</p><p class="mut">{} · {} · <a href="{}" data-jump>定位安装实例</a>{}</p>'
             '</div>').format(esc(name), esc(short), esc(detail),
                                esc(_instance_context(inst)), esc(update.get("repo") or "来源待核实"),
-                               esc(target))
+                               esc(target), btns)
 
 
 def _attention_section(view):
@@ -508,6 +513,22 @@ document.addEventListener('click',async e=>{
     if(!confirm('计划摘要:'+p.summary+'\\n确认恢复 digest: '+p.digest+'\\n(目标已存在则冲突失败,不覆盖)')){b.disabled=false;return;}
     const ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
     toast(ar.j&&ar.j.ok?'✅ 已恢复,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
+    if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
+    return;
+  }
+  if(act==='update'){
+    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已安检;计划确认后才会执行)'))return;
+    b.disabled=true;
+    const pr=await post('/api/plan',{action:'update',instance_id:id});
+    if(!pr.j||!pr.j.ok){toast('❌ 生成更新计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
+    const p=pr.j;
+    if(!confirm('更新计划摘要:'+p.summary+'\n确认执行 digest: '+p.digest+'\n(旧版本自动备份;失败自动回滚)')){b.disabled=false;return;}
+    let ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
+    if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('warning')>=0){
+      if(!confirm('候选安检为 warning: '+ar.j.error+'\n确认接受风险并继续?')){b.disabled=false;return;}
+      ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true,accept_warning:true});
+    }
+    toast(ar.j&&ar.j.ok?'✅ 已更新,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
     if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
     return;
   }

@@ -173,7 +173,9 @@ def _build_handler(ctx, token):
 
         def _auth(self, q):
             given = q.get("t", [""])[0]
-            return secrets.compare_digest(str(given), token)
+            # 常量时间比较必须用字节串:非 ASCII token 的字符串比较会 TypeError
+            return secrets.compare_digest(str(given).encode("utf-8"),
+                                          str(token).encode("utf-8"))
 
         def _check_origin(self):
             origin = self.headers.get("Origin")
@@ -186,7 +188,7 @@ def _build_handler(ctx, token):
                 n = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 raise _BadRequest("Content-Length 不合法")
-            if n > MAX_BODY:
+            if n < 0 or n > MAX_BODY:
                 raise _TooLarge()
             raw = self.rfile.read(n) if n else b"{}"
             try:
