@@ -112,6 +112,7 @@ def cached_repo_snapshot(repo, reputation_path, gh_runner):
     repos = flatten_repos(cache if isinstance(cache, dict) else {})
     snap = repo_snapshot(repo, gh_runner)
     if snap.get("ok"):
+        snap["refresh_status"] = "fresh"
         repos[repo] = snap
         atomic_write_json(reputation_path, {"schema_version": 2, "repos": repos})
         return snap
@@ -120,6 +121,8 @@ def cached_repo_snapshot(repo, reputation_path, gh_runner):
         stale = dict(old)
         stale["stale"] = True
         stale["error"] = snap.get("error", "refresh-failed")
+        stale["last_attempt_at"] = _iso_now()
+        stale["refresh_status"] = "error"
         return stale
     return snap
 
@@ -136,9 +139,14 @@ def _safe_rel(rel: str) -> bool:
 def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
     """按固定 commit 抓取 repo 内 source_dir 的完整文件树到 dest(二进制安全)。
 
-    成功返回 {ok, commit_sha, files, tree_hash};任何失败返回 {ok: False, error},
-    绝不把半成品目录当作候选。
+    协议不完整即失败:truncated 树、submodule、重复路径、链接父级冲突、缺根
+    SKILL.md、无效 frontmatter 都明确拒绝,绝不降格成"完整候选"。
+    支持 100644/100755/120000;symlink 只落地链接目标字符串,物化不跟随。
+    成功返回 {ok, commit_sha, files, tree_hash, source_dir, tree_complete,
+    source_tree_sha, materialization_version};失败没有 candidate_hash 可用。
     """
+    from .fingerprint import FingerprintError
+    from scripts.scan import parse_frontmatter
     dest = Path(dest)
     try:
         code, out = gh_runner(["repos/{}/git/trees/{}?recursive=1".format(repo, commit_sha)])
@@ -148,22 +156,49 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
         tree = data.get("tree") or []
     except (json.JSONDecodeError, TypeError) as e:
         return {"ok": False, "error": "tree-parse-failed: " + type(e).__name__, "commit_sha": commit_sha}
+    if data.get("truncated"):
+        # 官方协议:truncated 表示响应缺子树;一期明确失败,不补齐不猜测
+        return {"ok": False, "error": "tree-truncated", "commit_sha": commit_sha}
 
-    prefix = str(source_dir).strip("/") + "/"
-    members = [t for t in tree if t.get("type") == "blob" and str(t.get("path", "")).startswith(prefix)]
+    sd = str(source_dir or "").strip("/")
+    prefix = sd + "/" if sd else ""
+    members = [t for t in tree if str(t.get("path", "")).startswith(prefix)]
     if not members:
         return {"ok": False, "error": "source-dir-empty-or-missing", "commit_sha": commit_sha}
 
-    fetched = []
+    rows = []
+    seen_paths = set()
+    symlink_dirs = set()
     for m in members:
-        rel = str(m["path"])[len(prefix):]
+        full_path = str(m.get("path", ""))
+        rel = full_path[len(prefix):]
+        mtype = str(m.get("type") or "")
+        if mtype == "commit":
+            return {"ok": False, "error": "unsupported-submodule", "path": rel,
+                    "commit_sha": commit_sha}
+        if mtype != "blob":
+            return {"ok": False, "error": "unsupported-tree-entry", "path": rel,
+                    "commit_sha": commit_sha}
         if not _safe_rel(rel):
             return {"ok": False, "error": "unsafe-path", "path": rel, "commit_sha": commit_sha}
-        fetched.append((rel, m.get("sha"), str(m.get("mode") or "")))
+        if rel in seen_paths:
+            return {"ok": False, "error": "duplicate-path", "path": rel, "commit_sha": commit_sha}
+        seen_paths.add(rel)
+        git_mode = str(m.get("mode") or "")
+        parts = rel.split("/")
+        for i in range(1, len(parts)):
+            if "/".join(parts[:i]) in symlink_dirs:
+                return {"ok": False, "error": "link-parent-conflict", "path": rel,
+                        "commit_sha": commit_sha}
+        if git_mode == "120000":
+            symlink_dirs.add(rel)
+        rows.append((rel, m.get("sha"), git_mode))
+    if "SKILL.md" not in seen_paths:
+        return {"ok": False, "error": "source-dir-empty-or-missing", "commit_sha": commit_sha}
 
     dest.mkdir(parents=True, exist_ok=True)
     count = 0
-    for rel, blob_sha, git_mode in fetched:
+    for rel, blob_sha, git_mode in rows:
         try:
             bc, bo = gh_runner(["repos/{}/git/blobs/{}".format(repo, blob_sha)])
             if bc != 0:
@@ -171,14 +206,43 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
             blob = json.loads(bo)
             if blob.get("encoding") != "base64":
                 return {"ok": False, "error": "unsupported-blob-encoding", "path": rel, "commit_sha": commit_sha}
-            content = base64.b64decode(blob.get("content") or "")
-        except (json.JSONDecodeError, TypeError, OSError) as e:
-            return {"ok": False, "error": "blob-error: " + type(e).__name__, "path": rel, "commit_sha": commit_sha}
+            content = base64.b64decode(blob.get("content") or "", validate=True)
+            if blob.get("size") is not None and int(blob["size"]) != len(content):
+                return {"ok": False, "error": "blob-size-mismatch", "path": rel,
+                        "commit_sha": commit_sha}
+        except (json.JSONDecodeError, TypeError, OSError, ValueError) as e:
+            return {"ok": False, "error": "blob-error: " + type(e).__name__, "path": rel,
+                    "commit_sha": commit_sha}
         local = dest / rel
-        local.parent.mkdir(parents=True, exist_ok=True)
-        local.write_bytes(content)
-        # Git mode 100755 的文件落地后必须保留可执行位;完整树指纹含权限,丢位会产生幽灵更新
-        if git_mode.endswith("755"):
-            os.chmod(local, 0o755)
+        if git_mode == "120000":
+            try:
+                target = content.decode("utf-8")
+            except UnicodeDecodeError:
+                return {"ok": False, "error": "unsafe-link-target", "path": rel,
+                        "commit_sha": commit_sha}
+            if target.startswith("/") or target in ("", ".", ".."):
+                # 相对目标(可含 ..)是合法 Git 形态:只落地链接字符串,物化/指纹都不跟随;
+                # 绝对路径目标一律拒绝
+                return {"ok": False, "error": "unsafe-link-target", "path": rel,
+                        "commit_sha": commit_sha}
+            if local.exists() or local.is_symlink():
+                local.unlink()
+            os.symlink(target, local)
+        else:
+            local.parent.mkdir(parents=True, exist_ok=True)
+            local.write_bytes(content)
+            # 权限固定,不依赖进程 umask;100755 保留可执行位(指纹含权限,丢位产生幽灵更新)
+            os.chmod(local, 0o755 if git_mode.endswith("755") else 0o644)
         count += 1
-    return {"ok": True, "commit_sha": commit_sha, "files": count, "tree_hash": tree_hash(dest)}
+    try:
+        result_hash = tree_hash(dest)
+    except FingerprintError as e:
+        return {"ok": False, "error": "materialize-incomplete", "detail": str(e)[:120],
+                "commit_sha": commit_sha}
+    with open(dest / "SKILL.md", encoding="utf-8", errors="ignore") as f:
+        fm, ok = parse_frontmatter(f.read(8000))
+    if not ok or not str(fm.get("name") or "").strip():
+        return {"ok": False, "error": "invalid-frontmatter", "commit_sha": commit_sha}
+    return {"ok": True, "commit_sha": commit_sha, "files": count, "tree_hash": result_hash,
+            "source_dir": sd, "tree_complete": True, "source_tree_sha": str(data.get("sha") or ""),
+            "materialization_version": 1}

@@ -74,6 +74,55 @@ def read_ownership(staging_root) -> dict:
     return records
 
 
+def collect_staging_references(updates, plans, transactions) -> set:
+    """汇总 staging 引用:本轮/上次更新结果 + 未过期计划 + 执行中/待恢复事务。
+
+    updates/plans/transactions 都是已加载的 dict/list(读取由调用方负责);
+    引用集合以绝对路径与目录名两种形态给出,供 cleanup_staging 匹配。
+    """
+    refs = set()
+    time_now = time.strftime("%Y-%m-%d %H:%M:%S")
+    for d in (updates or {}).get("differs", []) or []:
+        if d.get("staging_path"):
+            refs.add(str(Path(d["staging_path"])))
+    for plan in plans or []:
+        if not isinstance(plan, dict):
+            continue
+        if str(plan.get("expires_at") or "") >= time_now:
+            for pair in plan.get("preconditions") or []:
+                if isinstance(pair, (list, tuple)) and len(pair) == 2 and pair[0] == "staging_path":
+                    refs.add(str(Path(str(pair[1]))))
+    for txn in transactions or []:
+        if isinstance(txn, dict) and txn.get("phase") in ("prepared", "mutating",
+                                                          "rolling-back", "recovery-required"):
+            holding = txn.get("candidate_holding")
+            if holding:
+                refs.add(str(Path(str(holding))))
+    return refs
+
+
+def load_reference_inputs(data_dir):
+    """从 data 目录读取引用来源:updates.json + change-plans/*.json + transactions/*.json。"""
+    from .io import load_json_checked
+    data_dir = Path(data_dir)
+    updates, _ = load_json_checked(data_dir / "updates.json", {})
+    plans = []
+    plans_dir = data_dir / "change-plans"
+    if plans_dir.is_dir():
+        for path in sorted(plans_dir.glob("*.json")):
+            value, _ = load_json_checked(path, None)
+            if isinstance(value, dict):
+                plans.append(value)
+    transactions = []
+    txn_dir = data_dir / "transactions"
+    if txn_dir.is_dir():
+        for path in sorted(txn_dir.glob("*.json")):
+            value, _ = load_json_checked(path, None)
+            if isinstance(value, dict):
+                transactions.append(value)
+    return updates, plans, transactions
+
+
 def cleanup_staging(root, references) -> dict:
     """清理无有效引用且本工具登记所有的 cand-/tmp- 目录;返回 {removed, kept, unowned, errors}。
 

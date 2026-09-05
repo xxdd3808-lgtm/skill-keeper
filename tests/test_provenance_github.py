@@ -94,7 +94,9 @@ class ProvenanceGithubTests(unittest.TestCase):
                 ]},
                 "repos/o/r/git/blobs/b1": {"content": b64(b"#!/bin/sh\necho hi\n"),
                                            "encoding": "base64"},
-                "repos/o/r/git/blobs/b3": {"content": b64(b"hello\n"), "encoding": "base64"},
+                # 夹具修正(任务 6):候选必须带合法 frontmatter,无 name 的 SKILL.md 会被拒绝
+                "repos/o/r/git/blobs/b3": {"content": b64(b"---\nname: demo\ndescription: d\n---\nhello\n"),
+                                           "encoding": "base64"},
             })
             result = fetch_skill_tree("o/r", "skills/demo", "abc123", Path(td), gh)
             self.assertTrue(result["ok"])

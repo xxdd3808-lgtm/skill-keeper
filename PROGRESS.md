@@ -17,7 +17,7 @@
 | Task 3 事务与中断恢复 F03(阶段A达成) | 完成 | 43d7155 |
 | Task 4 观察完整性 F05 | 完成 | ca1bcc4 |
 | Task 5 审查历史与有效性 F06 | 完成 | 979f2c1 |
-| Task 6 完整候选与缓存生命周期 F07 | 未开始 | |
+| Task 6 完整候选与缓存生命周期 F07 | 完成 | （见 git log） |
 | Task 7 CLI/API/报告闭环 F08(阶段B) | 未开始 | |
 | Task 8 去重计算与外部运行态 F09 F10 | 未开始 | |
 | Task 9 验收入口与文档 F11(阶段C) | 未开始 | |
@@ -29,6 +29,7 @@
 - Task 3:transactions.py(状态文件 data/transactions/<plan>.json,phase 机,holding_path=.sk-txn-<plan尾8>-<iid前8>);删除=原子移入同目录保管;更新=旧版保管+候选物化再交换;恢复=restore_backup+哈希匹配撤销;recover_transaction 只回退不激活;重放 committed 返回 already_applied,rolled-back 拒绝;审计失败→audit_pending;resulting_hash=真实哈希 JSON;子进程 os._exit(77) 三窗口可恢复;_undo_remove 两遍(先全移回再校验,链接依赖正本)。.gitignore 加 data/transactions/。
 - Task 4:fingerprint.py FingerprintError(OSError 子类)+collect_errors 参数+排除目录剪枝;scan.py parse_frontmatter_detailed(嵌套 requires.bins,unsupported 警告码)+实例 content_status+observation{complete,issues,observed_scope,rule_version,load_contexts}+scan --json need_vet 真实+退出码 0/1/2;load_rules.py(规则带来源/日期/范围,RULE_VERSION);observations.py(evaluate_load eligible≠confirmed/load_receipt_evidence 白名单);插件坐标加 marketplace;check_updates 输入缺失退出 2。
 - Task 5:review_state.py(review_dependencies/evaluate_review,REVIEW_POLICY_VERSION);record_review 校验 safety∈safe|warning|danger、reviewer_model 非空、提交 hash 一致、生成 review_snapshot_id+alternatives_state(候选无条目行记 None→evaluate 按 alternative-unverified 过期);value_review record 台账 FileLock+损坏拒写。CONFIDENCE_LEVELS 是 高/中/低(测试别用 medium)。队列/报告共用 evaluate_review 的接线放到 Task 7 报告改造时做(计划允许,不另开任务)。
+- Task 6:github.fetch_skill_tree 重写(truncated/160000/重复路径/链接父级冲突/缺根 SKILL.md/无效 frontmatter 一律拒绝;120000 只落地相对链接串,绝对目标拒绝;100755/100644 权限固定;blob base64 strict+size 校验;source_dir 空串=仓库根;成功返回 source_dir/tree_complete/source_tree_sha/materialization_version);stage_candidate 同名 cand 按完整哈希复核,损坏旁路重物化为 cand-<hash>-<rand>(不覆盖);staging.collect_staging_references(updates+未过期计划 staging_path+活跃事务 candidate_holding)+load_reference_inputs(data 目录读三源);check() GC 引用接上计划/事务;cached_repo_snapshot 加 refresh_status/last_attempt_at(stale 分支)。测试夹具注意:候选树的 SKILL.md 必须有合法 frontmatter(test_provenance_github b3 已修)。
 
 ## 已知遗留/风险
 

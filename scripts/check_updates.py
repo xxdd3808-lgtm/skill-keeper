@@ -43,7 +43,9 @@ def staging_root_for(output_path=None):
 def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):
     """把固定 commit 的完整候选树放入 staging(按内容哈希命名,天然不可变)。
 
-    返回 {ok, candidate_hash, staging_path, files};失败时清理临时目录并返回 {ok: False}。
+    已有同名 cand 目录先按完整哈希复核:一致才复用;不一致(损坏)保留证据,
+    以独立临时对象重新物化,绝不覆盖、绝不信任截断哈希目录名。
+    返回 {ok, candidate_hash, staging_path, files, commit_sha};失败 {ok: False}。
     """
     staging_root = Path(staging_root)
     staging_root.mkdir(parents=True, exist_ok=True)
@@ -52,15 +54,39 @@ def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):
     if not result.get("ok"):
         shutil.rmtree(tmp, ignore_errors=True)
         return result
+    from scripts.core.staging import record_ownership
     final = staging_root / ("cand-" + result["tree_hash"][:12])
     if final.is_dir():
-        shutil.rmtree(tmp, ignore_errors=True)  # 相同候选已存在(内容同哈希)
-    else:
-        os.replace(tmp, final)
-        # 所有权记录:清理只认本工具登记过的候选(F07 边界)
-        record_ownership(staging_root, final.name,
-                         {"candidate_hash": result["tree_hash"], "repo": repo,
-                          "commit_sha": commit_sha})
+        shutil.rmtree(tmp, ignore_errors=True)  # 同哈希候选已存在
+        try:
+            intact = tree_hash(final) == result["tree_hash"]
+        except (NotADirectoryError, OSError):
+            intact = False
+        meta = {"candidate_hash": result["tree_hash"], "repo": repo,
+                "commit_sha": commit_sha}
+        if not intact:
+            # 损坏目录保留现场,旁路重物化为独立对象
+            side = staging_root / ("cand-" + result["tree_hash"][:12] + "-"
+                                   + secrets.token_hex(2))
+            rescue = staging_root / ("tmp-" + secrets.token_hex(4))
+            fixed = fetch_skill_tree(repo, source_dir, commit_sha, rescue, gh_runner)
+            if not fixed.get("ok"):
+                shutil.rmtree(rescue, ignore_errors=True)
+                return fixed
+            os.replace(rescue, side)
+            record_ownership(staging_root, side.name, dict(meta, note="re-materialized"))
+            return {"ok": True, "candidate_hash": fixed["tree_hash"],
+                    "staging_path": str(side), "files": fixed["files"],
+                    "commit_sha": commit_sha, "rematerialized": True}
+        record_ownership(staging_root, final.name, meta)
+        return {"ok": True, "candidate_hash": result["tree_hash"],
+                "staging_path": str(final), "files": result["files"],
+                "commit_sha": commit_sha, "verified_existing": True}
+    os.replace(tmp, final)
+    # 所有权记录:清理只认本工具登记过的候选(F07 边界)
+    record_ownership(staging_root, final.name,
+                     {"candidate_hash": result["tree_hash"], "repo": repo,
+                      "commit_sha": commit_sha})
     return {"ok": True, "candidate_hash": result["tree_hash"], "staging_path": str(final),
             "files": result["files"], "commit_sha": commit_sha}
 
@@ -197,8 +223,7 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
                         "full_diff_summary": diff_summary(local_manifest, candidate_manifest),
                         "checked_at": time.strftime("%Y-%m-%d %H:%M:%S")})
     # 循环结束后统一清理:只清"本工具登记所有权且无有效引用"的候选目录。
-    # 不相关目录与无所有权记录的历史目录一律保留(unowned 列表可审查),
-    # 旧版"整个暂存根无引用即删"的行为曾把不相关目录一起清掉,已废弃。
+    # 引用覆盖本轮/上次更新结果 + 未过期计划 + 执行中/待恢复事务(F07)。
     referenced = {str(Path(d["staging_path"])) for d in differs}
     try:
         prev, _ = load_json_checked(Path(output_path), {})
@@ -207,6 +232,10 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
                 referenced.add(str(Path(d["staging_path"])))
     except (OSError, ValueError, TypeError):
         pass
+    from scripts.core.staging import load_reference_inputs
+    _, plan_rows, txn_rows = load_reference_inputs(Path(output_path).parent)
+    from scripts.core.staging import collect_staging_references
+    referenced |= collect_staging_references({}, plan_rows, txn_rows)
     staging_cleanup = cleanup_staging(staging_root, referenced)
     return {"schema_version": 2, "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "differs": differs, "up_to_date": up_to_date, "skipped": skipped,
