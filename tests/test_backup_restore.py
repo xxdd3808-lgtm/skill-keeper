@@ -101,20 +101,60 @@ class BackupRestoreTests(unittest.TestCase):
         with self.assertRaises(BackupError):
             verify_backup(archive)
 
-    def test_tar_link_and_device_members_are_rejected(self):
-        fd, path = tempfile.mkstemp(suffix=".tar")
+    def _valid_archive_parts(self):
+        """一份真实备份的 manifest 与 payload,用于在合法归档上注入单个非法成员。"""
+        env = two_location_skill_fixture(self)
+        backup = create_backup(env.plan, env.inventory, env.backup_dir)
+        info = verify_backup(Path(backup["path"]))
+        with tarfile.open(backup["path"], "r:gz") as t:
+            payload = {m.name: t.extractfile(m).read()
+                       for m in t if m.name != "manifest.json"}
+        return info["manifest"], payload
+
+    def _write_archive(self, manifest, payload, extra_members=(), compressed=True):
+        fd, path = tempfile.mkstemp(suffix=".tar.gz" if compressed else ".tar")
         os.close(fd)
         self.addCleanup(os.unlink, path)
+        with tarfile.open(path, "w:gz" if compressed else "w") as t:
+            mb = json.dumps(manifest, ensure_ascii=False, indent=1).encode("utf-8")
+            minfo = tarfile.TarInfo("manifest.json")
+            minfo.size = len(mb)
+            t.addfile(minfo, io.BytesIO(mb))
+            for arc, data in payload.items():
+                ainfo = tarfile.TarInfo(arc)
+                ainfo.size = len(data)
+                t.addfile(ainfo, io.BytesIO(data))
+            for member in extra_members:
+                t.addfile(member)
+        return Path(path)
+
+    def test_tar_link_and_device_members_are_rejected(self):
+        """修正(任务 1):旧夹具生成未压缩 tar,verify 因 r:gz 打不开而通过,
+        并不能证明命中链接/设备拒绝分支;现在用合法 gzip+完整 manifest,
+        仅注入非法成员,并保留合法对照组。"""
+        manifest, payload = self._valid_archive_parts()
+        ok_archive = self._write_archive(manifest, payload)
+        self.assertTrue(verify_backup(ok_archive)["ok"], "合法对照组必须通过打开归档步骤")
+
         sinfo = tarfile.TarInfo("payload/x/link")
         sinfo.type = tarfile.SYMTYPE
         sinfo.linkname = "/etc/passwd"
+        with self.assertRaises(BackupError) as ctx:
+            verify_backup(self._write_archive(manifest, payload, extra_members=[sinfo]))
+        self.assertIn("链接", str(ctx.exception), "必须以链接成员为由拒绝")
+
         dinfo = tarfile.TarInfo("payload/x/dev")
         dinfo.type = tarfile.CHRTYPE
-        with tarfile.open(path, "w") as t:
-            t.addfile(sinfo)
-            t.addfile(dinfo)
-        with self.assertRaises(BackupError):
-            verify_backup(Path(path))
+        with self.assertRaises(BackupError) as ctx:
+            verify_backup(self._write_archive(manifest, payload, extra_members=[dinfo]))
+        self.assertIn("设备", str(ctx.exception), "必须以设备成员为由拒绝")
+
+    def test_uncompressed_tar_rejected_as_archive_format(self):
+        manifest, payload = self._valid_archive_parts()
+        archive = self._write_archive(manifest, payload, compressed=False)
+        with self.assertRaises(BackupError) as ctx:
+            verify_backup(archive)
+        self.assertIn("无法打开备份", str(ctx.exception))
 
     def test_conflict_restore_fails_without_touching_target(self):
         env = two_location_skill_fixture(self)

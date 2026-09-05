@@ -163,8 +163,20 @@ def create_update_plan(instance_id, candidate_snapshot, inventory, plans_dir,
     return plan
 
 
+def _restore_targets_document(manifest_entries):
+    """manifest 目标集合的规范化 JSON(恢复计划与执行期共用同一序列化,防止口径漂移)。"""
+    rows = [{"instance_id": str(e.get("instance_id")),
+             "location_id": str(e.get("location_id")),
+             "original_relative_path": str(e.get("original_relative_path")),
+             "type": str(e.get("type"))}
+            for e in manifest_entries or []]
+    rows.sort(key=lambda r: (r["instance_id"], r["original_relative_path"]))
+    return json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 def create_restore_plan(backup_id, backup_dir, plans_dir) -> ChangePlan:
-    """生成恢复计划:先校验备份可用,precondition 绑定 backup_id 与归档绝对路径;冲突不覆盖。"""
+    """生成恢复计划:先校验备份可用,precondition 绑定 backup_id、归档路径、归档内容摘要
+    (archive_sha256)与目标集合快照;执行期任何一项不符都拒绝。冲突不覆盖。"""
     from .backup import BackupError, verify_backup
     path = _find_backup(backup_dir, backup_id)
     try:
@@ -179,7 +191,10 @@ def create_restore_plan(backup_id, backup_dir, plans_dir) -> ChangePlan:
     plan = ChangePlan(
         plan_id=plan_id, action="restore", target_ids=tuple(iids),
         preconditions=(("backup_id", str(backup_id)),
-                       ("backup_path", os.path.abspath(str(path)))),
+                       ("backup_path", os.path.abspath(str(path))),
+                       ("archive_sha256", str(info.get("archive_sha256"))),
+                       ("restore_targets", _restore_targets_document(
+                           manifest.get("entries", [])))),
         summary="从备份 {} 恢复 {} 个实体(目标已存在则冲突失败,不覆盖)".format(
             str(backup_id), len(iids)),
         digest="", created_at=now, expires_at=expires)
@@ -456,12 +471,25 @@ def _execute_remove(row, targets, context):
 
 
 def _execute_restore(row, inventory, context):
-    """按计划恢复备份:目标已存在则冲突失败;恢复后逐实体校验摘要。"""
-    from .backup import restore_backup
+    """按计划恢复备份:先重新核对归档内容绑定,目标已存在则冲突失败;恢复后逐实体校验摘要。"""
+    from .backup import BackupError, restore_backup, verify_backup
     pre = dict(row.get("preconditions", []))
     backup_path = str(pre.get("backup_path") or "")
     if not os.path.isfile(backup_path):
         raise ChangeError("备份归档不存在,恢复中止")
+    if not pre.get("archive_sha256") or not pre.get("restore_targets"):
+        # F01/F02:旧恢复计划没有归档摘要与目标集合绑定,无法证明确认对象就是执行对象
+        raise ChangeError("旧恢复计划缺少归档摘要/目标集合绑定,请重新生成恢复计划(原备份保留)")
+    try:
+        info = verify_backup(backup_path)
+    except BackupError as e:
+        raise ChangeError("备份当前校验失败,恢复中止: " + str(e))
+    if str(info.get("archive_sha256")) != str(pre.get("archive_sha256")):
+        raise ChangeError("备份归档与计划确认时的内容不一致(archive_sha256 不符),"
+                          "拒绝执行,请重新生成恢复计划")
+    if _restore_targets_document((info.get("manifest") or {}).get("entries", [])) \
+            != str(pre.get("restore_targets")):
+        raise ChangeError("备份目标集合与计划确认时的不一致,拒绝执行,请重新生成恢复计划")
     result = restore_backup(backup_path, inventory.get("locations", []), conflict="fail")
     if context.verify_after_apply is not None and not context.verify_after_apply():
         raise ChangeError("恢复后验证失败")
