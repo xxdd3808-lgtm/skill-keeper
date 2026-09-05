@@ -14,38 +14,22 @@ if BASE not in sys.path:
     sys.path.insert(0, BASE)
 
 from scripts.core.clients import discover_locations, discover_skill_roots  # noqa: E402
-from scripts.core.fingerprint import instance_id, tree_hash  # noqa: E402
+from scripts.core.clients import load_rules  # noqa: E402
+from scripts.core.fingerprint import FingerprintError, instance_id, tree_hash  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked, redact_secrets  # noqa: E402
 from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
 
 HOME = os.path.expanduser("~")
 LOCK_FILE = os.path.join(HOME, ".agents/.skill-lock.json")
+CLIENT_LABELS = load_rules.CLIENT_LABELS
+DUP_FINDING_CLIENTS = load_rules.DUP_FINDING_CLIENTS
 
-# 客户端 → 实际读取的位置(加载拓扑,2026-09 按各客户端真实行为核实):
-# - ZCode:~/.zcode/skills → 共享库 → 工作区 .zcode/.agents → 插件缓存;
-# - Codex:2026-08-25 起自动导入外部 Agent 技能库 ~/.agents/skills(external agent home),
-#   叠加自身目录、.system 与插件缓存——共享库内容会整体进入 Codex;
-# - Claude Code:~/.claude/skills(逐项符号链接)+ 插件缓存,不读共享库;
-# - Haha:复用 Claude 目录与共享库(机制固有,镜像同名会双份);
-# - Cindy:只读投影,不单列重复(其内容随共享库/Codex 目录变化)。
-CLIENT_LABELS = {
-    "zcode": "ZCode", "codex": "Codex", "claude-code": "Claude Code", "haha": "Haha",
-    "cindy": "Cindy", "accio": "Accio", "workbuddy": "WorkBuddy", "ego": "Ego",
-}
-# 重复加载逐个报告的客户端;Haha 聚合为一条,Cindy 不报
-DUP_FINDING_CLIENTS = ("zcode", "codex", "claude-code", "accio", "workbuddy", "ego")
+# 加载拓扑规则(F05)已抽出为 scripts/core/clients/load_rules.py:
+# 每条规则带来源标识/核实日期/适用范围;重复口径、客户端标签也从那里引用。
 
 
 def _location_in_client(loc, client):
-    if client == "zcode":
-        return loc["client"] == "zcode" or loc["client"] == "workspace-zcode" or loc["location_id"] == "shared"
-    if client == "codex":
-        return loc["client"] == "codex" or loc["location_id"] == "shared"
-    if client == "claude-code":
-        return loc["client"] == "claude-code"
-    if client == "haha":
-        return "haha" in (loc.get("aliases") or [])
-    return loc["client"] == client
+    return load_rules.location_in_client(loc, client)
 
 # 各位置的加载优先级(数字小先加载,用于遮蔽/重复判定与展示排序)
 _PRIORITY_RULES = (
@@ -81,36 +65,116 @@ def collect_bins(obj, out):
             collect_bins(x, out)
 
 
-def parse_frontmatter(text):
-    """返回 (dict, ok)。只用项目自带确定性解析器提取核心字段(name/description/version、
-    requires.bins),保证结果与 PyYAML 是否安装、能否解析完全无关;YAML 合法性由
-    yaml_validate 单独标注。"""
+def _parse_inline_string_list(val):
+    """YAML 行内字符串列表 [a, b] → ['a','b'];裸标识符是合法 YAML 但不是 Python 字面量。"""
+    inner = val[1:-1].strip()
+    if not inner:
+        return []
+    return [item.strip().strip('"').strip("'") for item in inner.split(",")]
+
+
+def parse_frontmatter_detailed(text):
+    """确定性 frontmatter 子集解析(F05):顶层核心标量、多行 description(|/> )、
+    布尔值、metadata.requires.bins(行内/块列表)。
+
+    返回 (fields, ok, warnings);合法但超出子集的结构给 {"code":"unsupported"}
+    警告(绝不静默当作没有),截断/缺失给具体问题码。PyYAML 合法性仍由
+    yaml_validate 单独标注,不影响核心字段。
+    """
+    warnings = []
     if not text.startswith("---"):
-        return {}, False
+        return {}, False, [{"code": "missing"}]
     m = re.search(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
     if not m:
-        return {}, False
-    fm_text = m.group(1)
-    out, cur_key = {}, None
-    for line in fm_text.splitlines():
-        if re.match(r"^\s", line) and cur_key:
-            out[cur_key] = (out[cur_key] + " " + line.strip()).strip()
+        return {}, False, [{"code": "truncated"}]
+    out = {}
+    cur = None      # 当前顶层标量键
+    block = False   # 正在读多行 description
+    meta = None     # None → "top" → "requires" → "bins"
+    for raw in m.group(1).splitlines():
+        stripped = raw.strip()
+        if not stripped:
             continue
-        mm = re.match(r'^([A-Za-z_-]+):\s*(.*)$', line)
-        if not mm:
+        indented = raw[:1] in (" ", "\t")
+        if not indented:
+            mm = re.match(r"^([A-Za-z_-]+):\s*(.*)$", stripped)
+            if not mm:
+                warnings.append({"code": "unsupported", "path": stripped[:40]})
+                cur, block, meta = None, False, None
+                continue
+            key, val = mm.group(1), mm.group(2).strip()
+            cur, block, meta = key, False, None
+            if key == "metadata":
+                if val == "":
+                    out["metadata"] = {}
+                    meta = "top"
+                else:
+                    warnings.append({"code": "unsupported", "path": "metadata"})
+                cur = None
+                continue
+            if val in (">", ">-", "|", "|-"):
+                out[key] = ""
+                block = True
+            elif val == "true":
+                out[key] = True
+            elif val == "false":
+                out[key] = False
+            elif val.startswith("[") and val.endswith("]"):
+                try:
+                    import ast
+                    out[key] = ast.literal_eval(val)
+                except (ValueError, SyntaxError):
+                    out[key] = val.strip('"').strip("'")
+            elif val == "" and key != "description":
+                warnings.append({"code": "unsupported", "path": key})
+                cur = None
+            else:
+                out[key] = val.strip('"').strip("'")
             continue
-        cur_key, val = mm.group(1), mm.group(2).strip()
-        if val in (">", ">-", "|", "|-"):
-            out[cur_key] = ""
-        elif val.startswith("[") and val.endswith("]"):
-            try:
-                import ast
-                out[cur_key] = ast.literal_eval(val)
-            except (ValueError, SyntaxError):
-                out[cur_key] = val.strip('"').strip("'")
-        else:
-            out[cur_key] = val.strip('"').strip("'")
-    return out, True
+        # 缩进行
+        if block and cur and isinstance(out.get(cur), str):
+            out[cur] = (out[cur] + " " + stripped).strip()
+            continue
+        if meta == "top":
+            mm = re.match(r"^([A-Za-z_-]+):\s*(.*)$", stripped)
+            if mm and mm.group(1) == "requires" and mm.group(2).strip() == "":
+                out["metadata"]["requires"] = {}
+                meta = "requires"
+            else:
+                warnings.append({"code": "unsupported", "path": "metadata." + stripped[:30]})
+            continue
+        if meta == "requires":
+            mm = re.match(r"^([A-Za-z_-]+):\s*(.*)$", stripped)
+            if mm and mm.group(1) == "bins":
+                val = mm.group(2).strip()
+                if val.startswith("[") and val.endswith("]"):
+                    out["metadata"]["requires"]["bins"] = _parse_inline_string_list(val)
+                    meta = None
+                elif val == "":
+                    out["metadata"]["requires"]["bins"] = []
+                    meta = "bins"
+                else:
+                    warnings.append({"code": "unsupported", "path": "metadata.requires.bins"})
+                    meta = None
+            else:
+                warnings.append({"code": "unsupported", "path": "metadata." + stripped[:30]})
+            continue
+        if meta == "bins":
+            if stripped.startswith("- "):
+                out["metadata"]["requires"]["bins"].append(
+                    stripped[2:].strip().strip('"').strip("'"))
+            else:
+                warnings.append({"code": "unsupported", "path": "metadata.requires.bins"})
+                meta = None
+            continue
+        warnings.append({"code": "unsupported", "path": stripped[:40]})
+    return out, True, warnings
+
+
+def parse_frontmatter(text):
+    """兼容入口:返回 (dict, ok);警告与逐条问题用 parse_frontmatter_detailed。"""
+    fields, ok, _ = parse_frontmatter_detailed(text)
+    return fields, ok
 
 
 def yaml_validate(text):
@@ -162,18 +226,35 @@ def _display_path(path, home):
     return str(path)
 
 
-def _plugin_coordinates(root: Path):
-    """插件缓存 skills 根 → (插件名, 版本);非缓存布局返回 ("", "")。"""
+def _plugin_coordinates(root: Path, location_path=None):
+    """插件缓存 skills 根 → (插件名, 版本, marketplace);非缓存布局返回 ("", "", "")。
+
+    marketplace 只在嵌套布局(缓存根/<marketplace>/<plugin>/<version>/skills)下识别,
+    平铺布局返回空串;同名插件跨 marketplace 互不参与"最高版本"比较。
+    """
     try:
-        return root.parent.parent.name, root.parent.name
+        plugin, version = root.parent.parent.name, root.parent.name
+        marketplace = ""
+        if location_path:
+            cache_root = os.path.abspath(str(location_path))
+            grand = root.parent.parent.parent
+            great = grand.parent
+            if os.path.abspath(str(great)) == cache_root:
+                marketplace = grand.name
+        return plugin, version, marketplace
     except (AttributeError, IndexError):
-        return "", ""
+        return "", "", ""
 
 
 def _extra_locations(data_dir: Path):
-    """可选的 data/client-locations.json:用户登记的额外客户端目录(字段白名单)。"""
+    """可选的 data/client-locations.json:用户登记的额外客户端目录(字段白名单)。
+
+    「可选文件未创建」与「已有文件损坏」分开报告:后者进 config_issues。"""
     rows, issues = [], []
-    value, _ = load_json_checked(data_dir / "client-locations.json", {})
+    value, load_issues = load_json_checked(data_dir / "client-locations.json", {})
+    if any(i.get("code") == "corrupt-json" for i in load_issues):
+        issues.append({"code": "bad-client-locations", "detail": "文件存在但已损坏(非合法 JSON)"})
+        return rows, issues
     raw = value.get("locations") if isinstance(value, dict) else None
     if raw is None and not isinstance(value, dict):
         issues.append({"code": "bad-client-locations", "detail": "顶层必须是对象"})
@@ -227,11 +308,13 @@ def _scan_entry(location, root: Path, entry: Path, home):
         "tree_hash": "",
         "is_skill": False,
         "issue_codes": [],
+        "content_status": "complete",
     }
-    plugin, version = ("", "")
+    plugin, version, marketplace = "", "", ""
     if location.kind == "plugin-cache":
-        plugin, version = _plugin_coordinates(root)
+        plugin, version, marketplace = _plugin_coordinates(root, location.path)
         base["plugin_name"], base["plugin_version"] = plugin, version
+        base["plugin_marketplace"] = marketplace
 
     if is_link and not os.path.exists(entry):
         findings.append(_finding("dangling-link", "info", base,
@@ -246,13 +329,37 @@ def _scan_entry(location, root: Path, entry: Path, home):
         return base, findings
 
     base["is_skill"] = True
-    base["tree_hash"] = tree_hash(real)
+    base["content_status"] = "complete"
+    try:
+        base["tree_hash"] = tree_hash(real)
+    except FingerprintError as e:
+        # F05:部分读不到的树不得当作完整树;不给完整指纹,变更入口随之停用
+        base["tree_hash"] = ""
+        base["content_status"] = "unreadable"
+        detail = ";".join("{}({})".format(i.get("path"), i.get("code"))
+                          for i in (e.issues or [])[:3])
+        findings.append(_finding("content-unreadable", "yellow", base,
+                                 "内容不完整或不可读,本次不提供指纹: " + detail))
+    except OSError as e:
+        base["tree_hash"] = ""
+        base["content_status"] = "unreadable"
+        findings.append(_finding("content-unreadable", "yellow", base,
+                                 "内容不可读({})".format(type(e).__name__)))
     try:
         with open(sk, encoding="utf-8", errors="ignore") as f:
             text = f.read(8000)
     except OSError:
         text = ""
-    fm, ok = parse_frontmatter(text)
+    fm, ok, fm_warnings = parse_frontmatter_detailed(text)
+    for w in fm_warnings:
+        if w.get("code") == "unsupported":
+            findings.append(_finding(
+                "frontmatter-unsupported", "info", base,
+                "frontmatter 含确定性解析器不支持的结构({}),相关字段未提取: {}".format(
+                    w.get("path"), w.get("path"))))
+        elif w.get("code") == "truncated":
+            findings.append(_finding("frontmatter-invalid", "red", base,
+                                     "frontmatter 未闭合(缺少结束 ---)"))
     yaml_state = yaml_validate(text)
     base["yaml_ok"] = None if yaml_state is None else bool(yaml_state)
     fm_name = str(fm.get("name") or "").strip()
@@ -308,18 +415,19 @@ def _version_key(v):
 
 def _effective_loaded(instances):
     """插件缓存内同一插件多版本并存时,只有最高版本真正参与加载(按 ZCode/Codex 实测行为);
-    旧版本目录只是缓存残留。返回 (参与加载的实例, 旧版本残留实例)。"""
+    旧版本目录只是缓存残留。marketplace 参与坐标:同名插件跨 marketplace 互不比较。
+    返回 (参与加载的实例, 旧版本残留实例)。"""
     best = {}
     for i in instances:
         if i.get("plugin_name"):
-            key = (i["location_id"], i["plugin_name"])
+            key = (i["location_id"], i.get("plugin_marketplace") or "", i["plugin_name"])
             v = _version_key(i.get("plugin_version"))
             if key not in best or v > best[key]:
                 best[key] = v
     loaded, stale = [], []
     for i in instances:
         if i.get("plugin_name"):
-            key = (i["location_id"], i["plugin_name"])
+            key = (i["location_id"], i.get("plugin_marketplace") or "", i["plugin_name"])
             if _version_key(i.get("plugin_version")) < best[key]:
                 stale.append(i)
                 continue
@@ -478,39 +586,98 @@ def _build_logical_skills(instances):
     return rows
 
 
-def build_inventory(home, data_dir) -> dict:
-    """聚合全部客户端位置 → inventory v2 dict(只读;不写任何文件)。"""
+def _need_vet(instances, data_dir):
+    """需要安检的第三方实例 ID:来源核实为 third-party 且 review_required。"""
+    from scripts.core.provenance import classify_provenance, load_user_config
+    known = load_user_config(data_dir)
+    receipts = {}
+    for inst in instances:
+        if inst.get("kind") in ("builtin", "plugin-cache"):
+            receipts[str(inst.get("instance_id"))] = {"type": inst["kind"]}
+    out = []
+    for inst in instances:
+        if not inst.get("is_skill") or not inst.get("mutable"):
+            continue
+        prov = classify_provenance(inst, receipts, known)
+        if prov.get("review_required"):
+            out.append(str(inst["instance_id"]))
+    return sorted(out)
+
+
+def build_inventory(home, data_dir, workspace=None) -> dict:
+    """聚合全部客户端位置 → inventory v2 dict(只读;不写任何文件)。
+
+    workspace=None 表示全局上下文(不选中任何项目);传入项目路径时,该工作区
+    位置参与加载上下文评估。inventory 附 observation(观察完整性)与每个实例的
+    content_status;观察不完整时相关对象不得用于变更。
+    """
     home, data_dir = Path(home), Path(data_dir)
+    from scripts.core.observations import evaluate_load, load_receipt_evidence
     locations = discover_locations(home, data_dir)
     extra, config_issues = _extra_locations(data_dir)
     locations = sorted(_dedupe(locations + extra), key=lambda x: x.location_id)
 
     instances, findings = [], []
+    obs_issues = []
     for loc in locations:
         for root in discover_skill_roots(loc):
             try:
                 entries = sorted(root.iterdir())
-            except OSError:
+            except OSError as e:
+                # F05:位置读不到必须可见,不能当作"空位置"扫描成功
+                obs_issues.append({"code": "location-unreadable",
+                                   "location_id": loc.location_id,
+                                   "path": _display_path(root, home),
+                                   "reason": type(e).__name__})
                 continue
             for entry in entries:
                 inst, f = _scan_entry(loc, root, entry, home)
                 instances.append(inst)
                 findings.extend(f)
+                if inst.get("content_status") == "unreadable":
+                    obs_issues.append({"code": "instance-unreadable",
+                                       "instance_id": inst["instance_id"],
+                                       "path": inst.get("display_path")})
     findings.extend(_structural_findings(instances, [l.to_dict() for l in locations], data_dir))
     _apply_ignore(findings, data_dir)
     logical = _build_logical_skills(instances)
     client_load = _client_load_stats(instances, [l.to_dict() for l in locations])
 
+    # 已有配置文件损坏(known-sources)也计入观察问题;可选文件未创建不算
+    ks_value, ks_issues = load_json_checked(Path(data_dir) / "known-sources.json", {})
+    for issue in ks_issues:
+        if issue.get("code") != "missing-file":
+            obs_issues.append({"code": "config-corrupt", "source": "known-sources.json",
+                               "reason": issue.get("reason") or issue.get("code")})
+
+    loc_dicts = [l.to_dict() for l in locations]
+    load_contexts = {}
+    for client in load_rules.CLIENT_LABELS:
+        load_contexts[client] = evaluate_load(instances, loc_dicts, client,
+                                              workspace=workspace)
+    observation = {
+        "complete": not obs_issues,
+        "issues": obs_issues,
+        "observed_scope": {
+            "workspace": os.path.abspath(str(workspace)) if workspace else None,
+            "locations": len(locations),
+            "instances": len(instances),
+        },
+        "rule_version": load_rules.RULE_VERSION,
+        "load_contexts": load_contexts,
+    }
+
     inv = {
         "schema_version": SCHEMA_VERSION,
         "scanned_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "home_display": "~",
-        "locations": [loc.to_dict() for loc in locations],
+        "locations": loc_dicts,
         "instances": instances,
         "logical_skills": logical,
         "client_load": client_load,
         "findings": findings,
         "config_issues": config_issues,
+        "observation": observation,
         "total": len(logical),
         "by_source": {},
         "operational_ok": True,
@@ -585,18 +752,23 @@ def main():
     atomic_write_json(cur, inv)
 
     red, yellow, dup, ignored_n = _summary_rows(inv)
+    obs = inv.get("observation") or {}
+    obs_complete = bool(obs.get("complete"))
     if "--json" in argv:
-        # 退出码:0=健康,1=有红色问题,2=运行失败(operational_ok=false)
+        # 退出码:0=健康,1=有红色问题,2=运行失败或观察不完整(数据不得当作可信)
         print(json.dumps({
             "schema_version": inv["schema_version"], "scanned_at": inv["scanned_at"],
             "total": inv["total"], "instances": len(inv["instances"]),
             "locations": len(inv["locations"]), "duplicated": dup,
             "client_load": inv.get("client_load", {}),
             "red": red, "yellow": yellow, "junk_count": len(inv["instances"]) - sum(1 for i in inv["instances"] if i["is_skill"]),
-            "ignored_issues": ignored_n, "need_vet": [],
+            "ignored_issues": ignored_n,
+            "need_vet": _need_vet(inv["instances"], ddir),
+            "observation_complete": obs_complete,
+            "observation_issues": obs.get("issues", []),
             "operational_ok": inv["operational_ok"], "health_status": inv["health_status"],
         }, ensure_ascii=False, indent=1))
-        sys.exit(1 if red else 0)
+        sys.exit(2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0))
 
     print(f"✅ 扫描完成:{inv['total']} 个逻辑 skill / {len(inv['instances'])} 个安装实例 → {cur}")
     print(f"位置:{len(inv['locations'])} 个;" + "、".join(sorted({loc['client'] for loc in inv['locations']})))
@@ -607,8 +779,10 @@ def main():
         if cl.get(c, {}).get("entries"))
     print(f"客户端加载条目:{load_line or '无'}")
     print(f"健康:{len(red)} 红 / {len(yellow)} 黄;重复加载 {len(dup)} 个;忽略 {ignored_n} 条")
+    if not obs_complete:
+        print(f"⚠️ 观察不完整({len(obs.get('issues', []))} 项),相关对象已停用变更入口")
     print(f"详细报告: python3 {os.path.join(BASE, 'scripts', 'report.py')}")
-    sys.exit(1 if red else 0)
+    sys.exit(2 if (not inv["operational_ok"] or not obs_complete) else (1 if red else 0))
 
 
 if __name__ == "__main__":

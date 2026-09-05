@@ -232,11 +232,12 @@ def main():
                   "reason": "inventory 缺失或为空({})".format(issues[0]["code"] if issues else "empty")}],
                   "operational_ok": issues == []}
         atomic_write_json(output_path, result)
+        # F05:输入缺失/损坏是操作失败,退出码 2;不得覆盖已有成功结果为"全都无差异"
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=1))
-            sys.exit(0)
-        print("⏭️ inventory 缺失或为空,先跑 scan.py")
-        sys.exit(0)
+            sys.exit(2)
+        print("⛔ inventory 缺失或为空,先跑 scan.py")
+        sys.exit(2)
 
     try:
         result = check(inv, data_dir, output_path)

@@ -20,6 +20,16 @@ EXCLUDED_SUFFIXES = (".pyc",)
 MANIFEST_VERSION = 2
 
 
+class FingerprintError(OSError):
+    """指纹计算遇到不可读/消失的对象;部分树绝不能冒充完整树。"""
+
+    def __init__(self, issues):
+        self.issues = issues
+        first = issues[0] if issues else {}
+        super().__init__("指纹目标不完整: {}({})".format(
+            first.get("path"), first.get("code")))
+
+
 def _is_excluded(rel_parts):
     for part in rel_parts:
         if part in EXCLUDED_NAMES or part in EXCLUDED_DIR_NAMES:
@@ -29,19 +39,37 @@ def _is_excluded(rel_parts):
     return False
 
 
-def tree_manifest(root) -> List[dict]:
-    """返回按相对路径 UTF-8 字节序排序的条目列表;root 不是目录时抛 NotADirectoryError。"""
+def _walk_error(collect_errors, root):
+    """os.walk onerror:目录不可读时结构化记录;未提供收集容器则抛错,绝不静默跳过。"""
+    def handler(err):
+        path = err.filename
+        issue = {"code": "unreadable", "path": os.path.relpath(path, root)
+                 if path.startswith(root) else path}
+        if collect_errors is None:
+            raise FingerprintError([issue])
+        collect_errors.append(issue)
+    return handler
+
+
+def tree_manifest(root, collect_errors=None) -> List[dict]:
+    """返回按相对路径 UTF-8 字节序排序的条目列表;root 不是目录时抛 NotADirectoryError。
+
+    不可读的目录/文件:collect_errors 给 None 时抛 FingerprintError(备份/变更路径),
+    给列表时收集结构化错误并继续(观察路径,由调用方决定 partial 的用途)。
+    """
     root = os.fspath(root)
     if not os.path.isdir(root):
         raise NotADirectoryError(f"指纹目标不是目录: {os.path.basename(root)}")
     entries = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False,
+                                                onerror=_walk_error(collect_errors, root)):
         rel_dir = os.path.relpath(dirpath, root)
+        # 排除目录就地剪枝:不进入 __pycache__ 等运行时垃圾目录
+        dirnames[:] = sorted(d for d in dirnames
+                             if not _is_excluded((*_rel_parts(rel_dir), d)))
         for name in sorted(dirnames):
             full = os.path.join(dirpath, name)
             rel_parts = (*_rel_parts(rel_dir), name)
-            if _is_excluded(rel_parts):
-                continue
             if os.path.islink(full):
                 entries.append(_entry(rel_parts, "symlink", os.lstat(full), target=os.readlink(full)))
             elif os.path.isdir(full):
@@ -51,13 +79,31 @@ def tree_manifest(root) -> List[dict]:
             rel_parts = (*_rel_parts(rel_dir), name)
             if _is_excluded(rel_parts):
                 continue
+            try:
+                st = os.lstat(full)
+            except OSError as e:
+                issue = {"code": "unreadable", "path": "/".join(rel_parts),
+                         "reason": type(e).__name__}
+                if collect_errors is None:
+                    raise FingerprintError([issue])
+                collect_errors.append(issue)
+                continue
             if os.path.islink(full):
-                entries.append(_entry(rel_parts, "symlink", os.lstat(full), target=os.readlink(full)))
+                entries.append(_entry(rel_parts, "symlink", st, target=os.readlink(full)))
             elif os.path.isfile(full):
-                entries.append(_entry(rel_parts, "file", os.lstat(full), sha256=_file_sha256(full)))
+                try:
+                    digest = _file_sha256(full)
+                except OSError as e:
+                    issue = {"code": "unreadable", "path": "/".join(rel_parts),
+                             "reason": type(e).__name__}
+                    if collect_errors is None:
+                        raise FingerprintError([issue])
+                    collect_errors.append(issue)
+                    continue
+                entries.append(_entry(rel_parts, "file", st, sha256=digest))
             else:
                 # 设备/套接字等非常规条目记录类型但不读内容
-                entries.append(_entry(rel_parts, "special", os.lstat(full)))
+                entries.append(_entry(rel_parts, "special", st))
     entries.sort(key=lambda e: e["path"].encode("utf-8"))
     return entries
 
