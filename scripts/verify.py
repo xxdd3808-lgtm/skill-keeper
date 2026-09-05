@@ -9,6 +9,7 @@
 - 不包装成永远成功的 shell 脚本:一切以 unittest 的 TestResult 为准。
 """
 import argparse
+import faulthandler
 import json
 import re
 import subprocess
@@ -20,6 +21,10 @@ from unittest import TextTestRunner
 BASE = Path(__file__).resolve().parents[1]
 BASELINE_MIN_TESTS = 233      # 2026-09-05 v3.1.1 冻结基线;只允许随真实用例增长
 BASELINE_IDS_PATH = BASE / "tests" / "fixtures" / "private-v311" / "v311-test-ids.json"
+
+# 挂死看门狗:10 分钟后把全部线程堆栈打到 stderr 并以非零码退出 ——
+# CI 上某个平台卡住时,日志里直接给出卡点,而不是无限等待。
+faulthandler.dump_traceback_later(600, exit=True)
 
 # 扫描时跳过的目录(运行时产物/依赖,不是源代码)
 SCAN_SKIP_DIRS = {".git", "__pycache__", "node_modules", "data", "backups",

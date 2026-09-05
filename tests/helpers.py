@@ -154,7 +154,7 @@ def copy_private_v311_fixture(testcase):
             final_target = os.path.realpath(str(link.parent) + os.sep
                                             + target.replace("/", os.sep))
             subprocess.run(["cmd", "/c", "mklink", "/J", str(link), final_target],
-                           check=True, capture_output=True)
+                           check=True, capture_output=True, timeout=30)
         else:
             final_target = target
             os.symlink(final_target, str(link), target_is_directory=True)
