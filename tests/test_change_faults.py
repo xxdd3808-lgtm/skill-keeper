@@ -75,7 +75,9 @@ class RemoveFaultTests(unittest.TestCase):
                 raise OSError("fixture second move fails")
             return real_rename(src, dst)
 
-        with patch("os.rename", flaky_rename):
+        with patch("os.rename", flaky_rename), \
+                patch("scripts.core.preflight.preflight_target_directory",
+                      lambda *a, **k: None):  # 引擎故障注入;预检由 Task 4 专项测试覆盖
             with self.assertRaises(ChangeError):
                 apply_plan(plan.plan_id, plan.digest, True, env.context)
         self.assertTrue(env.skill_path.is_dir(), "第一个已移走目标必须回滚")
@@ -173,7 +175,9 @@ class UpdateFaultTests(unittest.TestCase):
                 raise OSError("fixture second rename fails")
             return real_rename(src, dst)
 
-        with patch("os.rename", flaky_rename):
+        with patch("os.rename", flaky_rename), \
+                patch("scripts.core.preflight.preflight_target_directory",
+                      lambda *a, **k: None):  # 引擎故障注入;预检由 Task 4 专项测试覆盖
             with self.assertRaises(ChangeError):
                 apply_plan(plan.plan_id, plan.digest, True, env.context)
         self.assertEqual(tree_hash(env.skill_path), env.local_hash, "旧版本必须回到原位")

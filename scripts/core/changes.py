@@ -667,6 +667,24 @@ def recover_transaction(plan_id, context) -> dict:
     return state
 
 
+def _preflight_parents(target_paths, plan_id):
+    """Task 4:对每个目标实体的同目录做真实预检(同目录只检一次)。
+
+    放在锁后、备份与任何移动之前;失败转换为 ChangeError,目标保持原状。
+    """
+    from .preflight import PreflightError, preflight_target_directory
+    seen = set()
+    for path in target_paths or []:
+        parent = os.path.dirname(os.path.abspath(os.fspath(path)))
+        if parent in seen:
+            continue
+        seen.add(parent)
+        try:
+            preflight_target_directory(parent, plan_id)
+        except PreflightError as e:
+            raise ChangeError("目标目录预检失败,已中止(未改动任何内容): " + str(e)) from e
+
+
 def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
     """执行不可变计划:锁 → 事务状态 → 备份 → 受控移动 → 验证(失败恢复原状)→ 提交 → 审计。
 
@@ -735,6 +753,7 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
             # 恢复的目标通常不存在,不做存在性前置校验;备份绑定本身就是 precondition
             _policy_check_restore_targets(row, inventory, policy)
             state = _prepare_restore_state(row, inventory, context)
+            _preflight_parents([t["path"] for t in state["targets"]], plan_id)
             audit_event["backup_id"] = state["backup_id"]
             audit_event["expected_hash"] = json.dumps(
                 {t["instance_id"]: "" for t in state["targets"]},
@@ -755,6 +774,9 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         _check_preconditions(row, inventory, policy)
         by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
         targets = [by_id[i] for i in row.get("target_ids", [])]
+        # Task 4:真实目标预检 —— 在每个目标同目录实际验证创建/rename/fsync,
+        # 失败在备份与任何移动发生之前中止(此时目标从未被动过)。
+        _preflight_parents([inst["path"] for inst in targets], plan_id)
         candidate_hash = None
         if action == "update":
             pre = dict(row.get("preconditions", []))

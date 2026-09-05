@@ -69,6 +69,8 @@ def spy(src, dst):
 
 
 os.rename = spy
+import scripts.core.preflight as _pf
+_pf.preflight_target_directory = lambda *a, **k: None  # 引擎中断窗口;预检另有专项
 changes.apply_plan(plan.plan_id, plan.digest, True, env.context)
 os._exit(0)  # 没走到注入点就算失败
 '''
@@ -119,6 +121,8 @@ def spy(src, dst):
 
 
 os.rename = spy
+import scripts.core.preflight as _pf
+_pf.preflight_target_directory = lambda *a, **k: None  # 引擎中断窗口;预检另有专项
 changes.apply_plan(plan.plan_id, plan.digest, True, env.context)
 os._exit(0)
 '''

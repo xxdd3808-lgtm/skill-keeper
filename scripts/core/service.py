@@ -40,6 +40,10 @@ class AppService:
         known = load_user_config(self.paths.data_dir)
         ctx = self._context()
         with self._process_lock:
+            if action in ("remove", "update"):
+                # Task 4:service 层拒绝模型位置声明来源(policy 层还有一道;
+                # 只有当前 inventory 里本机扫描、mutable 且策略允许的实例才可能成计划)
+                self._refuse_model_declared(payload, ctx)
             if action == "remove":
                 ids = payload.get("instance_ids") or payload.get("instance_id") or []
                 if isinstance(ids, str):
@@ -59,6 +63,23 @@ class AppService:
         row = plan.to_dict()
         row["ok"] = True
         return row
+
+    def _refuse_model_declared(self, payload, ctx):
+        """remove/update 目标里只要有一个来自模型临时位置声明,整个动作拒绝。"""
+        ids = payload.get("instance_ids") or payload.get("instance_id") or []
+        if isinstance(ids, str):
+            ids = [ids]
+        wanted = [str(i) for i in ids if str(i)]
+        if not wanted:
+            return
+        inventory = ctx.load_inventory()
+        by_id = {str(i.get("instance_id")): i for i in inventory.get("instances", [])}
+        for iid in wanted:
+            inst = by_id.get(iid)
+            if inst is not None and "model-declaration" in (inst.get("evidence") or []):
+                raise ChangeError(
+                    "实例 {} 来自模型临时位置声明(客户端自报),只读盘点;"
+                    "要长期管理请把根目录登记进 data/client-locations.json".format(iid))
 
     def _plan_update(self, payload, known, ctx):
         iid = str(payload.get("instance_id") or "")

@@ -86,6 +86,12 @@ def check_action(action, target, location, policy) -> dict:
                        + reason, policy_hash)
     if not isinstance(target, dict) or not target.get("instance_id"):
         return _denied("missing-target", "目标缺少 instance_id,拒绝", policy_hash)
+    if "model-declaration" in (target.get("evidence") or []):
+        # Task 4:模型位置声明来源只能在扫描/报告里出现;mutable 即使被翻成 true
+        # 也照旧拒绝 —— 只有用户本地 client-locations.json 登记的位置才可能变更。
+        return _denied("model-declared-location",
+                       "实例来自模型临时位置声明(客户端自报),只读盘点,拒绝{}: {}".format(
+                           action, target.get("instance_id")), policy_hash)
     if action == "restore":
         if location is not None and not location.get("mutable"):
             return _denied("location-immutable",
