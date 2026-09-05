@@ -45,6 +45,6 @@ python3 scripts/verify.py
 
 ## 当前状态与下一步
 
-v4 本地独立复核已修复验收器假成功、共享根声明关系丢失、模型根越界、Windows HOME 隔离、锁异常清理和输入回显边界。现役架构见 `docs/architecture.md`，版本演化见 `docs/changes.md`，执行证据见 `PROGRESS.md`，阻塞见 `BLOCKED.md`。
+v4 已于 2026-09-05 发布:case1 经用户独立复核修复(验收器假成功、共享根声明关系丢失、模型根越界、Windows HOME 隔离、锁异常清理、输入回显边界)后 push,CI 修复 7 轮(归档 fsync 句柄、仓库布局冻结分支、Python 3.8 dict 合并、Windows UTF-8、fixture 链接绝对目标重建、3.12 mkdtemp 对 deny 的重试挂死——verify 增 faulthandler 看门狗、只读计划 replace 重试),四平台全绿后合并 main、tag v4.0.0 并发布 GitHub Release(166d1a9)。现役架构见 `docs/architecture.md`,版本演化见 `docs/changes.md`,执行证据见 `PROGRESS.md`,阻塞见 `BLOCKED.md`。
 
-本地 macOS Python 3.9/3.12 门槛通过后，下一步是 push `case1` 触发四平台 CI；只有 CI 实际全绿后才能合并、tag 或发布。push/tag/release 均需用户授权。
+后续发布仍需用户逐次授权 push/tag/release。
