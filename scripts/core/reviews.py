@@ -82,6 +82,9 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     reviews = normalize_reviews(existing_reviews)
     legacy = legacy_vetting if isinstance(legacy_vetting, dict) else {}
+    from .overlap import build_overlap_index
+    overlap_index = build_overlap_index(inventory)
+    dup_rows_all = exact_duplicate_groups(inventory)
     items = []
     for logical in inventory.get("logical_skills", []):
         lg_id = logical.get("logical_id")
@@ -125,10 +128,10 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
                 "vetted_at": legacy_rec.get("vetted_at"),
                 "note": "v1 安检结论已按完整树指纹规则降级,复检后才算已安检",
             } if legacy_rec else None,
-            "similar_candidates": _similar_for(inventory, lg_id),
-            "alternative_candidates": alternative_candidates(inventory, lg_id),
-            "exact_duplicates": [g for g in exact_duplicate_groups(inventory)
-                                 if iid in g["instance_ids"]],
+            "similar_candidates": _similar_for(inventory, lg_id, index=overlap_index),
+            "alternative_candidates": alternative_candidates(inventory, lg_id,
+                                                             index=overlap_index),
+            "exact_duplicates": [g for g in dup_rows_all if iid in g["instance_ids"]],
             "previous_review_status": review_status,
             "previous_review": _public_review(prev),
         })
@@ -166,11 +169,11 @@ def _repo_snapshot(reputation, source):
     return snap if isinstance(snap, dict) else None
 
 
-def _similar_for(inventory, logical_id, min_similarity=0.32, cap=8):
+def _similar_for(inventory, logical_id, min_similarity=0.32, cap=8, index=None):
     """可解释的相似候选(分项打分);与替代候选同一相似度门槛,宁缺毋滥。"""
     from .overlap import candidate_pairs
     rows = []
-    for p in candidate_pairs(inventory, min_similarity=min_similarity):
+    for p in candidate_pairs(inventory, min_similarity=min_similarity, index=index):
         if p["a"] == logical_id:
             rows.append({"logical_id": p["b"], "name": p["b_name"], "score": p["score"],
                          "breakdown": p["breakdown"]})

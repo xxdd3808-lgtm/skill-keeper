@@ -1,0 +1,449 @@
+{
+ "alternatives": {
+  "alpha-helper": [
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "keyword-overlap:alpha(df2)",
+     "similarity:0.533"
+    ],
+    "score": 0.533
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "alpha-tool": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "keyword-overlap:alpha(df2)",
+     "similarity:0.533"
+    ],
+    "score": 0.533
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.499"
+    ],
+    "score": 0.499
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.375"
+    ],
+    "score": 0.375
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "beta-memo": [
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "keyword-overlap:beta(df2)",
+     "similarity:0.53"
+    ],
+    "score": 0.53
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.366"
+    ],
+    "score": 0.366
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "beta-notes": [
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "keyword-overlap:beta(df2)",
+     "similarity:0.53"
+    ],
+    "score": 0.53
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.375"
+    ],
+    "score": 0.375
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "clip-tool": [
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.499"
+    ],
+    "score": 0.499
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "delta-scan": [
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.366"
+    ],
+    "score": 0.366
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "gamma-fmt": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "protected-core": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ]
+ },
+ "duplicate_groups": 0,
+ "note": "frozen pre-optimization candidate results (task 8 F09); names+scores only, no machine paths",
+ "pairs": {
+  "alpha-helper|alpha-tool": 0.533,
+  "alpha-helper|beta-memo": 0.358,
+  "alpha-helper|beta-notes": 0.358,
+  "alpha-helper|clip-tool": 0.35,
+  "alpha-helper|delta-scan": 0.358,
+  "alpha-helper|gamma-fmt": 0.357,
+  "alpha-helper|protected-core": 0.35,
+  "alpha-tool|beta-memo": 0.35,
+  "alpha-tool|beta-notes": 0.375,
+  "alpha-tool|clip-tool": 0.499,
+  "alpha-tool|delta-scan": 0.35,
+  "alpha-tool|gamma-fmt": 0.357,
+  "alpha-tool|protected-core": 0.35,
+  "beta-memo|beta-notes": 0.53,
+  "beta-memo|clip-tool": 0.357,
+  "beta-memo|delta-scan": 0.366,
+  "beta-memo|gamma-fmt": 0.35,
+  "beta-memo|protected-core": 0.35,
+  "beta-notes|clip-tool": 0.358,
+  "beta-notes|delta-scan": 0.358,
+  "beta-notes|gamma-fmt": 0.357,
+  "beta-notes|protected-core": 0.35,
+  "clip-tool|delta-scan": 0.35,
+  "clip-tool|gamma-fmt": 0.35,
+  "clip-tool|protected-core": 0.35,
+  "delta-scan|gamma-fmt": 0.35,
+  "delta-scan|protected-core": 0.35,
+  "gamma-fmt|protected-core": 0.35
+ },
+ "schema": 1
+}

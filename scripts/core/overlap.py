@@ -173,31 +173,72 @@ def pair_score(breakdown):
     return round(sum(WEIGHTS[k] * v for k, v in breakdown.items()), 3)
 
 
-def candidate_pairs(inventory, min_similarity=0.32):
-    """第三方↔第三方(含一方受保护)的相似候选对;只生成候选,不下结论。"""
+def build_overlap_index(inventory):
+    """一次读取全库正文、一次评分每对(F09):返回语料索引供所有消费者复用。
+
+    index: {tokens_by_logical, df, status_map, inst_by_id,
+            pairs_by_ids: {排序对键: {score, breakdown, shared, rare, a, b}}}
+    打分调用次数 = N(N-1)/2;read_head 次数 = 实例数(O(N))。
+    """
     logicals = inventory.get("logical_skills", [])
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     status = logical_status_map(inventory)
-    toks = {}
+    tokens_by_logical = {}
     for lg in logicals:
-        insts = {"instance_ids": lg.get("instance_ids", [])}
-        toks[lg.get("logical_id")] = _content_tokens(
-            {**lg, "instance_ids": insts["instance_ids"]}, inst_by_id)
-    rows = []
-    for i in range(len(logicals)):
-        for j in range(i + 1, len(logicals)):
+        tokens_by_logical[lg.get("logical_id")] = _content_tokens(lg, inst_by_id)
+    total = len(logicals)
+    df = {}
+    for name_t, desc_t, _body_t in tokens_by_logical.values():
+        for tok in set().union(name_t, desc_t):
+            df[tok] = df.get(tok, 0) + 1
+    max_df = max(2, int(total * 0.15)) if total else 2
+    pairs_by_ids = {}
+    for i in range(total):
+        for j in range(i + 1, total):
             a, b = logicals[i], logicals[j]
-            breakdown = pair_breakdown(a, b, toks[a.get("logical_id")], toks[b.get("logical_id")])
+            a_id, b_id = a.get("logical_id"), b.get("logical_id")
+            breakdown = pair_breakdown(a, b, tokens_by_logical[a_id],
+                                       tokens_by_logical[b_id])
             score = pair_score(breakdown)
-            if score < min_similarity:
-                continue
-            rows.append({
-                "a": a.get("logical_id"), "a_name": a.get("name"),
-                "b": b.get("logical_id"), "b_name": b.get("name"),
-                "a_protected": status.get(a.get("logical_id"), {}).get("protected", False),
-                "b_protected": status.get(b.get("logical_id"), {}).get("protected", False),
-                "score": score, "breakdown": breakdown,
-            })
+            ta = tokens_by_logical[a_id][0] | tokens_by_logical[a_id][1]
+            tb = tokens_by_logical[b_id][0] | tokens_by_logical[b_id][1]
+            shared = [t for t in significant_overlap(ta, tb) if df.get(t, 0) <= max_df]
+            rare = [t for t in shared if df.get(t, 0) <= 2]
+            key = (a_id, b_id) if str(a_id) <= str(b_id) else (b_id, a_id)
+            pairs_by_ids[key] = {"score": score, "breakdown": breakdown,
+                                 "shared": shared, "rare": rare, "a": a_id, "b": b_id}
+    return {"tokens_by_logical": tokens_by_logical, "df": df, "status_map": status,
+            "inst_by_id": inst_by_id, "pairs_by_ids": pairs_by_ids,
+            "logicals": logicals}
+
+
+def _index_or_build(inventory, index):
+    if index is None:
+        return build_overlap_index(inventory)
+    return index
+
+
+def candidate_pairs(inventory, min_similarity=0.32, index=None):
+    """第三方↔第三方(含一方受保护)的相似候选对;只生成候选,不下结论。
+
+    index 提供 build_overlap_index 的结果时零重建:过滤即得,不再读正文/重评分。"""
+    index = _index_or_build(inventory, index)
+    logicals = index["logicals"]
+    status = index["status_map"]
+    by_id = {lg.get("logical_id"): lg for lg in logicals}
+    rows = []
+    for key, rec in index["pairs_by_ids"].items():
+        if rec["score"] < min_similarity:
+            continue
+        a_id, b_id = rec["a"], rec["b"]
+        a, b = by_id[a_id], by_id[b_id]
+        rows.append({
+            "a": a_id, "a_name": a.get("name"),
+            "b": b_id, "b_name": b.get("name"),
+            "a_protected": status.get(a_id, {}).get("protected", False),
+            "b_protected": status.get(b_id, {}).get("protected", False),
+            "score": rec["score"], "breakdown": rec["breakdown"],
+        })
     rows.sort(key=lambda x: -x["score"])
     return rows
 
@@ -222,7 +263,7 @@ def _same_identity(a_lg, b_lg, rep_a, rep_b, src_a, src_b):
 
 
 def alternative_candidates(inventory, target_logical_id, min_similarity=0.32,
-                           max_candidates=8):
+                           max_candidates=8, index=None):
     """目标可能存在的本地替代候选(含受保护类)——只圈定审查范围,不下替代结论。
 
     替代品语义(宁缺毋滥):候选必须来自当前 inventory 已安装的本地逻辑 skill;
@@ -236,26 +277,14 @@ def alternative_candidates(inventory, target_logical_id, min_similarity=0.32,
     logicals = inventory.get("logical_skills", [])
     if not logicals:
         return []
-    inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
-    status = logical_status_map(inventory)
-    tok_map = {}
-    for lg in logicals:
-        tok_map[lg.get("logical_id")] = _content_tokens(
-            {**lg, "instance_ids": lg.get("instance_ids", [])}, inst_by_id)
-    total = len(logicals)
-    # 文档频率只统计 name/description 词元:正文词元天然嘈杂,只参与相似度打分
-    df = {}
-    for name_t, desc_t, _body_t in tok_map.values():
-        for tok in set().union(name_t, desc_t):
-            df[tok] = df.get(tok, 0) + 1
-    max_df = max(2, int(total * 0.15))
-    rare_df = 2
-
+    index = _index_or_build(inventory, index)
+    status = index["status_map"]
+    tokens_by_logical = index["tokens_by_logical"]
+    df = index["df"]
     target = next((lg for lg in logicals if lg.get("logical_id") == target_logical_id), None)
     if target is None:
         return []
     t_status = status.get(target_logical_id) or {}
-    t_all = tok_map[target.get("logical_id")][0] | tok_map[target.get("logical_id")][1]
     out = []
     for lg in logicals:
         lg_id = lg.get("logical_id")
@@ -267,11 +296,13 @@ def alternative_candidates(inventory, target_logical_id, min_similarity=0.32,
         if _same_identity(target, lg, t_rep, rep,
                           t_status.get("source") or {}, st.get("source") or {}):
             continue
-        breakdown = pair_breakdown(target, lg, tok_map[target.get("logical_id")], tok_map[lg_id])
-        score = pair_score(breakdown)
-        l_all = tok_map[lg_id][0] | tok_map[lg_id][1]
-        shared = [t for t in significant_overlap(t_all, l_all) if df.get(t, 0) <= max_df]
-        rare = [t for t in shared if df.get(t, 0) <= rare_df]
+        key = (target_logical_id, lg_id) if str(target_logical_id) <= str(lg_id) \
+            else (lg_id, target_logical_id)
+        rec = index["pairs_by_ids"].get(key)
+        if rec is None:
+            continue
+        score = rec["score"]
+        shared, rare = rec["shared"], rec["rare"]
         keyword_hit = len(shared) >= 2 and bool(rare)
         if score < min_similarity and not keyword_hit:
             continue

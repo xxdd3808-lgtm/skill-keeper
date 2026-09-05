@@ -75,6 +75,41 @@ def publish_snapshot(paths, timeout=300) -> dict:
     return {"ok": True, "status": "fresh", "snapshot_id": _snapshot_id(inv_path)}
 
 
+def plan_runtime_migration(old_paths, new_paths) -> dict:
+    """迁移预演(F10):只列文件清单、哈希与冲突,绝不复制/删除/移动真实数据。
+
+    用户真实迁移仍须走新计划与确认;预演只是给决策材料。
+    """
+    import hashlib
+    old_paths, new_paths = Path(old_paths), Path(new_paths)
+    files = []
+    migratable = old_paths.is_dir()
+    if migratable:
+        for path in sorted(old_paths.rglob("*")):
+            if not path.is_file() or path.name.startswith(".tmp-"):
+                continue
+            rel = str(path.relative_to(old_paths))
+            h = hashlib.sha256()
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            target = new_paths / rel
+            conflict = False
+            if target.is_file():
+                th = hashlib.sha256()
+                with open(target, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        th.update(chunk)
+                conflict = th.hexdigest() != h.hexdigest()
+            if conflict:
+                migratable = False
+            files.append({"relative": rel, "bytes": path.stat().st_size,
+                          "sha256": h.hexdigest(), "conflict": conflict})
+    return {"schema_version": 1, "old": str(old_paths), "new": str(new_paths),
+            "migratable": migratable, "files": files,
+            "note": "预演输出;真实迁移需另行计划与确认,本函数不移动任何文件"}
+
+
 def _snapshot_id(inv_path):
     try:
         st = inv_path.stat()
