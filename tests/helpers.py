@@ -150,11 +150,13 @@ def copy_private_v311_fixture(testcase):
             except OSError:
                 pass
         if os.name == "nt":
-            import subprocess
+            # 相对+正斜杠目标在 Windows 解析不可靠(round 2 实证悬空);
+            # 绝对目标符号链接创建正常(round 2/3 实证 os.symlink 不报错,
+            # runner 开发者模式放行)。junction 不可用:CPython 3.12 的
+            # islink 对 MOUNT_POINT 返回 False,会破坏 is_symlink 合同。
             final_target = os.path.realpath(str(link.parent) + os.sep
                                             + target.replace("/", os.sep))
-            subprocess.run(["cmd", "/c", "mklink", "/J", str(link), final_target],
-                           check=True, capture_output=True, timeout=30)
+            os.symlink(final_target, str(link), target_is_directory=True)
         else:
             final_target = target
             os.symlink(final_target, str(link), target_is_directory=True)
