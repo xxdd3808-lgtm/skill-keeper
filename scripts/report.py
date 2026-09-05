@@ -23,6 +23,9 @@ from scripts.core.provenance import (classify_provenance, client_managed_advice,
 from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 from scripts.scan import CLIENT_LABELS  # noqa: E402
 
+# 实例/位置展示用的客户端标签;"shared" 不是客户端,是共享库这一位置本身
+CLIENT_LABELS_EXT = dict(CLIENT_LABELS, shared="共享库")
+
 SERVE_HINT = "python3 ~/skill-keeper/scripts/report.py --serve"
 VERDICT_GROUPS = ("建议保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
 # 记账 verdict("保留")→ 报告分组标签("建议保留");其余两边的文字相同
@@ -572,6 +575,45 @@ def _claude_app_present():
     return False
 
 
+def _shared_library_rows(view):
+    """共享库视图行:哪些逻辑 Skill 放在 ~/.agents/skills(用户 2026-09-05 反馈:
+    该事实只藏在明细表 client 列里,159 行中等于看不见)。
+
+    每行带价值结论与其他占用客户端,让用户能就地判断去留;只做展示,
+    变更仍走 计划→确认→备份→执行 流程。
+    """
+    insts = view["inv"].get("instances", [])
+    verdict_of = {}
+    for g in VERDICT_GROUPS:
+        for row in view["verdict_rows"][g]:
+            verdict_of[row["inst"].get("logical_name")] = (g, row["stale"])
+    for row in view["unreviewed"]:
+        verdict_of.setdefault(row["inst"].get("logical_name"), (None, False))
+    loc_client = {l.get("location_id"): l.get("client")
+                  for l in view["inv"].get("locations", [])}
+    lg_insts = {}
+    for i in insts:
+        lg_insts.setdefault(i.get("logical_name"), []).append(i)
+    rows = []
+    for inst in insts:
+        if inst.get("location_id") != "shared":
+            continue
+        nm = inst.get("logical_name")
+        cls, _why = classify_instance(inst, set(), view.get("known"))
+        g, stale = verdict_of.get(nm, (None, False))
+        others = sorted({CLIENT_LABELS_EXT.get(loc_client.get(x.get("location_id")),
+                                                x.get("client") or "") or "?"
+                         for x in lg_insts.get(nm, [])
+                         if x.get("location_id") != "shared"})
+        rows.append({"name": nm, "iid": inst.get("instance_id"),
+                     "protected": cls == "protected",
+                     "verdict": g, "stale": stale,
+                     "function": inst.get("function") or "",
+                     "directory_name": inst.get("directory_name"),
+                     "others": "、".join(others) or "仅共享库"})
+    return rows
+
+
 def render_html(inv, last=None, ctx=None):
     view = build_view(inv, last, ctx)
     c = view["counts"]
@@ -579,6 +621,8 @@ def render_html(inv, last=None, ctx=None):
         _jump_metric("逻辑 Skill", c["total"], "instance-details"),
         _jump_metric("🛡️ 受保护", c["protected"], "protected-skills", "metric-green"),
         _jump_metric("第三方", c["third_party"], "third-party-review"),
+        _jump_metric("📂 共享库", len(_shared_library_rows(view)),
+                     "shared-library", "metric-blue"),
     ]
     attention_metrics = [
         _jump_metric("🔴 红灯", c["red"], "health-red", "metric-red"),
@@ -670,7 +714,8 @@ def render_html(inv, last=None, ctx=None):
                 esc(inst.get("logical_name")),
                 ' <span class="badge">受保护</span>' if cls == "protected" else "",
                 esc(grp),
-                esc(inst.get("function") or ""), esc(inst.get("client") or ""),
+                esc(inst.get("function") or ""),
+                esc(CLIENT_LABELS_EXT.get(inst.get("client"), inst.get("client")) or ""),
                 esc(inst.get("kind") or ""), findings_badges(view, inst), action))
     table_sec = (
         '<details id="instance-details"><summary><b>📋 安装实例明细</b>'
@@ -678,6 +723,35 @@ def render_html(inv, last=None, ctx=None):
         '<table><tr><th>Skill</th><th>分组</th><th>功能</th><th>客户端</th><th>位置类型</th><th>健康</th><th>操作</th></tr>'
         '{}</table>{}</details>').format(len(view["inv"].get("instances", [])), c["total"],
                                          "".join(rows), _back_top())
+
+    # 共享库视图:哪些 Skill 放在 ~/.agents/skills(ZCode/Codex 都会整体加载)
+    shared_rows = _shared_library_rows(view)
+    shared_cells = []
+    for r in shared_rows:
+        if r["protected"]:
+            verdict_cell = '<span class="mut">受保护</span>'
+            action = '<span class="mut">受保护</span>'
+        else:
+            if r["verdict"]:
+                verdict_cell = esc(VERDICT_EMOJI[r["verdict"]])
+                if r["stale"]:
+                    verdict_cell += ' <span class="badge badge-yellow">已过期</span>'
+            else:
+                verdict_cell = '<span class="badge badge-yellow">🔍 待审查</span>'
+            action = btn("🗑️ 删", "remove", {"id": r["iid"], "name": r["name"],
+                                             "cmd": _safe_plan_cmd(r["iid"])}, "btn-danger")
+        shared_cells.append(
+            '<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(
+                esc(r["name"]), esc(group_of.get(str(r["directory_name"]), "未分组")),
+                verdict_cell, esc(r["function"]), esc(r["others"]), action))
+    shared_sec = (
+        '<details id="shared-library"><summary><b>📂 共享库(~/.agents/skills)</b>'
+        '<span class="cnt">{n} 个 · ZCode 与 Codex 都会整体加载(Codex 2026-08-25 起);'
+        '放一个 = 多个客户端同时占</span></summary>'
+        '<table><tr><th>Skill</th><th>分组</th><th>价值结论</th><th>功能</th><th>还占用哪些客户端</th><th>操作</th></tr>'
+        '{rows}</table>{back}</details>').format(
+        n=len(shared_rows), rows="".join(shared_cells) or '<tr><td colspan="6" class="mut">共享库当前为空</td></tr>',
+        back=_back_top())
 
     extras = []
     if view["backups"]:
@@ -744,6 +818,7 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 __DASHBOARD__
 __ATTENTION__
 __LOAD__
+__SHARED__
 __VALUE__
 __PROTECTED__
 __TABLE__
@@ -757,6 +832,7 @@ __TABLE__
             .replace("__DASHBOARD__", dashboard)
             .replace("__ATTENTION__", _attention_section(view))
             .replace("__LOAD__", load_sec)
+            .replace("__SHARED__", shared_sec)
             .replace("__PROTECTED__", protected_sec)
             .replace("__VALUE__", value_sec)
             .replace("__TABLE__", table_sec)
@@ -781,6 +857,19 @@ def render_md(inv, last=None, ctx=None):
     for _cl, _e, _s, _d, _n in _client_load_rows(inv):
         L.append("| {} | {} | {} | {} | {} |".format(
             CLIENT_LABELS.get(_cl, _cl), _e, _s, _d, _n))
+    shared_rows = _shared_library_rows(view)
+    L += ["", "## 共享库({} 个)".format(len(shared_rows)), "",
+          "> 共享库 = `~/.agents/skills`:ZCode 与 Codex 都会整体加载(Codex 2026-08-25 起);"
+          "Haha/Claude Code 走 `~/.claude/skills` 镜像。放一个 = 多个客户端同时占。", "",
+          "| Skill | 价值结论 | 功能 | 还占用哪些客户端 |", "|---|---|---|---|"]
+    for r in shared_rows:
+        if r["protected"]:
+            verdict = "受保护"
+        elif r["verdict"]:
+            verdict = VERDICT_EMOJI[r["verdict"]] + ("(已过期)" if r["stale"] else "")
+        else:
+            verdict = "🔍 待审查"
+        L.append("| {} | {} | {} | {} |".format(r["name"], verdict, r["function"], r["others"]))
     L += ["", "## 一、需要关注", ""]
     if view["attention_findings"]:
         for finding in view["attention_findings"]:
@@ -833,7 +922,8 @@ def render_md(inv, last=None, ctx=None):
         L.append("| {}{} | {} | {} | {} |".format(
             inst.get("logical_name"),
             "(受保护)" if cls == "protected" else "",
-            inst.get("client"), inst.get("kind"), health))
+            CLIENT_LABELS_EXT.get(inst.get("client"), inst.get("client")),
+            inst.get("kind"), health))
     if view["backups"]:
         L += ["", "## 四、备份(恢复走两阶段计划,冲突不覆盖)"]
         for b in view["backups"]:

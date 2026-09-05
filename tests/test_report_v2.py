@@ -88,6 +88,27 @@ class ReportV2Tests(unittest.TestCase):
         self.assertIn('<details id="instance-details">', html)
         self.assertIn("function openJump(hash)", html)
 
+    def test_shared_library_section_lists_skills_verdicts_and_reach(self):
+        """用户反馈(2026-09-05):哪些 Skill 放在共享库,事实埋在明细表 client 列
+        里,159 行中等于看不见。报告必须有专属区块(顶部指标可直达,HTML/Markdown
+        双通道),且区块内自带价值结论与其他占用客户端,方便就地判断去留。"""
+        from scripts.report import render_html, render_md
+        base = v2_report_fixture()
+        reviews = [dict(r, logical_id="lg-" + str(r["name"]))
+                   for r in base["value_reviews"]]
+        html = render_html(base, None, {"value_reviews": reviews})
+        self.assertIn('href="#shared-library"', html, "顶部资产概况缺少共享库指标")
+        start = html.index('id="shared-library"')
+        sec = html[start:html.find(' id="', start + 10)]
+        self.assertIn("Codex", sec, "必须说明共享库会被 Codex 整体导入")
+        for nm in ("word", "mystery", "notes-pro", "tabfmt", "clipmgr"):
+            self.assertIn(nm, sec, "共享库区块缺技能 " + nm)
+        self.assertIn("建议删除", sec, "区块内要能看到该技能的价值结论")
+        md, _ = render_md(base, None, {"value_reviews": reviews})
+        msec = md[md.index("## 共享库"):md.index("\n## ", md.index("## 共享库") + 5)]
+        self.assertIn("word", msec)
+        self.assertIn("建议删除", msec)
+
     def test_findings_are_attached_to_their_instance_not_same_name_siblings(self):
         """同名不同实例的告警不能互相复制,否则顶部黄灯与明细会对不上。"""
         from scripts.report import render_html
