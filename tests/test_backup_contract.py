@@ -403,23 +403,31 @@ class RestoreCleanupContractTests(unittest.TestCase):
         saved = create_backup(env.plan, env.inventory, env.backup_dir)
         env.remove_targets()
         if os.name == "nt":
-            # deny 全部权限 (F):mkdtemp(创建子目录)需要 AD,只 deny (WD) 挡不住;
-            # 全拒绝后 mkdtemp 必定失败,注入确定生效
-            import subprocess
-            subprocess.run(["icacls", str(env.claude_root), "/deny", "*S-1-1-0:(F)"],
-                           check=True, capture_output=True)
-            self.addCleanup(lambda: subprocess.run(
-                ["icacls", str(env.claude_root), "/reset"], capture_output=True))
+            # Windows 注入:CPython 3.12 的 tempfile.mkdtemp 遇 PermissionError
+            # 会静默重试到上限(挂死),icacls 拒绝也无法让 mkdtemp 快速失败;
+            # 与本文件 patch tarfile.addfile 的先例一致,对标准库设施注入同一
+            # 故障——只对第二个实体所在的 claude 根生效,第一个实体照常落地,
+            # 被测的仍是"已落地后第二实体失败 → 撤销"这条真实路径。
+            import tempfile as _tempfile
+
+            real_mkdtemp = _tempfile.mkdtemp
+            claude_abs = os.path.abspath(str(env.claude_root))
+
+            def denied_mkdtemp(*a, **k):
+                d = k.get("dir")
+                if d is not None and os.path.abspath(str(d)) == claude_abs:
+                    raise PermissionError(5, "Access is denied")
+                return real_mkdtemp(*a, **k)
+
+            with patch.object(_tempfile, "mkdtemp", denied_mkdtemp):
+                with self.assertRaises(BackupError):
+                    restore_backup(Path(saved["path"]), env.locations)
         else:
             os.chmod(env.claude_root, 0o555)  # 第二个实体所在根不可写
             self.addCleanup(os.chmod, env.claude_root, 0o755)
-        with self.assertRaises(BackupError):
-            restore_backup(Path(saved["path"]), env.locations)
+            with self.assertRaises(BackupError):
+                restore_backup(Path(saved["path"]), env.locations)
         self.assertFalse(env.demo.exists(), "已落地的第一个实体必须撤销")
-        if os.name == "nt":
-            # 先还原 ACL 再检查目录内容(被 deny 时 listdir 本身会被拒)
-            subprocess.run(["icacls", str(env.claude_root), "/reset"],
-                           check=True, capture_output=True)
         self.assertEqual(os.listdir(env.claude_root), [], "失败根目录不留半成品")
         home = env.backup_dir.parent
         for dirpath, dirnames, _ in os.walk(home):
