@@ -117,10 +117,28 @@ def cmd_record(args):
     except ValueError as e:
         print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
         return 1
-    store = _load_reviews(reviews_path)
-    store["reviews"].append(saved)
-    store["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    atomic_write_json(reviews_path, store)
+    # 台账读改写全程持锁;损坏台账拒绝记账,绝不默认为空再覆盖(F06)
+    from scripts.core.io import FileLock
+    reviews_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(reviews_path.parent / ".reviews.lock")
+    try:
+        lock.acquire()
+    except (BlockingIOError, OSError):
+        print(json.dumps({"ok": False, "error": "另一条记账正在进行,请重试"}, ensure_ascii=False))
+        return 2
+    try:
+        _, lissues = load_json_checked(reviews_path, {})
+        if any(i.get("code") == "corrupt-json" for i in lissues):
+            print(json.dumps({"ok": False,
+                              "error": "审查台账已损坏,拒绝记账;请先人工修复 " + reviews_path.name},
+                             ensure_ascii=False))
+            return 2
+        store = _load_reviews(reviews_path)
+        store["reviews"].append(saved)
+        store["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        atomic_write_json(reviews_path, store)
+    finally:
+        lock.release()
     if args.json:
         print(json.dumps({"ok": True, "review": saved}, ensure_ascii=False, indent=1))
     else:

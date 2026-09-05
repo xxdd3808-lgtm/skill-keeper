@@ -12,6 +12,7 @@ import time
 from .overlap import alternative_candidates, exact_duplicate_groups, receipts_from_inventory
 
 ALLOWED_VERDICTS = ("保留", "优先保留另一个", "观察", "建议删除", "需要人工确认")
+SAFETY_VALUES = ("safe", "warning", "danger")
 CONFIDENCE_LEVELS = ("高", "中", "低")
 DECISION_VERDICTS = ("保留", "优先保留另一个", "建议删除")
 
@@ -231,6 +232,12 @@ def record_review(queue, review_payload, reviewer_model):
     verdict = payload.get("verdict")
     if verdict not in ALLOWED_VERDICTS:
         raise ValueError("verdict 必须是: " + "/".join(ALLOWED_VERDICTS))
+    safety = payload.get("safety")
+    if safety is not None and safety not in SAFETY_VALUES:
+        raise ValueError("safety 必须是: " + "/".join(SAFETY_VALUES) + "(或不填)")
+    reviewer_model = str(reviewer_model or "").strip()
+    if not reviewer_model:
+        raise ValueError("必须给出审查模型/审查者标识(reviewer_model 不能为空)")
     confidence = payload.get("confidence")
     if confidence not in CONFIDENCE_LEVELS:
         raise ValueError("confidence 必须是: " + "/".join(CONFIDENCE_LEVELS))
@@ -266,6 +273,20 @@ def record_review(queue, review_payload, reviewer_model):
     now = time.strftime("%Y-%m-%d %H:%M:%S")
     review_id = "rv-" + hashlib.sha256(
         "{}|{}|{}".format(iid, item.get("tree_hash", ""), now).encode("utf-8")).hexdigest()[:12]
+    submitted_hash = payload.get("skill_tree_hash")
+    if submitted_hash is not None and str(submitted_hash) != str(item.get("tree_hash", "")):
+        raise ValueError("提交的 skill_tree_hash 与队列目标不一致:必须核对当前对象后再记账")
+    # 替代品依赖快照:记录采纳时的内容版本,供 evaluate_review 判定过期;
+    # 候选没有完整条目行时记录未知(评估按需复核处理,绝不假装修过)
+    items_by_lid = {str(x.get("logical_id")): x for x in queue.get("items", [])}
+    alternatives_state = {}
+    for lid in alternatives:
+        th = (items_by_lid.get(lid) or {}).get("tree_hash")
+        alternatives_state[lid] = {"tree_hash": str(th) if th else None}
+    review_snapshot_id = "rs-" + hashlib.sha256(
+        "{}|{}|{}".format(iid, item.get("tree_hash", ""),
+                          queue.get("inventory_fingerprint", "")).encode("utf-8")
+    ).hexdigest()[:12]
     return {
         "review_id": review_id,
         "instance_id": iid,
@@ -274,6 +295,7 @@ def record_review(queue, review_payload, reviewer_model):
         "verdict": verdict,
         "reason": reason,
         "alternatives": alternatives,
+        "alternatives_state": alternatives_state,
         "unique_capabilities": list(payload.get("unique_capabilities") or []),
         "loss_if_removed": str(payload.get("loss_if_removed") or ""),
         "confidence": confidence,
@@ -281,8 +303,9 @@ def record_review(queue, review_payload, reviewer_model):
         "skill_tree_hash": item.get("tree_hash", ""),
         "inventory_fingerprint": queue.get("inventory_fingerprint", ""),
         "reputation_snapshot_id": queue.get("reputation_snapshot_id", ""),
+        "review_snapshot_id": review_snapshot_id,
         "reviewed_at": now,
-        "reviewer_model": str(reviewer_model or "unknown"),
-        "safety": payload.get("safety"),
+        "reviewer_model": reviewer_model,
+        "safety": safety,
         "note": str(payload.get("note") or ""),
     }
