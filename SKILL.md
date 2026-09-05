@@ -154,8 +154,9 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
    ```
    限额:总输入 ≤64 KiB、roots ≤32、字符串 ≤4 KiB;`load_state` 只允许 `reported`。
 4. **不知道就说不知道**:找不到或不确定的根,`complete` 保持 `false`;**禁止猜路径、禁止修改客户端配置、禁止拿 Home 目录或系统目录凑数**。声明指向本机不存在的目录会记黄灯(model-root-missing),不会被当作空位置扫描成功。
-5. **看结果**:自报客户端的实例与已知客户端一起进 inventory 和报告,客户端列标注"客户端自报";其位置内部的同名重复会以"等待本地确认"口径报告;同一真实路径若已被适配器/本地配置登记,本机事实优先,声明副本自动丢弃。**临时声明的实例永远不可变,没有任何删除/更新入口**。
-6. **长期管理**:用户确认该根要长期盘点时,把目录登记进 `data/client-locations.json`(参照 `data/client-locations.example.json`)。只有用户本地明确登记 `mutable: true` 的位置才可能进入 计划→确认→备份→事务 的变更闭环;模型声明本身永远不能开通写权限。
+5. **看结果**:自报客户端的实例与已知客户端一起进 inventory 和报告,客户端列标注"客户端自报";其位置内部的同名重复会以"等待本地确认"口径报告;同一真实路径若已被适配器/本地配置登记,物理目录只扫描一次,但自报客户端与该目录的读取关系必须保留。**临时声明的实例永远不可变,没有任何删除/更新入口**。
+6. **守住范围**:临时声明的根必须严格位于当前用户 HOME 内,符号链接解析到 HOME 外也拒绝。外置盘或其他受信目录只能由用户在本地 `client-locations.json` 登记。
+7. **长期管理**:用户确认该根要长期盘点时,把目录登记进 `data/client-locations.json`(参照 `data/client-locations.example.json`)。只有用户本地明确登记 `mutable: true` 的位置才可能进入 计划→确认→备份→事务 的变更闭环;模型声明本身永远不能开通写权限。
 
 ## 分组维护
 
@@ -166,14 +167,14 @@ v2 记账两处:**价值审查结论**(含 safety 字段 safe/warning/danger)用
 - `github`:手动从 GitHub 安装(khazix-skills、anthropics/skills、clawic/skills、obra/superpowers 等)
 - `skills.sh`:经 skills.sh 市场安装(有 `_meta.json` 回执;锁文件 `~/.agents/.skill-lock.json` 里有来源仓库的可自动查更新)
 - `registry-*`:国内注册表(火山 skills.volces.com、魔搭 modelscope.cn、鸿蒙 matrix.openharmony.cn、SkillHub)
-- `builtin-app`:随应用自带(智谱 autoglm 六件套、ego-browser),不建议手动动
+- `builtin-app`:随应用自带,由所属客户端管理,不建议手动动
 - `self-built`:用户自建(白名单内),**受保护**
 - `plugin`:ZCode 插件自带,由插件系统管理
 - `unknown`:来源不明,报告里标注待补
 
 ## 客户端加载规则(已按实测核实,2026-09-02)
 
-- ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`(智谱 autoglm 技能放在这里,只给 ZCode 加载)。
+- ZCode 发现顺序:`~/.zcode/skills` → `~/.agents/skills` → 工作区 `.zcode/skills`/`.agents/skills` → 插件。**同名不同路径都会进加载列表**(双份占上下文),但只加载第一个,后面的是遮蔽副本。跨工具共享的 skill 应放 `~/.agents/skills`,ZCode 专属覆盖才放 `~/.zcode/skills`。
 - **Codex:2026-08-25 起的桌面版自动导入外部 Agent 技能库 `~/.agents/skills`**——共享库里有什么,Codex 就整体加载什么;再叠加自身 `~/.codex/skills`、`~/.codex/skills/.system`(内置)与插件缓存。往共享库加东西前要想清楚 Codex 也会带上。
 - Claude Code 读 `~/.claude/skills`(目录本体真实,条目为逐项指向 `~/.agents/skills` 的符号链接),不读共享库;Codex CLI 旧版读 `~/.codex/skills`;Ego 读 `~/.local/share/ego/ego-skills`。
 - Haha(存在 `~/.claude/cc-haha` 时)与 Claude Code 同源,只读 `~/.claude/skills` 镜像(2026-09-02 按 Haha traces 核实,不直接读共享库);Cindy 是共享库+Codex 目录的只读投影;WorkBuddy/Ego/Accio 只读各自目录。

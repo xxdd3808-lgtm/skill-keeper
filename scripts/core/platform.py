@@ -11,6 +11,7 @@
 """
 import errno
 import os
+from pathlib import Path
 
 IS_WINDOWS = os.name == "nt"
 
@@ -70,3 +71,33 @@ def is_absolute_path(path) -> bool:
     校验走 paths.validate_archive_member_path,不得用本函数替代。
     """
     return os.path.isabs(os.fspath(path))
+
+
+def user_home(explicit=None) -> Path:
+    """返回本次运行使用的 HOME，支持 Windows 测试/嵌入式调用显式隔离。"""
+    if explicit is not None:
+        return Path(explicit)
+    configured = os.environ.get("SKILL_KEEPER_HOME") or os.environ.get("HOME")
+    return Path(configured) if configured else Path(os.path.expanduser("~"))
+
+
+def expand_user_path(path, home=None) -> str:
+    """只展开当前用户的 ~ 前缀，并服从 skill-keeper 的显式 HOME。"""
+    value = os.fspath(path)
+    if value == "~":
+        return str(user_home(home))
+    if value.startswith("~/") or value.startswith("~\\"):
+        return str(user_home(home) / value[2:])
+    return value
+
+
+def is_strictly_within(path, root) -> bool:
+    """按当前平台真实路径规则判断 path 是否严格位于 root 之下。"""
+    candidate = os.path.normcase(os.path.realpath(os.fspath(path)))
+    boundary = os.path.normcase(os.path.realpath(os.fspath(root)))
+    if candidate == boundary:
+        return False
+    try:
+        return os.path.commonpath([candidate, boundary]) == boundary
+    except ValueError:  # Windows 不同盘符等不可比较路径
+        return False

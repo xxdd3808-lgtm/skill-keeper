@@ -47,8 +47,9 @@ python3 scripts/scan.py --locations-json - --json
 ```
 
 - 不知道就说不知道:`complete` 保持 `false`;禁止猜路径、禁止改客户端配置;
-- 临时声明**只读、仅本次扫描、不持久化**:产生的实例永远不可变,没有任何删除/更新入口;
-- 与已知位置重复的真实路径按"本机事实优先"去重;报告里自报客户端标注「客户端自报」。
+- 临时声明**只读、仅本次扫描、不写入长期配置**:扫描生成的本地 inventory 会记录派生实例与路径，产生的实例永远不可变,没有任何删除/更新入口;
+- 与已知位置重复时物理目录只扫描一次；系统仍保留“该客户端自报读取此目录”的关系，并在加载总览和共享库视图标注「自报」。
+- 临时根必须严格位于当前用户 HOME 内；外置盘或其他受信目录请由用户登记进本地 `client-locations.json`。
 
 ### 流程三:把确认的位置写进本地配置长期管理
 
@@ -128,12 +129,12 @@ skill-keeper/
 
 ## 隐私说明
 
-`data/` 下的个人配置与运行时产物、`backups/` 备份均已列入 `.gitignore`,不会被提交。示例报告由固定虚构 fixture 生成(`make_sample_report.py`),不读取真实盘点。Accio 账号编号等敏感标识在扫描阶段即哈希化;位置声明只保留 home-relative 显示路径、证据类型与完整度,原始声明不落盘。
+`data/` 下的个人配置与运行时产物、`backups/` 备份均已列入 `.gitignore`,不会被提交。示例报告由固定虚构 fixture 生成(`make_sample_report.py`),不读取真实盘点。Accio 账号编号等敏感标识在扫描阶段即哈希化。inventory 为支持本地复核与安全操作会记录本机绝对路径和内容指纹；报告把 HOME 缩写为 `~`。原始位置声明不写入长期配置，全部文件都只留本机。
 
 ## 已验证环境
 
 - macOS(Python 3.9)+ ZCode / Codex / WorkBuddy / Ego / 共享库(私人部署长期使用)
-- CI:Ubuntu(Python 3.8 与主力版)、macOS、Windows 四个 job 自动验证安装、扫描、报告、锁、路径、预检与事务(0 skipped)
+- CI 工作流：Ubuntu(Python 3.8 与主力版)、macOS、Windows 四个 job 验证安装、扫描、报告、锁、路径、预检与事务；是否通过以 push 后 GitHub Actions 的实际结果为准
 - 其他客户端:模型位置声明即可盘点,或登记 `data/client-locations.json`,或在 `scripts/core/clients/` 增加适配器
 
 ## License

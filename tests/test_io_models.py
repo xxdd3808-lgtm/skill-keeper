@@ -1,5 +1,6 @@
-import json, tempfile, unittest
+import json, os, tempfile, unittest
 from pathlib import Path
+from unittest import mock
 from scripts.core.io import FileLock, atomic_write_json, load_json_checked, read_json_fields
 from scripts.core.models import Location, SCHEMA_VERSION
 
@@ -55,6 +56,32 @@ class IoModelTests(unittest.TestCase):
                 except Exception:
                     acquired = False
                 self.assertFalse(acquired, "第二个锁持有者必须拿不到锁")
+
+    def test_file_lock_closes_fd_when_backend_errors(self):
+        with tempfile.TemporaryDirectory() as td:
+            lock_path = Path(td) / "change.lock"
+            real_close = os.close
+            closed = []
+
+            def record_close(fd):
+                closed.append(fd)
+                return real_close(fd)
+
+            with mock.patch("scripts.core.io.platform_tools.try_lock_exclusive",
+                            side_effect=OSError("backend failed")), \
+                    mock.patch("scripts.core.io.os.close", side_effect=record_close):
+                with self.assertRaises(OSError):
+                    FileLock(lock_path).acquire()
+            self.assertEqual(len(closed), 1)
+
+    def test_file_lock_unlocks_and_closes_when_pid_write_errors(self):
+        with tempfile.TemporaryDirectory() as td:
+            lock_path = Path(td) / "change.lock"
+            with mock.patch("scripts.core.io.os.write", side_effect=OSError("disk failed")):
+                with self.assertRaises(OSError):
+                    FileLock(lock_path).acquire()
+            lock = FileLock(lock_path).acquire()
+            lock.release()
 
 
 if __name__ == "__main__":

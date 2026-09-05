@@ -10,14 +10,14 @@
   command、url、token、env……)一律拒绝;
 - 限额:总输入 ≤ 64 KiB、roots ≤ 32、字符串 ≤ 4 KiB、JSON 嵌套 ≤ 6 层、UTF-8;
 - load_state 只允许 "reported":模型只能"客户端自报",永远不能自证 confirmed;
-- 解析错误绝不回显字段值(可能含秘密),只回显键名与位置;
+- 解析错误绝不回显字段值或白名单外键名(可能含秘密),只回显结构位置;
 - 声明默认只读、只用于本次扫描、不单独持久化,永远不能产生变更计划
   (mutable 只能由用户本地 client-locations.json 登记)。
 """
 import json
 import re
 
-from .platform import is_absolute_path
+from .platform import expand_user_path, is_absolute_path
 
 MAX_DECL_BYTES = 64 * 1024
 MAX_ROOTS = 32
@@ -69,13 +69,22 @@ def _decode(text):
     return text
 
 
+def _reject_duplicate_keys(pairs):
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            raise LocationInputError("声明含重复字段")
+        out[key] = value
+    return out
+
+
 def parse_declaration(text):
     """解析并规范化一份位置声明 JSON;返回 normalized dict;任何问题抛 LocationInputError。"""
     text = _decode(text)
     if not text.strip():
         raise LocationInputError("声明为空")
     try:
-        value = json.loads(text)
+        value = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
     except RecursionError:
         raise LocationInputError("声明嵌套超过 {} 层".format(MAX_DEPTH))
     except json.JSONDecodeError as e:
@@ -87,7 +96,7 @@ def parse_declaration(text):
     unknown = sorted(set(value) - {"schema_version", "client", "observed_by",
                                    "complete", "roots"})
     if unknown:
-        raise LocationInputError("声明含未知字段: {}".format(", ".join(unknown[:8])))
+        raise LocationInputError("声明含白名单外字段")
 
     version = value.get("schema_version")
     if version != 1 or isinstance(version, bool):
@@ -118,8 +127,7 @@ def parse_declaration(text):
             raise LocationInputError("roots[{}] 必须是对象".format(i))
         unknown = sorted(set(root) - {"path", "scope", "load_state"})
         if unknown:
-            raise LocationInputError("roots[{}] 含未知字段: {}".format(
-                i, ", ".join(unknown[:8])))
+            raise LocationInputError("roots[{}] 含白名单外字段".format(i))
         path = _string_limited(root.get("path"), "roots[{}].path".format(i))
         if not path:
             raise LocationInputError("roots[{}].path 不能为空".format(i))
@@ -147,8 +155,7 @@ def parse_declaration(text):
 
 def expand_path(path):
     """声明路径的 ~ 展开;绝不触碰文件系统(不存在性由扫描器稍后判定)。"""
-    import os
-    return os.path.expanduser(path)
+    return expand_user_path(path)
 
 
 def parse_cli_roots(pairs):

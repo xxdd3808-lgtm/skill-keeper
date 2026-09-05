@@ -22,6 +22,7 @@ from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_r
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
 from scripts.core.runtime import default_data_dir                      # noqa: E402
+from scripts.core.platform import user_home                            # noqa: E402
 from scripts.core.staging import (StagingBoundaryError, cleanup_staging,   # noqa: E402
                                   record_ownership, validate_staging_root)
 from scripts.scan import parse_frontmatter                              # noqa: E402
@@ -35,7 +36,7 @@ def staging_root_for(output_path=None):
     env = os.environ.get("SKILL_KEEPER_STAGING")
     if env:
         return Path(env)
-    home = Path(os.path.expanduser("~"))
+    home = user_home()
     if sys.platform == "darwin":
         return home / "Library/Caches/skill-keeper/staging"
     return home / ".cache/skill-keeper/staging"

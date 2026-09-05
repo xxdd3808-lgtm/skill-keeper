@@ -111,7 +111,19 @@ class FileLock:
         except BlockingIOError as e:
             os.close(fd)
             raise BlockingIOError("另一个 skill-keeper 变更正在进行,请稍后再试") from e
-        os.write(fd, str(os.getpid()).encode())
+        except BaseException:
+            os.close(fd)
+            raise
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.write(fd, str(os.getpid()).encode())
+        except BaseException:
+            try:
+                platform_tools.unlock_fd(fd)
+            except OSError:
+                pass
+            os.close(fd)
+            raise
         self._fd = fd
         return self
 

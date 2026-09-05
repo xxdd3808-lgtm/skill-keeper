@@ -5,13 +5,22 @@
 - 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
 - 开工基线(实测):HEAD `f858d2ba89d82acc93bcd78e30f3bc6ac1b24b04`,Python 3.9.6,分支 case1,verify 233 项 0 失败 0 skipped;工作树原有三份计划文档(untracked,随 Task 0 入库)。
 - 零退化合同:tests/fixtures/private-v311/(完全虚构,含 shared/Codex/WorkBuddy/Ego、自建、builtin owner、符号链接、重复加载、审查、备份、旧 CLI)+ tests/test_private_compatibility.py(9 项)。v4 各任务必须保持全绿。
-- 测试入口:`python3 scripts/verify.py`(Task 5 后 303 项 / 0 失败 / 0 skipped;`python -m scripts.verify` 同口径,CI 使用)。
+- 测试入口:`python3 scripts/verify.py`(独立复核后 313 项 / 0 失败 / 0 skipped；v3.1.1 的 233 个冻结 ID 全在；`python -m scripts.verify` 同口径,CI 使用)。
 - BLOCKED.md:无。
 - Task 5 要点:.github/workflows/ci.yml 四 job(Ubuntu/Python 3.8、Ubuntu/主力、macOS/主力、Windows/主力,均 `pip install .` + `python -m scripts.verify`,真实 runner 不 mock 平台);SECURITY.md(位置声明不可信、变更边界、数据留存、私有漏洞报告);verify.py 增强(v3.1.1 原 233 项测试 ID 基线不减少 tests/fixtures/private-v311/v311-test-ids.json、安装 smoke=doctor JSON、恶意位置声明探针、模型输入不可写探针、tracked 文件个人路径/秘密模式扫描);README 重写为三种流程(已知客户端直扫/模型传根/登记 client-locations)+数据全留本机;AGENTS/architecture/SKILL 版本与命令同步(4.0.0);test_migrations_docs 的版本与 README 热度口径断言随文档同步更新。
 
-## 最终交付记录(v4,2026-09-05)
+## 独立复核记录(v4,2026-09-05)
 
-- 全量:303 项测试 0 失败 0 skipped(python3 scripts/verify.py 与 python -m scripts.verify 均退出 0);其中 v3.1.1 基线 233 项 ID 全部保留(基线文件锁死),新增 70 项(兼容合同 9、CLI/运行态 14、跨平台底座 15、位置声明 20、预检与两层拒绝 12)。
+- 发现原交付的 `verify.py` 在 unittest 运行后才收集测试 ID，导致 233 个基线 ID 全部误报缺失；同时附加检查失败后仍沿用旧 `passed` 返回 0。两处已修复并用故意失败反例锁定。
+- 未知客户端声明已知共享根时，原实现为避免重复扫描把整条声明丢掉，报告因此不知道该客户端会读取共享库。现改为物理目录只扫描一次，同时用 `observation.reported_roots` 保留每个客户端→位置关系，未知客户端 `client_load` 与共享库视图均可见。
+- 临时根现在必须严格位于当前用户 HOME 内，真实路径/符号链接越界拒绝；模型声明仍不可写。未知字段名与重复 JSON 键不再进入错误信息。
+- 增加 `SKILL_KEEPER_HOME` 统一隔离 Windows/Unix 子进程，修复 Windows `expanduser("~")` 不服从测试 `HOME` 的风险；Windows checkout 若把 fixture symlink 物化为文本，测试会在临时 HOME 重建。
+- FileLock 在后端异常和 PID 写入异常时都会解锁并关闭 fd。隐私门禁新增 Linux/Windows 用户路径与 tracked runtime 文件检查。
+- 本地实测：macOS Python 3.9.6 与 3.12.13 均为 313 项、0 失败、0 skipped，附加五项检查全过；`git diff --check` 通过。Python 3.8/Linux/Windows 的真实 runner 仍需 push 后由 CI 给出最终证据。
+
+## 原 Task 0–5 交付记录(v4,2026-09-05)
+
+- 原交付运行了 303 项 unittest 且全部通过；独立复核发现当时附加基线检查实际失败但退出码错误地为 0。修复后当前为 313 项，基线 233 项 ID 全部保留。
 - 阶段门槛:Task 3 后阶段 A 七模块 58 项全绿;Task 5 最终门槛 verify + `pip install .`(venv 实装 metadata=skill_keeper-4.0.0,console script 离线运行 doctor/scan/report)+ `git diff --check` 干净。
 - 安装 smoke:doctor --json 输出 version/python/layout/paths/lock_backend;打包测试在临时 venv 安装后从仓库外离线运行,并按布局断言(安装态=新默认 ~/.skill-keeper)。
 - 恶意位置声明/模型不可写:verify 探针 + 20 项专项测试(白名单外字段整体拒绝、错误不回显值、临时声明零持久化、policy/service 两层拒绝、create_remove_plan 拒绝)。
@@ -20,7 +29,7 @@
 - CI:四个 job 已定义;实际跑绿需 push 后在 GitHub Actions 观察——**push/tag/release 等待用户授权**。
 - Git 范围:scripts/ tests/ docs/ pyproject.toml .github/ SECURITY.md README/SKILL/AGENTS/.gitignore/PROGRESS/BLOCKED/data examples;真实 data/backups/客户端目录未动;分支 case1(f858d2b → 本提交,未 push)。
 - Task 4 要点:scripts/core/preflight.py(preflight_target_directory:目标同目录唯一临时对象验证 mkdir/写+fsync/同目录 rename/文件 replace/父目录 fsync/清理,清理不干净也拒绝);changes._preflight_parents 接入 apply 三条路径(remove/update 在 targets 解析后、备份前;restore 在 state 就绪后);policy.check_action 对 evidence 含 model-declaration 的实例一律拒绝(reason_code=model-declared-location,restore 也不放行);service.plan_action 在 create_remove/update_plan 之前 _refuse_model_declared 二层拦截。**改既有故障测试的口径**:引擎级 rename 计数注入(test_change_faults 两处)与子进程中断窗口(test_transaction_recovery 两处)须先 patch preflight 为 no-op —— 它们测引擎回滚/中断,预检故障由 test_cross_platform_preflight 专项覆盖;restore 子进程窗口的 spy 带 dst 过滤不受影响。
-- Task 3 要点:scripts/core/location_input.py(parse_declaration/parse_cli_roots,白名单 schema_version/client/observed_by/complete/roots[path/scope/load_state];64KiB/32根/4KiB字符串/6层嵌套/UTF-8;load_state 只认 reported;错误只回显键名不回显值);scan.py --root/--locations-json FILE|- 接线(拒绝发生在扫描与落盘之前;stdin 按 64KiB+1 读取);_model_locations 产 mutable=False Location(证据 model-declaration/scope/load-state),与已有位置按真实路径去重、本机事实优先;缺失根记黄灯 model-root-missing;_structural_findings 为自报客户端补 duplicate-load("等待本地确认"口径);observation.observed_scope 记 model_roots/model_inputs_complete;report.py client_display() 明细行加"(客户端自报)";SKILL.md 增"未知客户端通用流程"章节(version 4.0.0,test_migrations_docs 版本断言随升级更新);临时声明零持久化、零变更入口(测试锁定)。
+- Task 3 要点:scripts/core/location_input.py(parse_declaration/parse_cli_roots,白名单 schema_version/client/observed_by/complete/roots[path/scope/load_state];64KiB/32根/4KiB字符串/6层嵌套/UTF-8;load_state 只认 reported;错误不回显值或白名单外键名);scan.py --root/--locations-json FILE|- 接线(拒绝发生在扫描与落盘之前;stdin 按 64KiB+1 读取);_model_locations 产 mutable=False Location,同一物理根只扫一次并以 observation.reported_roots 保留全部客户端读取关系;缺失根记黄灯 model-root-missing;_structural_findings 为自报客户端补 duplicate-load("等待本地确认"口径);report.py 标注"客户端自报";临时声明不写长期配置、零变更入口(测试锁定)。
 - Task 2 要点:scripts/core/platform.py(lock_backend_name/try_lock_exclusive/unlock_fd/is_absolute_path,fcntl 与 msvcrt 延迟导入);io.FileLock 改走 platform(接口/非阻塞语义不变,锁文件绝不静默清除);paths.validate_relative_path 增加盘符组件拒绝(`C:` 即使相对外形也拒),validate_archive_member_path 是其显式别名(assertIs 锁死同一实现);scan._extra_locations 改 os.path.isabs 原生判断;锁竞争测试用真实双进程(clean 模式经 stdin 放行避免释放竞态;crash 模式 os._exit(3) 验证 OS 释放 + 锁文件保留);AST 检查全 scripts/ 无顶层无条件 fcntl/msvcrt 导入、backup/transactions/changes/staging 不碰 platform 辅助。
 - Task 1 要点:scripts/cli.py 统一命令(scan/report/manage/doctor,手动分发直传参数——argparse REMAINDER 有吞参缺陷,勿改回子解析器);runtime.py 增 detect_repo_layout/default_layout_dirs/default_data_dir(优先级:显式参数>env>可识别旧仓库运行态>新默认 ~/.skill-keeper/{data,cache/staging,backups});scan/report/manage 主入口改 main(argv=None) 返回码;remove_skill/serve/check_updates/value_review 数据目录共用同一解析链;pyproject.toml PEP 621(version 动态读 scripts.__version__;本地 setuptools 58 不支持 PEP 621,构建隔离下安装正常);安装烟测走 python -m venv + pip install .(需网络取构建后端,装好完全离线)。
 
@@ -34,6 +43,7 @@
 | Task 3 模型位置声明与未知客户端盘点(阶段 A 达成) | 完成 | af7f8a2 |
 | Task 4 apply 前真实目标预检 | 完成 | 32a202b |
 | Task 5 CI、文档与最终验收 | 完成 | 本提交(2026-09-05) |
+| 独立复核与缺口修复 | 本地完成，CI 待跑 | 本次复核提交 |
 
 ## 历史计划一:可信性优化(2026-09-05,F01–F11,已交付)
 

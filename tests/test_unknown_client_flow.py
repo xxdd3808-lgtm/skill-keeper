@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 from scripts.core.changes import ChangeError, create_remove_plan   # noqa: E402
 from scripts.core.policy import check_action, load_policy          # noqa: E402
 from scripts.core.provenance import load_user_config               # noqa: E402
-from scripts.scan import build_inventory                           # noqa: E402
+from scripts.scan import InventoryError, build_inventory           # noqa: E402
 from tests.helpers import temp_home, write_skill                   # noqa: E402
 
 CLIENT = "fictitious-agent"
@@ -83,6 +83,13 @@ class InProcessFlowTests(unittest.TestCase):
         self.assertTrue(any(f["code"] == "model-root-missing" for f in inv["findings"]))
         self.assertFalse(any(i["client"] == CLIENT for i in inv["instances"]))
 
+    def test_model_root_outside_declared_home_is_rejected(self):
+        home, data, _ = _unknown_client_env(self)
+        with self.assertRaises(InventoryError):
+            build_inventory(home, data, model_roots=[
+                {"client": CLIENT, "path": str(home.parent), "scope": "user",
+                 "load_state": "reported", "complete": False}])
+
     def test_realpath_dedup_local_facts_win(self):
         home, data, _ = _unknown_client_env(self)
         shared = home / ".agents" / "skills"
@@ -93,6 +100,27 @@ class InProcessFlowTests(unittest.TestCase):
                          len(build_inventory(home, data)["instances"]),
                          "与共享库同真实路径的声明必须被丢弃,不得双份扫描")
         self.assertFalse(any(i["client"] == CLIENT for i in inv["instances"]))
+        claims = inv["observation"]["reported_roots"]
+        self.assertEqual([(r["client"], r["location_id"]) for r in claims],
+                         [(CLIENT, "shared")],
+                         "物理目录只扫一次，但客户端读取共享库的关系不能丢")
+        self.assertEqual(inv["client_load"][CLIENT]["entries"], 1)
+        self.assertTrue(inv["client_load"][CLIENT]["reported"])
+
+    def test_two_unknown_clients_can_report_same_shared_root(self):
+        home, data, _ = _unknown_client_env(self)
+        shared = home / ".agents" / "skills"
+        inv = build_inventory(home, data, model_roots=[
+            {"client": "agent-one", "path": str(shared), "scope": "user",
+             "load_state": "reported", "complete": False},
+            {"client": "agent-two", "path": str(shared), "scope": "user",
+             "load_state": "reported", "complete": False},
+        ])
+        claims = inv["observation"]["reported_roots"]
+        self.assertEqual({(r["client"], r["location_id"]) for r in claims},
+                         {("agent-one", "shared"), ("agent-two", "shared")})
+        self.assertEqual(inv["client_load"]["agent-one"]["entries"], 1)
+        self.assertEqual(inv["client_load"]["agent-two"]["entries"], 1)
 
     def test_model_instances_have_no_change_entry(self):
         home, data, alpha = _unknown_client_env(self)
@@ -192,6 +220,18 @@ class CliFlowTests(unittest.TestCase):
             self.assertFalse((data / "inventory.json").exists(),
                              "拒绝发生在扫描之前,不得产生任何落盘")
 
+    def test_root_outside_home_rejected_before_any_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            data = home / "data"
+            data.mkdir()
+            env = self._env(home, data)
+            r = self._run_scan(env, "--root", "{}={}".format(CLIENT, home.parent),
+                               "--json")
+            self.assertEqual(r.returncode, 2)
+            self.assertFalse((data / "inventory.json").exists())
+
     def test_report_marks_model_reported_clients(self):
         with tempfile.TemporaryDirectory() as td:
             home = Path(td) / "home"
@@ -212,6 +252,25 @@ class CliFlowTests(unittest.TestCase):
             md = (data / "report.md").read_text(encoding="utf-8")
             self.assertIn("fictitious-agent", md)
             self.assertIn("客户端自报", md)
+
+    def test_report_keeps_unknown_client_relationship_to_shared_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            data = home / "data"
+            data.mkdir()
+            write_skill(home / ".agents" / "skills", "shared-real",
+                        description="共享库真实技能")
+            env = self._env(home, data)
+            r = self._run_scan(env, "--root",
+                               "{}={}".format(CLIENT, home / ".agents" / "skills"))
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            r = subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "report.py")],
+                               capture_output=True, text=True, env=env,
+                               cwd=str(REPO_ROOT), timeout=180)
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            md = (data / "report.md").read_text(encoding="utf-8")
+            self.assertIn("fictitious-agent(自报)", md)
 
 
 if __name__ == "__main__":

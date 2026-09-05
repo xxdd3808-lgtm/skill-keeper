@@ -22,6 +22,7 @@ from scripts.core.provenance import (classify_provenance, client_managed_advice,
                                      load_user_config)
 from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 from scripts.scan import CLIENT_LABELS  # noqa: E402
+from scripts.core.platform import user_home  # noqa: E402
 
 # 实例/位置展示用的客户端标签;"shared" 不是客户端,是共享库这一位置本身
 CLIENT_LABELS_EXT = dict(CLIENT_LABELS, shared="共享库")
@@ -568,19 +569,24 @@ def _client_load_rows(inv):
     if cl.get("claude-code") and cl.get("haha") and not _claude_app_present():
         notes["claude-code"] = "应用已卸载,目录实际由 Haha 读取"
     rows = []
-    for client in ("zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego"):
+    order = ["zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego"]
+    order += sorted(c for c in cl if c not in order)
+    for client in order:
         s = cl.get(client)
         if not s or not s.get("entries"):
             continue
         dup = "⚠️ {} 个重复:{}".format(len(s["duplicates"]), "、".join(s["duplicates"][:8]) +
                                        ("…" if len(s["duplicates"]) > 8 else "")) if s["duplicates"] else "✅"
-        rows.append((client, s["entries"], s["skills"], dup, notes.get(client, "")))
+        note = notes.get(client, "")
+        if s.get("reported"):
+            note = "客户端自报读取位置；只读观察"
+        rows.append((client, s["entries"], s["skills"], dup, note))
     return rows
 
 
 def _claude_app_present():
     """只查应用是否存在(不读内容):Claude Code 应用卸载后,claude 目录实际只有 Haha 在用。"""
-    for base in ("/Applications", os.path.expanduser("~/Applications")):
+    for base in ("/Applications", str(user_home() / "Applications")):
         for name in ("Claude.app", "Claude Code.app"):
             if os.path.isdir(os.path.join(base, name)):
                 return True
@@ -606,6 +612,10 @@ def _shared_library_rows(view):
     lg_insts = {}
     for i in insts:
         lg_insts.setdefault(i.get("logical_name"), []).append(i)
+    reported_by_location = {}
+    for claim in (view["inv"].get("observation") or {}).get("reported_roots", []):
+        reported_by_location.setdefault(claim.get("location_id"), set()).add(
+            str(claim.get("client") or "") + "(自报)")
     rows = []
     for inst in insts:
         if inst.get("location_id") != "shared":
@@ -613,16 +623,16 @@ def _shared_library_rows(view):
         nm = inst.get("logical_name")
         cls, _why = classify_instance(inst, set(), view.get("known"))
         g, stale = verdict_of.get(nm, (None, False))
-        others = sorted({CLIENT_LABELS_EXT.get(loc_client.get(x.get("location_id")),
-                                                x.get("client") or "") or "?"
-                         for x in lg_insts.get(nm, [])
-                         if x.get("location_id") != "shared"})
+        others = {CLIENT_LABELS_EXT.get(loc_client.get(x.get("location_id")),
+                                        x.get("client") or "") or "?"
+                  for x in lg_insts.get(nm, []) if x.get("location_id") != "shared"}
+        others.update(reported_by_location.get(inst.get("location_id"), set()))
         rows.append({"name": nm, "iid": inst.get("instance_id"),
                      "protected": cls == "protected",
                      "verdict": g, "stale": stale,
                      "function": inst.get("function") or "",
                      "directory_name": inst.get("directory_name"),
-                     "others": "、".join(others) or "仅共享库"})
+                     "others": "、".join(sorted(others)) or "仅共享库"})
     return rows
 
 

@@ -24,10 +24,12 @@
 schema_version / client / observed_by / complete / roots[path/scope/load_state];
 限额 64KiB / 32 根 / 4KiB 字符串 / 6 层 / UTF-8;load_state 只认 reported)。
 `scripts/core/location_input.py` 只做纯文本校验——拒绝发生在任何扫描与落盘之前,
-错误不回显字段值,解析阶段不打开任何文件。`scan.py` 把声明转成 mutable=False、
-证据 `model-declaration` 的 Location:与既有位置按真实路径去重(本机事实优先),
+错误不回显字段值或白名单外键名,解析阶段不打开任何文件。临时根必须严格位于
+当前用户 HOME 内(真实路径越界也拒绝)。`scan.py` 把声明转成 mutable=False、
+证据 `model-declaration` 的 Location:与既有位置按真实路径去重；物理目录只扫描一次，
+`observation.reported_roots` 独立保留每个自报客户端与位置的关系，
 缺失根记黄灯 `model-root-missing`,自报客户端的同名重复按"等待本地确认"口径报告。
-临时声明只读、不持久化;policy(`check_action` reason_code=model-declared-location)
+临时声明只读、不写入长期配置；派生实例与路径会进入本地 inventory。policy(`check_action` reason_code=model-declared-location)
 与 service(`plan_action` 预拒)两层都没有变更入口;只有用户本地
 `client-locations.json` 显式 `mutable: true` 的位置才可能进变更闭环。
 
@@ -37,7 +39,7 @@ schema_version / client / observed_by / complete / roots[path/scope/load_state];
 可识别旧仓库运行态(仓库 data/ 有 v2/v3 真实标记)> 新统一默认
 `~/.skill-keeper/{data,cache/staging,backups}`**。旧仓库布局同时沿用仓库 backups
 与平台缓存暂存(私人部署零迁移);CLI/API/报告共用同一解析;子进程环境被钉死
-(SKILL_KEEPER_DATA/STAGING/HOME),禁止回到真实 HOME。
+(SKILL_KEEPER_HOME/DATA/STAGING/HOME),禁止 Windows 子进程因 `expanduser` 规则回到真实用户目录。
 
 ## 跨平台底座(scripts/core/platform.py)
 
@@ -93,6 +95,7 @@ manifest 严格校验(schema/类型/权限/路径边界/唯一性/父子关系/�
 - 加载规则集中在 `clients/load_rules.py`,每条带来源/核实日期/适用范围;
   工作区位置按各自项目上下文评估,不同项目的同名技能不是全局双载。
 - inventory 带 `observation{complete, issues, observed_scope, rule_version, load_contexts}`;
+  自报位置关系另存 `observation.reported_roots`,未知客户端的 `client_load` 按这些关系计算；
   实例带 `content_status`;不完整观察的对象不提供完整指纹、变更入口停用。
 - CLI 退出码:0=成功且无关注;1=成功但有约定红灯/差异;2=操作失败或观察不完整。
 

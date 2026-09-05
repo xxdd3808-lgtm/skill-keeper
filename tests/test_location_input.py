@@ -74,6 +74,18 @@ class ParseDeclarationTests(unittest.TestCase):
             parse_declaration(json.dumps({"schema_version": 1, "client": "c" * 5000,
                                           "roots": []}))
         self.assertNotIn("c" * 100, str(ctx2.exception))
+        secret_key = "SUPER-SECRET-KEY-NAME-000"
+        with self.assertRaises(LocationInputError) as ctx3:
+            parse_declaration(json.dumps({"schema_version": 1, "client": "c",
+                                          secret_key: True, "roots": []}))
+        self.assertNotIn(secret_key, str(ctx3.exception))
+
+    def test_duplicate_json_keys_rejected_without_echoing_values(self):
+        payload = ('{"schema_version":1,"client":"safe","client":"SECRET-VALUE",'
+                   '"roots":[]}')
+        with self.assertRaises(LocationInputError) as ctx:
+            parse_declaration(payload)
+        self.assertNotIn("SECRET-VALUE", str(ctx.exception))
 
     def test_size_and_count_limits(self):
         with self.assertRaises(LocationInputError):

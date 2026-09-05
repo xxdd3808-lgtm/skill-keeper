@@ -4,6 +4,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from scripts import verify
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFY = REPO_ROOT / "scripts" / "verify.py"
@@ -45,6 +48,33 @@ class VerifySelfValidationTests(unittest.TestCase):
                 "    def test_ok(self):\n"
                 "        self.assertTrue(True)\n", encoding="utf-8")
             self.assertEqual(self._run(td).returncode, 0)
+
+    def test_failed_supplementary_check_controls_exit_code(self):
+        fake_stats = {"test_count": verify.BASELINE_MIN_TESTS, "skipped": 0,
+                      "failures": 0, "errors": 0, "test_ids": []}
+        with mock.patch.object(verify, "run_tests", return_value=fake_stats), \
+                mock.patch.object(verify, "check_baseline_ids",
+                                  return_value={"ok": False, "missing_count": 1}), \
+                mock.patch.object(verify, "check_location_input_probe",
+                                  return_value={"ok": True}), \
+                mock.patch.object(verify, "check_model_input_immutable_probe",
+                                  return_value={"ok": True}), \
+                mock.patch.object(verify, "check_path_secret_scan",
+                                  return_value={"ok": True}), \
+                mock.patch.object(verify, "check_install_smoke",
+                                  return_value={"ok": True}), \
+                mock.patch.object(sys, "argv", ["verify.py"]):
+            with self.assertRaises(SystemExit) as caught:
+                verify.main()
+        self.assertNotEqual(caught.exception.code, 0)
+
+    def test_personal_path_patterns_cover_three_platforms_without_fixture_false_positive(self):
+        samples = ("/Users/user/project", "/home/user/project",
+                   "C:\\Users\\user\\project")
+        for sample in samples:
+            self.assertTrue(any(p.search(sample) for p in verify.PERSONAL_PATH_RES), sample)
+        self.assertFalse(any(p.search("/fixture/home/.agents/skills")
+                             for p in verify.PERSONAL_PATH_RES))
 
 
 if __name__ == "__main__":

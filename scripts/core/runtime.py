@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .platform import user_home
+
 BASE = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
 # 仓库 data/ 里代表"真实 v2/v3 运行态"的标记:只有出现这些才启用旧仓库布局,
@@ -30,7 +32,7 @@ def detect_repo_layout(base=None) -> str:
 
 
 def _default_staging(home=None):
-    home = Path(home) if home is not None else Path(os.path.expanduser("~"))
+    home = user_home(home)
     if sys.platform == "darwin":
         return home / "Library/Caches/skill-keeper/staging"
     return home / ".cache/skill-keeper/staging"
@@ -43,7 +45,7 @@ def default_layout_dirs(base=None, home=None) -> dict:
     > 新统一默认 ~/.skill-keeper/{data,cache/staging,backups}。
     """
     base = Path(base) if base is not None else BASE
-    home = Path(home) if home is not None else Path(os.path.expanduser("~"))
+    home = user_home(home)
     if detect_repo_layout(base) == "old-repo":
         return {"layout": "old-repo", "data_dir": base / "data",
                 "staging_dir": _default_staging(home), "backup_dir": base / "backups"}
@@ -67,7 +69,7 @@ class RuntimePaths:
     """
 
     def __init__(self, home=None, data_dir=None, staging_dir=None, backup_dir=None):
-        self.home = Path(home) if home else Path(os.path.expanduser("~"))
+        self.home = user_home(home)
         defaults = None
         if data_dir:
             self.data_dir = Path(data_dir)
@@ -113,6 +115,9 @@ class RuntimePaths:
         env["SKILL_KEEPER_STAGING"] = str(self.staging_dir)
         if home:
             env["HOME"] = str(home)
+            env["SKILL_KEEPER_HOME"] = str(home)
+        else:
+            env["SKILL_KEEPER_HOME"] = str(self.home)
         return env
 
     def to_dict(self):

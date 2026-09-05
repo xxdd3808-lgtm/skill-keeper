@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scripts.core.runtime import RuntimePaths, plan_runtime_migration, publish_snapshot
 from scripts.core.fingerprint import tree_hash
@@ -33,6 +34,15 @@ class RuntimePathIsolationTests(unittest.TestCase):
             env = paths.subprocess_env()
             self.assertEqual(env["SKILL_KEEPER_DATA"], str(Path(td) / "rt"))
             self.assertEqual(env["SKILL_KEEPER_STAGING"], str(Path(td) / "stage"))
+            self.assertEqual(env["SKILL_KEEPER_HOME"], str(Path(td)))
+
+    def test_explicit_skill_keeper_home_wins_over_platform_expanduser(self):
+        with tempfile.TemporaryDirectory() as td:
+            fake = Path(td) / "isolated-home"
+            with mock.patch.dict(os.environ, {"SKILL_KEEPER_HOME": str(fake),
+                                              "HOME": str(Path(td) / "other")}, clear=True):
+                paths = RuntimePaths()
+                self.assertEqual(paths.home, fake)
 
 
 class MigrationPreviewTests(unittest.TestCase):

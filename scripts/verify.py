@@ -24,7 +24,17 @@ BASELINE_IDS_PATH = BASE / "tests" / "fixtures" / "private-v311" / "v311-test-id
 # 扫描时跳过的目录(运行时产物/依赖,不是源代码)
 SCAN_SKIP_DIRS = {".git", "__pycache__", "node_modules", "data", "backups",
                   "build", "dist", ".skill-keeper"}
-PERSONAL_PATH_RE = re.compile(r"/Users/[A-Za-z0-9._-]+/")
+PERSONAL_PATH_RES = (
+    re.compile(r"(?<![A-Za-z0-9._/-])/Users/(?P<user>[A-Za-z0-9._-]+)/"),
+    re.compile(r"(?<![A-Za-z0-9._/-])/home/(?P<user>[A-Za-z0-9._-]+)/"),
+    re.compile(r"[A-Za-z]:\\Users\\(?P<user>[^\\/\r\n]+)\\"),
+)
+PLACEHOLDER_USERS = {"user", "example", "fixture", "test", "runneradmin"}
+TRACKED_RUNTIME_ALLOWLIST = {
+    "data/client-locations.example.json", "data/groups.example.json",
+    "data/known-sources.example.json", "data/self-built.example.txt",
+    "data/workspace-locations.example.txt",
+}
 SECRET_RES = (
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
@@ -38,6 +48,9 @@ def run_tests(test_dir):
         sys.path.insert(0, str(BASE))
     loader = unittest.TestLoader()
     suite = loader.discover(str(test_dir))
+    # unittest 默认在运行后清空 suite 内的测试引用。测试 ID 必须在 run 前冻结，
+    # 否则附加基线检查会把全部旧测试误报为“缺失”。
+    test_ids = collect_test_ids(suite)
     runner = TextTestRunner(verbosity=1, stream=sys.stderr)
     result = runner.run(suite)
     return {
@@ -46,7 +59,7 @@ def run_tests(test_dir):
         "failures": len(result.failures),
         "errors": len(result.errors),
         "result": result,
-        "suite": suite,
+        "test_ids": test_ids,
     }
 
 
@@ -60,13 +73,13 @@ def collect_test_ids(suite):
     return ids
 
 
-def check_baseline_ids(suite):
+def check_baseline_ids(test_ids):
     """v3.1.1 冻结的全部原测试 ID 必须仍然存在(防删测试/防改名)。"""
     path = Path(BASELINE_IDS_PATH)
     if not path.is_file():
         return {"ok": False, "error": "基线 ID 文件缺失: {}".format(path)}
     baseline = set(json.loads(path.read_text(encoding="utf-8")))
-    current = set(collect_test_ids(suite))
+    current = set(test_ids)
     missing = sorted(baseline - current)
     return {"ok": not missing, "baseline": len(baseline),
             "missing": missing[:20], "missing_count": len(missing)}
@@ -118,12 +131,17 @@ def check_path_secret_scan():
     try:
         out = subprocess.run(["git", "ls-files"], cwd=str(BASE), capture_output=True,
                              text=True, timeout=30)
+        if out.returncode != 0:
+            raise subprocess.SubprocessError("git ls-files failed")
         files = [line for line in out.stdout.splitlines() if line.strip()]
     except (OSError, subprocess.SubprocessError):
         files = [str(p.relative_to(BASE)) for p in sorted(BASE.rglob("*"))
                  if p.is_file() and not (set(p.parts) & SCAN_SKIP_DIRS)]
     violations = []
     for rel in files:
+        parts = Path(rel).parts
+        if parts and parts[0] in ("data", "backups") and rel not in TRACKED_RUNTIME_ALLOWLIST:
+            violations.append("{}: tracked-runtime-file".format(rel))
         path = BASE / rel
         if not path.is_file() or path.stat().st_size > 4 * 1024 * 1024:
             continue
@@ -133,9 +151,12 @@ def check_path_secret_scan():
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        for pattern in PERSONAL_PATH_RE, *SECRET_RES:
+        for pattern in PERSONAL_PATH_RES:
             hit = pattern.search(text)
-            if hit:
+            if hit and hit.group("user").lower() not in PLACEHOLDER_USERS:
+                violations.append("{}: {}".format(rel, pattern.pattern))
+        for pattern in SECRET_RES:
+            if pattern.search(text):
                 violations.append("{}: {}".format(rel, pattern.pattern))
     return {"ok": not violations, "violations": violations[:20],
             "scanned_files": len(files)}
@@ -182,7 +203,7 @@ def main():
     if not smoke and passed:
         # 附加反作弊/合同检查:任何一项失败都让验收失败
         verdict["checks"] = {
-            "baseline_ids": check_baseline_ids(stats["suite"]),
+            "baseline_ids": check_baseline_ids(stats["test_ids"]),
             "location_input_probe": check_location_input_probe(),
             "model_input_immutable_probe": check_model_input_immutable_probe(),
             "path_secret_scan": check_path_secret_scan(),
@@ -192,6 +213,9 @@ def main():
             if not result.get("ok"):
                 verdict["ok"] = False
                 verdict.setdefault("failed_checks", []).append(name)
+
+    # 退出码与展示必须以包含附加检查的最终结论为准。
+    passed = bool(verdict["ok"])
 
     if args.json:
         print(json.dumps(verdict, ensure_ascii=False, indent=1))

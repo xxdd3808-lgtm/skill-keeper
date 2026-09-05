@@ -4,6 +4,7 @@
 绝不写真实 token/key,也绝不指向真实用户目录。
 """
 import json
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -129,5 +130,18 @@ def copy_private_v311_fixture(testcase):
     data = td / "data"
     shutil.copytree(PRIVATE_V311_FIXTURE / "home", home, symlinks=True)
     shutil.copytree(PRIVATE_V311_FIXTURE / "data", data)
+    # Windows checkout 常把仓库 symlink 物化成只含目标的普通文本文件。
+    # 在临时 HOME 内重建，避免测试碰真实目录；若平台确实不支持则明确失败。
+    for rel, target in ((".workbuddy/skills/wb-link", "../../.agents/skills/shared-alpha"),
+                        (".workbuddy/skills/wb-drift", "../staging/shared-beta-v2")):
+        link = home / rel
+        if link.is_symlink():
+            continue
+        if link.exists():
+            if link.is_dir():
+                shutil.rmtree(link)
+            else:
+                link.unlink()
+        os.symlink(target, str(link), target_is_directory=True)
     testcase.addCleanup(shutil.rmtree, td, ignore_errors=True)
     return home, data

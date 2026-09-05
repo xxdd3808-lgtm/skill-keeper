@@ -36,6 +36,7 @@ from scripts.core.changes import (ChangeContext, ChangeError, LockBusy,  # noqa:
 from scripts.core.io import atomic_write_json, load_json_checked   # noqa: E402
 from scripts.core.provenance import load_user_config               # noqa: E402
 from scripts.core.runtime import default_data_dir                  # noqa: E402
+from scripts.core.platform import user_home                        # noqa: E402
 
 MAX_BODY = 64 * 1024
 SERVER_VERSION = "skill-keeper/2.0"
@@ -46,7 +47,7 @@ class ServiceContext:
 
     def __init__(self, data_dir, home=None, backup_dir=None):
         self.data_dir = Path(data_dir)
-        self.home = Path(home) if home else Path(os.path.expanduser("~"))
+        self.home = user_home(home)
         base = Path(BASE)
         self.backup_dir = (Path(backup_dir) if backup_dir else
                            (base / "backups" if self.data_dir == base / "data"

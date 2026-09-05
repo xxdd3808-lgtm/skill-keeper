@@ -14,9 +14,9 @@
   候选暂存迁出技能树(ZCode 面板泄漏修复);Haha 读共享库假设撤销(26 幻影双载);
   外部 Agent 删除复核——known_sources 省略绕过 builtin-app 保护的口子堵上;
   报告三组导航与定位。
-- **2026-09-02 运维记事**:AutoClaw 残留清理(18 实例,plan/apply+备份+审计);
-  `~/.openclaw-autoclaw` 残留整体清除(用户确认,归档在册);Claude Code 卸载后
-  只留 Haha,claude 插件缓存随之消失。
+- **2026-09-02 防线复盘**:卸载客户端可能留下正常适配器看不见的 Skill 树；
+  外部调用若省略 `known_sources` 曾可绕过 builtin-app 保护。修复后策略在边界自行加载
+  保护配置，调用者只能增加保护，不能省略保护。
 - **2026-09-05 可信性优化(F01–F11)**:备份/恢复合同与路径边界、统一执行策略、
   事务与中断恢复、观察完整性、审查有效性、候选/缓存生命周期、CLI/API/报告闭环、
   队列索引复用(读取 12800→80、评分 259120→3160)、外部运行态、验收入口。
@@ -25,19 +25,17 @@
   列出放在 `~/.agents/skills` 的全部逻辑 Skill 及其价值结论、其他占用客户端与
   plan 入口(HTML/Markdown 双通道);安装实例明细的客户端列改为友好标签
   (shared→共享库)。用户反馈驱动:该事实此前只藏在明细表 client 列里。
-- **2026-09-05 运维记事**:ego-browser 共享库快捷方式(`~/.agents/skills/ego-browser`,
-  2026-09-03 建)经用户确认摘除——ZCode/Codex 自带浏览器控制不需要加载它;
-  实体保留于 `~/.local/share/ego/ego-skills`,Haha/WorkBuddy/Accio 的直连快捷方式保留。
-  防线按设计拒绝 builtin-app 删除计划(实体与快捷方式不区分),按手册走符号链接
-  手工修;恢复命令 `ln -s ~/.local/share/ego/ego-skills ~/.agents/skills/ego-browser`。
-  摘除后 ZCode 45→44、Codex 69→68,builtin-app-spread 黄灯消除。引擎空档
-  (builtin-app 散布快捷方式无法走正规收回流程)记入 AGENTS.md 候选改进。
+- **2026-09-05 防线复盘**:builtin-app 的 owner 正本和非 owner 位置散布副本原先
+  被一刀切保护，导致散布副本无法走正规收回。v3.1.1 增加按住址区分的安全通道。
 - **v3.1.1(2026-09-05)**:补上 builtin-app 散布收回通道——known-sources 的
   builtin-app 条目可选登记 `owner`(所属客户端);`check_action` 按住址细分:
   owner 位置的正本删除/更新照旧拒绝,非所属位置的散布快捷方式允许走正规
   remove(计划→确认→备份→事务→审计),update 与位置缺失照旧拒绝,未登记
-  owner 的条目行为不变。ego-browser 已登记 owner:ego。回归测试锁定五种情形
+  owner 的条目行为不变。回归测试锁定五种情形
   (散布放行/正本拒绝/未登记拒绝/update 拒绝/无位置拒绝)+ 端到端计划测试。
+- **v4.0.0(2026-09-05)**:统一安装与 CLI、最小跨平台锁/路径底座、模型位置声明、
+  apply 前真实目标预检、四平台 CI。独立复核随后修复验收器附加门槛假成功、
+  共享根客户端关系丢失、临时根越界、Windows HOME 隔离、锁异常清理和错误回显边界。
 
 ## 历史教训(规则来源)
 

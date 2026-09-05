@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from ..models import Location
+from ..platform import expand_user_path, user_home
 from .base import ClientAdapter, WORKSPACE_CLIENT_PREFIX, hashed_token
 
 
@@ -23,7 +24,7 @@ def haha_installed(home: Path) -> bool:
     if (Path(home) / "Applications" / app).is_dir():
         return True
     try:
-        same_home = str(Path(home).resolve()) == str(Path("~/").expanduser().resolve())
+        same_home = str(Path(home).resolve()) == str(user_home().resolve())
     except OSError:
         same_home = False
     return same_home and (Path("/Applications") / app).is_dir()
@@ -44,7 +45,7 @@ class CommonAdapter(ClientAdapter):
         rows = []
         aliases = tuple(client_load_aliases(home).get("shared", []))
         rows.extend(self._default_dirs(home, aliases))
-        rows.extend(self._workspace_dirs(Path(data_dir)))
+        rows.extend(self._workspace_dirs(Path(data_dir), home))
         return rows
 
     def _default_dirs(self, home: Path, aliases):
@@ -68,7 +69,7 @@ class CommonAdapter(ClientAdapter):
                                  "plugin-cache", False, ("claude-plugin-cache-layout",)))
         return rows
 
-    def _workspace_dirs(self, data_dir: Path):
+    def _workspace_dirs(self, data_dir: Path, home: Path):
         rows = []
         cfg = data_dir / "workspace-locations.txt"
         if not cfg.is_file():
@@ -77,7 +78,7 @@ class CommonAdapter(ClientAdapter):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            path = Path(os.path.expanduser(line))
+            path = Path(expand_user_path(line, home))
             if not path.is_dir():
                 continue
             client = (WORKSPACE_CLIENT_PREFIX + "claude" if ".claude" in path.parts

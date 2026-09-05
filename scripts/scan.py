@@ -25,10 +25,11 @@ from scripts.core.io import atomic_write_json, load_json_checked, redact_secrets
 from scripts.core.location_input import (LocationInputError, MAX_DECL_BYTES,  # noqa: E402
                                          parse_cli_roots, parse_declaration)
 from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
-from scripts.core.platform import is_absolute_path  # noqa: E402
+from scripts.core.platform import (expand_user_path, is_absolute_path,        # noqa: E402
+                                   is_strictly_within, user_home)
 from scripts.core.runtime import default_data_dir  # noqa: E402
 
-HOME = os.path.expanduser("~")
+HOME = str(user_home())
 LOCK_FILE = os.path.join(HOME, ".agents/.skill-lock.json")
 CLIENT_LABELS = load_rules.CLIENT_LABELS
 DUP_FINDING_CLIENTS = load_rules.DUP_FINDING_CLIENTS
@@ -255,7 +256,7 @@ def _plugin_coordinates(root: Path, location_path=None):
         return "", "", ""
 
 
-def _extra_locations(data_dir: Path):
+def _extra_locations(data_dir: Path, home=None):
     """可选的 data/client-locations.json:用户登记的额外客户端目录(字段白名单)。
 
     「可选文件未创建」与「已有文件损坏」分开报告:后者进 config_issues。"""
@@ -273,7 +274,7 @@ def _extra_locations(data_dir: Path):
             issues.append({"code": "bad-client-locations", "detail": f"第 {i + 1} 项不是对象"})
             continue
         loc_id = str(item.get("location_id") or "").strip()
-        path = os.path.expanduser(str(item.get("path") or "").strip())
+        path = expand_user_path(str(item.get("path") or "").strip(), home)
         kind = str(item.get("kind") or "").strip()
         client = str(item.get("client") or loc_id or "custom").strip()
         mutable = item.get("mutable")
@@ -444,7 +445,7 @@ def _effective_loaded(instances):
     return loaded, stale
 
 
-def _client_load_stats(instances, locations):
+def _client_load_stats(instances, locations, reported_roots=None):
     """每个客户端真实加载的技能条目数与同名重复(启动上下文口径)。"""
     loaded, _ = _effective_loaded(instances)
     stats = {}
@@ -459,6 +460,21 @@ def _client_load_stats(instances, locations):
             "entries": len(insts), "skills": len(by_name), "duplicates": dups,
             "dup_entries": len(insts) - len(by_name),
         }
+    # 未知客户端无需新适配器：按它自报读取的位置计算启动上下文。
+    # 同一物理位置仍只扫描一次，reported_roots 只补客户端→位置关系。
+    unknown_clients = sorted({r["client"] for r in (reported_roots or [])
+                              if r["client"] not in CLIENT_LABELS})
+    for client in unknown_clients:
+        loc_ids = {r["location_id"] for r in (reported_roots or []) if r["client"] == client
+                   and r.get("location_id")}
+        insts = [i for i in loaded if i["is_skill"] and i["location_id"] in loc_ids]
+        by_name = {}
+        for i in insts:
+            by_name.setdefault(i["logical_name"], []).append(i)
+        dups = sorted(n for n, rows in by_name.items() if len(rows) > 1)
+        stats[client] = {"entries": len(insts), "skills": len(by_name),
+                         "duplicates": dups, "dup_entries": len(insts) - len(by_name),
+                         "reported": True}
     return stats
 
 
@@ -479,7 +495,7 @@ def _nested_skill_trees(inst, max_depth=4, limit=5):
     return hits[:limit], len(hits)
 
 
-def _structural_findings(instances, locations, data_dir):
+def _structural_findings(instances, locations, data_dir, reported_roots=None):
     """按客户端加载拓扑查重复加载;链接漂移;插件旧版本残留;应用内置技能扩散。"""
     findings = []
     loaded, stale = _effective_loaded(instances)
@@ -505,11 +521,11 @@ def _structural_findings(instances, locations, data_dir):
     # 模型自报客户端(无适配器):其声明根内部的同名重复仍要可见,
     # 但口径是"客户端自报",等待本地确认;绝不冒充精确加载事实。
     known_clients = set(CLIENT_LABELS)
-    model_clients = sorted({l["client"] for l in locations
-                            if "model-declaration" in (l.get("evidence") or [])
-                            and l["client"] not in known_clients})
+    model_clients = sorted({r["client"] for r in (reported_roots or [])
+                            if r["client"] not in known_clients})
     for client in model_clients:
-        loc_ids = {l["location_id"] for l in locations if l["client"] == client}
+        loc_ids = {r["location_id"] for r in (reported_roots or [])
+                   if r["client"] == client and r.get("location_id")}
         for name in sorted({n for n, v in by_name.items()
                             if len([i for i in v if i["location_id"] in loc_ids]) > 1}):
             insts = [i for i in by_name[name] if i["location_id"] in loc_ids]
@@ -643,16 +659,18 @@ def _model_locations(model_roots, home):
     rows, misses = [], []
     for root in model_roots or []:
         real = os.path.realpath(root["path"])
-        if not os.path.isdir(real) or real == os.path.realpath(str(home)):
+        if not is_strictly_within(real, home):
+            raise InventoryError("模型声明位置必须严格位于当前用户 HOME 内")
+        if not os.path.isdir(real):
             misses.append({"client": root["client"],
                            "display": _display_path(root["path"], home)})
             continue
         loc_id = "model-{}-{}".format(root["client"],
                                       instance_id("model", root["client"], real)[:8])
-        rows.append(Location(
+        rows.append((Location(
             loc_id, root["client"], real, "user", False,
             ("model-declaration", "scope:" + root["scope"],
-             "load-state:" + root["load_state"])))
+             "load-state:" + root["load_state"])), root))
     return rows, misses
 
 
@@ -666,21 +684,33 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
     home, data_dir = Path(home), Path(data_dir)
     from scripts.core.observations import evaluate_load, load_receipt_evidence
     locations = discover_locations(home, data_dir)
-    extra, config_issues = _extra_locations(data_dir)
+    extra, config_issues = _extra_locations(data_dir, home)
     locations = sorted(_dedupe(locations + extra), key=lambda x: x.location_id)
 
     # Task 3:模型临时位置声明 —— 只读、不可变;与已有位置按真实路径去重,
     # 本机事实优先(适配器/client-locations 命中的路径不再接受声明副本)。
     model_rows, model_misses = _model_locations(model_roots, home)
-    existing_real = {os.path.realpath(l.path) for l in locations}
-    model_seen = set()
+    location_by_real = {os.path.realpath(l.path): l for l in locations}
+    model_seen = {}
     model_deduped = []
-    for row in model_rows:
+    reported_roots = []
+    reported_seen = set()
+    for row, declaration in model_rows:
         real = os.path.realpath(row.path)
-        if real in existing_real or real in model_seen:
-            continue
-        model_seen.add(real)
-        model_deduped.append(row)
+        target = location_by_real.get(real) or model_seen.get(real)
+        if target is None:
+            target = row
+            model_seen[real] = row
+            model_deduped.append(row)
+        claim_key = (declaration["client"], target.location_id)
+        if claim_key not in reported_seen:
+            reported_seen.add(claim_key)
+            reported_roots.append({
+                "client": declaration["client"], "location_id": target.location_id,
+                "display_path": _display_path(real, home),
+                "load_state": declaration["load_state"],
+                "complete": bool(declaration.get("complete")),
+            })
     locations = sorted(_dedupe(locations + model_deduped), key=lambda x: x.location_id)
 
     instances, findings = [], []
@@ -704,7 +734,8 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
                     obs_issues.append({"code": "instance-unreadable",
                                        "instance_id": inst["instance_id"],
                                        "path": inst.get("display_path")})
-    findings.extend(_structural_findings(instances, [l.to_dict() for l in locations], data_dir))
+    findings.extend(_structural_findings(
+        instances, [l.to_dict() for l in locations], data_dir, reported_roots))
     for miss in model_misses:
         findings.append({
             "code": "model-root-missing", "severity": "yellow", "instance_id": "-",
@@ -714,7 +745,8 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
             "ignored": False})
     _apply_ignore(findings, data_dir)
     logical = _build_logical_skills(instances)
-    client_load = _client_load_stats(instances, [l.to_dict() for l in locations])
+    client_load = _client_load_stats(
+        instances, [l.to_dict() for l in locations], reported_roots)
 
     # 已有配置文件损坏(known-sources)也计入观察问题;可选文件未创建不算
     ks_value, ks_issues = load_json_checked(Path(data_dir) / "known-sources.json", {})
@@ -735,12 +767,14 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
             "workspace": os.path.abspath(str(workspace)) if workspace else None,
             "locations": len(locations),
             "instances": len(instances),
-            "model_roots": len(model_deduped),
+            "model_roots": len(reported_roots),
+            "model_locations": len(model_deduped),
             "model_inputs_complete": bool(model_roots) and all(
                 r.get("complete") for r in (model_roots or [])),
         },
         "rule_version": load_rules.RULE_VERSION,
         "load_contexts": load_contexts,
+        "reported_roots": reported_roots,
     }
 
     inv = {
@@ -806,7 +840,7 @@ def _summary_rows(inv):
     return red, yellow, dup, len([f for f in inv["findings"] if f["ignored"]])
 
 
-def _collect_model_inputs(argv):
+def _collect_model_inputs(argv, home=None):
     """解析 --root CLIENT=PATH 与 --locations-json FILE|-;返回 normalized model_roots。
 
     只读文本;拒绝发生在任何扫描/落盘之前。声明经 stdin("-")时按 64KiB 上限读取。
@@ -849,6 +883,8 @@ def _collect_model_inputs(argv):
         raise LocationInputError("模型位置根总数超过 32 个上限")
     for root in roots:
         root.setdefault("complete", False)
+        if home is not None and not is_strictly_within(root["path"], home):
+            raise LocationInputError("位置声明必须严格位于当前用户 HOME 内")
     return roots
 
 
@@ -863,12 +899,12 @@ def main(argv=None):
         print("环境变量: SKILL_KEEPER_DATA 可覆盖数据目录(测试/多环境)")
         return 0
     try:
-        model_roots = _collect_model_inputs(argv)
+        home = user_home()
+        model_roots = _collect_model_inputs(argv, home=home)
     except LocationInputError as e:
         print(json.dumps({"ok": False, "error": "位置声明被拒绝: {}".format(e)},
                          ensure_ascii=False))
         return 2
-    home = Path(os.path.expanduser("~"))
     ddir = data_dir()
     try:
         inv = build_inventory(home, ddir, model_roots=model_roots or None)
