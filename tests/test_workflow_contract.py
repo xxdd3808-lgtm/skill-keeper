@@ -158,7 +158,9 @@ class WorkflowContractTests(unittest.TestCase):
         text = report_mod.static_command_hint()
         self.assertTrue(text)
         self.assertNotIn("'~", text, "~ 不得被整体引号包住")
-        self.assertIn("manage.py", text)
+        self.assertTrue(text.startswith("skill-keeper manage "),
+                        "复制命令必须是安装态统一 CLI(离开仓库也可用)")
+        self.assertNotIn("scripts/manage.py", text)
 
 
 def _inventory_report_text(paths):

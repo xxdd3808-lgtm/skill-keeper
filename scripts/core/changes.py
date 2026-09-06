@@ -231,6 +231,10 @@ def create_restore_plan(backup_id, backup_dir, plans_dir) -> ChangePlan:
 
 VET_VERDICTS = ("safe", "warning")
 
+# 复核修复(2026-09-06):网页展示的安检命令里带"必填"占位标记;照抄占位文本
+# 当证据会形成"安检通过"的假记录——后端在任何其他校验之前先拒绝这些标记
+VET_EVIDENCE_PLACEHOLDERS = ("【必填】", "填写可核查依据", "在此填写", "<你的核查依据>")
+
 
 def vet_path(plan_id, plans_dir) -> Path:
     return Path(plans_dir) / (str(plan_id) + ".vet.json")
@@ -238,6 +242,13 @@ def vet_path(plan_id, plans_dir) -> Path:
 
 def record_candidate_vet(plan_id, candidate_hash, verdict, evidence, plans_dir=None) -> dict:
     """记录候选安检结论;只接受与计划绑定的当前候选 hash;danger 判危候选直接废弃,不进应用流程。"""
+    evidence = [str(e).strip() for e in (evidence or [])]
+    for e in evidence:
+        hit = next((m for m in VET_EVIDENCE_PLACEHOLDERS if m in e), None)
+        if hit:
+            raise ChangeError(
+                "安检证据仍是占位文本(含「{}」),不能当作可核查依据;"
+                "请替换为你实际做过的核查记录(读了什么/对比了什么/结论)".format(hit))
     if plans_dir is None:
         plans_dir = Path(os.environ.get("SKILL_KEEPER_DATA") or
                          os.path.join(BASE_DIR, "data")) / "change-plans"
@@ -253,7 +264,6 @@ def record_candidate_vet(plan_id, candidate_hash, verdict, evidence, plans_dir=N
         raise ChangeError("安检对象必须是计划绑定的当前候选 hash")
     if verdict not in VET_VERDICTS:
         raise ChangeError("verdict 必须是 safe|warning;判危(danger)候选直接废弃,重新生成候选后再安检")
-    evidence = [str(e).strip() for e in (evidence or [])]
     if not any(evidence):
         raise ChangeError("安检证据不能为空:至少给出一条可核查依据(来源/阅读记录/对比结论)")
     record = {"plan_id": str(plan_id), "candidate_hash": str(candidate_hash),

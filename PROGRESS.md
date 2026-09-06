@@ -157,3 +157,16 @@
 - 提交列表(本收尾轮):aadcdba(第一阶段修复,任务书前基线)→ fea9a30(任务1)→ e20bb39(任务2)→ e40b26e(任务3)→ 750df63(任务4)→ 本提交(任务5 收尾)。
 - 性能前后(同 benchmark 同语料):80 项 0.149→0.026s;200 项 2.714→0.168s;400 项 38.044→0.792s(48×);800 项 ~6 分钟未完成→3.395s / RSS 558MiB。
 - 仍需领导授权的动作:push、CI 四平台复核、合并 main、打 tag、发 Release。
+
+## 独立复核修复(2026-09-06 晚):6 个发布阻断项
+
+用户独立复核确认 HEAD 2f4ca9e / verify 364 全绿 / 性能复现(400 项 0.76s、800 项 3.26s)后,指出 6 个发布阻断项,全部修复:
+
+1. **SKILL.md 缺开头 `---`**(frontmatter 无法解析,Skill 无法被发现):已补;新增 parse_frontmatter_detailed 直接解析 SKILL.md 的回归(含 name/description 校验)。
+2. **复制命令离开仓库即失败**:网页安检/执行命令、静态报告 plan/restore 命令、serve 安检提示与 apply_hint 全部改为安装态统一 CLI `skill-keeper manage ...`;apply_hint 原指向旧式 remove_skill.py(只打印迁移说明),一并修正;新增回归锁定 JS/report.py/serve.py 不再出现 `python3 scripts/manage.py`。
+3. **占位证据可照抄成假 safe**:网页展示的安检命令证据改为「【必填】替换为…」标记;后端 record_candidate_vet 在任何其他校验之前拒绝占位文本(【必填】/填写可核查依据/在此填写/<你的核查依据>),错误消息点名"占位";回归测试从 JS 提取实际展示的占位串,断言后端拒绝且消息含"占位"(防无关原因假绿)。
+4. **SKILL.md 更新顺序不可执行**:改为 updates 暂存 → plan update 建计划 → 对该计划 vet 安检 → apply;新增工作流章节内的锚点顺序断言。
+5. **AGENTS.md 状态段过期**:改为"收尾轮已全部修完 + verify 364 项 + 待授权流程",新增一致性断言(不再出现"第二/三/四阶段均未执行")。
+6. **发布对象未定**(scripts/__init__.py=4.0.0 与 tag v4.0.0 并存):按授权流程在"合并 main 后、打 tag 前"确定;**建议 4.1.0**(新增 CLI 命令与行为变化,非破坏性);届时 bump `scripts/__init__.py` + SKILL.md version 字段并同步 test_migrations_docs 断言、补 Release 内容。本提交不改版本号。
+- 两条既有断言锁的是被否决的 manage.py 形态(test_update_flow_pauses_for_formal_vetting / test_static_commands_are_runnable),按新合同更新为 skill-keeper 形态——语义更严而非放宽。
+- verify **373 项** 0 失败 0 跳过;`git diff --check` 通过。

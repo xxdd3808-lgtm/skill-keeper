@@ -278,29 +278,25 @@ def _repo_root():
     return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-def _manage_entry():
-    """仓库相对入口(F08):相对路径在仓库根可直接运行,示例报告也不泄漏个人路径。"""
-    return os.path.join("scripts", "manage.py")
-
-
 def _safe_plan_cmd(iid):
-    """静态报告里可复制的安全命令:在仓库根运行;只含 instance_id,绝不含目录名。
+    """静态报告里可复制的安全命令:安装态统一 CLI;只含 instance_id,绝不含目录名。
 
-    F08 修复:旧版 shlex.join 里写死 "~/skill-keeper/...",~ 被整体引号包住
-    无法展开,复制出来的命令不可运行。"""
-    return shlex.join(["python3", _manage_entry(),
+    F08 修复:旧版写死 "~/skill-keeper/...",~ 被整体引号包住无法展开;
+    复核修复(2026-09-06):python3 scripts/manage.py 离开仓库就失败,
+    统一改为安装态 `skill-keeper manage ...`。"""
+    return shlex.join(["skill-keeper", "manage",
                        "plan", "remove", "--instance-id", str(iid),
                        "--reason", "报告建议,请补充或修改理由"])
 
 
 def static_restore_cmd(backup_id):
-    """恢复按钮在静态模式的等价命令(F08:此前复制到剪贴板却没有任何命令)。"""
-    return shlex.join(["python3", _manage_entry(),
+    """恢复按钮在静态模式的等价命令(安装态统一 CLI;此前复制到剪贴板却没有任何命令)。"""
+    return shlex.join(["skill-keeper", "manage",
                        "plan", "restore", "--backup-id", str(backup_id)])
 
 
 def static_command_hint():
-    """自检用:静态模式必须能给出可运行的命令示例(在仓库根运行)。"""
+    """自检用:静态模式必须能给出可运行的命令示例(安装态统一 CLI)。"""
     return _safe_plan_cmd("0" * 20)
 
 

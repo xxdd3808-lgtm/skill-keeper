@@ -111,7 +111,7 @@ def _handle_vet(ctx, body):
     if not evidence:
         raise ChangeError(
             "安检结论必须携带可核查证据(evidence 不能为空);网页点击不构成安检,"
-            "请用正式流程: python3 scripts/manage.py vet {} --verdict safe "
+            "请用正式流程: skill-keeper manage vet {} --verdict safe "
             "--evidence <你的核查依据>".format(str(body.get("plan_id") or "<plan_id>")))
     return ctx.service.vet_candidate(str(body.get("plan_id") or ""),
                                       str(body.get("verdict") or ""), evidence)
@@ -135,8 +135,10 @@ def _handle_plan(ctx, body):
         else:
             raise ChangeError("action 必须是 remove|restore|update")
     row = _plan_public(plan.to_dict())
-    row["apply_hint"] = shlex.join([sys.executable, os.path.join(BASE, "scripts", "remove_skill.py"),
-                                    "apply", row["plan_id"], "--digest", row["digest"], "--confirm"]) \
+    # 复核修复(2026-09-06):此前指向旧式 remove_skill.py(只打印迁移说明),
+    # 且离开仓库不可用;统一改为安装态 CLI
+    row["apply_hint"] = shlex.join(["skill-keeper", "manage", "apply", row["plan_id"],
+                                    "--digest", row["digest"], "--confirm"]) \
         if action == "remove" else None
     return row
 

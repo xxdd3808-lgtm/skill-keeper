@@ -32,8 +32,8 @@ function afterApply(ar,b,okMsg){
 }
 function showVetPanel(p){
   const old=document.getElementById('vet-panel');if(old)old.remove();
-  const vetCmd='python3 scripts/manage.py vet '+p.plan_id+' --verdict safe --evidence "填写可核查依据:已读候选全文/来源核对/差异结论"';
-  const applyCmd='python3 scripts/manage.py apply '+p.plan_id+' --digest '+p.digest+' --confirm';
+  const vetCmd='skill-keeper manage vet '+p.plan_id+' --verdict safe --evidence "【必填】替换为你实际核查过的依据:已读候选全文/来源核对/差异结论"';
+  const applyCmd='skill-keeper manage apply '+p.plan_id+' --digest '+p.digest+' --confirm';
   const host=document.getElementById('vet-panel-host')||document.body;
   const div=document.createElement('div');
   div.className='vet-panel';div.id='vet-panel';

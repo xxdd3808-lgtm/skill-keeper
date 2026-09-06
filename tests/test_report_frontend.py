@@ -125,7 +125,8 @@ class ReportFrontendTests(unittest.TestCase):
         可核查证据),浏览器绝不携带 verdict 调 /api/vet 造记录。
         """
         js = report_mod.JS_BLOB
-        self.assertIn("manage.py vet", js, "更新流程必须给出正式安检命令")
+        self.assertIn("skill-keeper manage vet", js,
+                      "更新流程必须给出安装态统一 CLI 的正式安检命令")
         self.assertIn("vet-continue", js, "安检后的续办执行必须有处理分支")
         self.assertNotIn("/api/vet", js,
                          "浏览器脚本不得直接记账安检:confirm 不等于 safe")
