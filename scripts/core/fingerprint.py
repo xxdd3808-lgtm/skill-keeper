@@ -145,7 +145,12 @@ def canonical_manifest_document(manifest):
 
 
 def tree_hash(root) -> str:
-    """完整目录树 SHA-256(不截断)。内容、权限、路径、链接目标任一变化都会改变结果。"""
+    """完整目录树 SHA-256(不截断)。内容、权限、路径、链接目标任一变化都会改变结果。
+
+    边界合同(F13):指纹只覆盖根目录之下的树;根目录自身的元数据(mode/mtime)
+    不参与指纹——"根目录被换成符号链接/指向别处"由计划前置键 root_real、
+    is_symlink 与执行期预检另行校验,本函数不重复承担该职责。
+    """
     doc = canonical_manifest_document(tree_manifest(root))
     canonical = json.dumps(doc, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

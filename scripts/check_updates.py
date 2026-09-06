@@ -262,12 +262,15 @@ def main():
                   "differs": [], "up_to_date": [], "skipped": [{"name": "-",
                   "reason": "inventory 缺失或为空({})".format(issues[0]["code"] if issues else "empty")}],
                   "operational_ok": issues == []}
-        atomic_write_json(output_path, result)
-        # F05:输入缺失/损坏是操作失败,退出码 2;不得覆盖已有成功结果为"全都无差异"
+        # F11:输入缺失/损坏是本次运行失败——上一份可用结果必须保留,
+        # 绝不覆盖成"全都无差异"(result 只在没有任何历史输出时落盘)
+        if not output_path.exists():
+            atomic_write_json(output_path, result)
+        # 退出码 2;不得覆盖已有成功结果为"全都无差异"
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=1))
             sys.exit(2)
-        print("⛔ inventory 缺失或为空,先跑 scan.py")
+        print("⛔ inventory 缺失或为空,先跑 scan.py(已有 updates.json 保留未动)")
         sys.exit(2)
 
     try:

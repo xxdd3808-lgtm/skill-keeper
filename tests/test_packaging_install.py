@@ -97,6 +97,47 @@ class PackagingInstallTests(unittest.TestCase):
         self.assertEqual(shipped, "1", "scripts/assets/report.js 未进安装包")
         self.assertGreater(int(blob_len), 0, "安装态 JS_BLOB 必须能从资源加载")
 
+    def test_installed_new_default_layout_full_roundtrip(self):
+        """任务2:真安装态(BASE 无 v2/v3 标记)下新默认 ~/.skill-keeper 布局
+        完整入口回归——doctor→scan→report→plan→apply→备份可见→restore。"""
+        from tests.helpers import write_skill
+        demo = write_skill(self._home / ".agents/skills", "demo", description="layout")
+        env = self._env()
+        r = self._run("doctor", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        doc = json.loads(r.stdout[r.stdout.index("{"):])
+        self.assertEqual(doc["layout"], "new")
+        backup_dir = Path(doc["paths"]["backup_dir"])
+        data_dir = Path(doc["paths"]["data_dir"])
+
+        r = self._run("scan", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        inv = json.loads((data_dir / "inventory.json").read_text())
+        iid = inv["instances"][0]["instance_id"]
+        r = self._run("report", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+
+        r = self._run("manage", "plan", "remove", "--instance-id", iid,
+                      "--reason", "layout roundtrip", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        plan = json.loads(r.stdout[r.stdout.index("{"):])
+        r = self._run("manage", "apply", plan["plan_id"], "--digest", plan["digest"],
+                      "--confirm", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        self.assertFalse(demo.exists())
+
+        backups = sorted(backup_dir.glob("backup-*.tar.gz"))
+        self.assertTrue(backups, "新默认布局的备份必须落在 ~/.skill-keeper/backups")
+        r = self._run("manage", "plan", "restore",
+                      "--backup-id", backups[-1].name[len("backup-"):-len(".tar.gz")],
+                      "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        plan = json.loads(r.stdout[r.stdout.index("{"):])
+        r = self._run("manage", "apply", plan["plan_id"], "--digest", plan["digest"],
+                      "--confirm", "--json", env=env)
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        self.assertTrue((demo / "SKILL.md").exists(), "恢复必须把实体放回原位")
+
 
 if __name__ == "__main__":
     unittest.main()

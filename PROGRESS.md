@@ -122,3 +122,13 @@
 - 缺口3(政策版本):record_review 保存实际 review_policy_version;evaluate_review 缺版本=policy-version-unproven、不一致=policy-changed,均 needs-recheck;当前政策版本可显式传入比对。红→绿:test_record_saves_actual_policy_version/test_unprovable_policy_version_expires。旧测试夹具补齐版本字段(语义更严,非放宽)。
 - 浏览器验收(IAB 真实点击,临时 HOME/DATA/STAGING,confirm 用记录式替身模拟用户点确定——IAB 后端会自动取消原生对话框,已如实记录):①顶部指标跳转 hash=#verdict-unreviewed+区块展开在视口;②「复制安检命令」剪贴板捕获完整 vet 命令;③更新续办:面板展示 plan-20260906-161351-de58f985+正式命令→未安检点继续被拒("❌ 尚未安检")→CLI 带 evidence 安检→点继续→v2 落盘+事务 committed;④删除 demo→两段 confirm→committed+刷新失败诚实 toast→点刷新报"❌ 重扫失败"→修复可读性后再刷新成功→报告出现备份行;⑤恢复按钮→demo 回原位(demo body v1 落盘)。
 - verify 341 项 0 失败 0 跳过(基线 233 保留)。
+
+### 任务2 完成(2026-09-06):F10–F13 数据口径统一
+
+- **F10 加载模型唯一化**:插件多版本"只有最高版本参与加载"的判定移入 observations.effective_loaded,evaluate_load 统一应用;scan._client_load_stats 改为从 evaluate_load(全局上下文) 派生(entries=eligible、重复=评估内 duplicates),未知客户端经 eligible_location_ids 显式覆盖走同一评估核;duplicate-load 发现同步改为评估派生 + 新增"工作区内同名"口径(标明工作区,不再冒充全局启动占用),跨项目同名不再误报。红→绿:test_cross_project_same_name_not_global_duplicate(病灶:2 条+重复告警)、test_client_load_and_load_contexts_agree_everything。
+- **F11 观察不完整如实报错**:client-locations.json 损坏 → observation.issues + complete=false(scan 退出 2),config_issues 保留解析细节;report --json 的 operational_ok 反映 observation.complete,不完整退出 2(此前硬编码 True);check_updates 输入缺失/损坏时不再覆盖已有 updates.json(仅在无历史输出时落盘)。
+- **F12 回滚基准**:apply_plan 事务的 original_hash 取计划前置哈希(执行前已验证与磁盘一致),不再取可能过期的 inventory tree_hash。红→绿:test_update_rollback_with_stale_inventory_is_rolled_back(病灶复现:recovery-required 假告警)。
+- **F13 指纹与身份**:同轮扫描按真实内容根复用指纹(_scan_entry hash_cache,同 Skill 多客户端入口只哈希一次);读不出指纹的实例按稳定实例身份隔离成独立逻辑条目,绝不按空哈希合并;tree_hash 文档写明"根目录自身元数据不在指纹内,由 root_real/is_symlink 前置+预检另行校验"的边界合同。红→绿:test_tree_hash_computed_once_per_real_root(2 次→1 次)、test_unreadable_instances_are_isolated_not_merged。
+- **view 分离**:本机应用存在性等环境探测移到 main 输入收集(ctx.claude_app_present),render_html/render_md 只消费 view(反向验证:夹具触发探测分支时旧实现确实变红)。
+- **双布局完整入口回归**:显式数据目录(env)布局 CLI 全链路(doctor→scan→report→plan→apply→备份→restore)一次通过;新默认 ~/.skill-keeper 布局回归放进 test_packaging_install 真安装态执行(仓库 checkout 自身是 old-repo 布局,从仓库内无环境变量运行 CLI 会指向真实运行态——产品行为如此,测试绝不那样跑,已如实记录)。真实 data/ 零改动已核实(inventory mtime 未变)。
+- verify 356 项 0 失败 0 跳过。

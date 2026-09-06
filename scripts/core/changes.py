@@ -866,12 +866,17 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         audit_event["backup_id"] = backup["backup_id"]
 
         # 事务状态(prepared):崩溃后凭保管路径 + 实体哈希恢复,不猜目录名
+        # F12:回滚核对基准=计划前置哈希(执行前已验证与磁盘一致);inventory 的
+        # tree_hash 可能因扫描后用户改动而过期,用它核对会误报 recovery-required
+        pre = dict(row.get("preconditions", []))
         txn_targets = []
         for inst in targets:
+            iid = str(inst["instance_id"])
             txn_targets.append({
-                "instance_id": str(inst["instance_id"]), "path": str(inst["path"]),
+                "instance_id": iid, "path": str(inst["path"]),
                 "kind": _entity_kind(inst),
-                "original_hash": str(inst.get("tree_hash") or ""),
+                "original_hash": str(pre.get("tree_hash:" + iid)
+                                     or inst.get("tree_hash") or ""),
                 "holding_path": _txn.holding_path(os.path.dirname(inst["path"]), plan_id,
                                                   str(inst["instance_id"])[:8]),
                 "moved": False, "published": False})

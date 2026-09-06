@@ -224,6 +224,8 @@ def build_view(inv, last, ctx):
         new = {i["instance_id"] for i in insts}
         diff = {"added": sorted(new - old), "removed": sorted(old - new)}
     backups = ctx.get("backups") or []
+    # view 分离(F11):输入(main/调用方收集)与展示彻底分开;渲染不再探测本机
+    claude_app_present = bool(ctx.get("claude_app_present"))
     return {"inv": inv, "counts": counts, "protected_names": protected_names,
             "verdict_rows": verdict_rows, "unreviewed": unreviewed,
             "findings_by_skill": findings_by_skill, "findings_by_instance": findings_by_instance,
@@ -232,7 +234,8 @@ def build_view(inv, last, ctx):
             "reputation": reputation, "reviews": reviews, "backups": backups, "diff": diff,
             "logical_by_id": logical_by_id, "inst_by_id": inst_by_id,
             "prov": prov_by_iid, "repos_flat": repos_flat, "queue_items": queue_items,
-            "known": known}
+            "known": known, "claude_app_present": claude_app_present,
+            "load_rows": _client_load_rows(inv, claude_app_present)}
 
 
 def _logical_of(inv, inst):
@@ -512,15 +515,19 @@ def _report_js() -> str:
 JS_BLOB = _report_js()
 
 
-def _client_load_rows(inv):
-    """各客户端加载总览行:客户端 / 加载条目 / 实际技能 / 重复条目 / 备注。"""
+def _client_load_rows(inv, claude_app_present=False):
+    """各客户端加载总览行:客户端 / 加载条目 / 实际技能 / 重复条目 / 备注。
+
+    F11(view 分离):本机应用存在性是输入,由入口收集一次经 ctx 传入;
+    渲染函数绝不再探测文件系统。
+    """
     cl = inv.get("client_load") or {}
     notes = {
         "codex": "2026-08-25 起自动导入共享库 ~/.agents/skills",
         "haha": "复用 ~/.claude/skills 镜像(Claude Code 卸载后由 Haha 独用)" if cl.get("haha") else "",
         "cindy": "只读投影(共享库 + Codex 目录)",
     }
-    if cl.get("claude-code") and cl.get("haha") and not _claude_app_present():
+    if cl.get("claude-code") and cl.get("haha") and not claude_app_present:
         notes["claude-code"] = "应用已卸载,目录实际由 Haha 读取"
     rows = []
     order = ["zcode", "codex", "claude-code", "haha", "cindy", "accio", "workbuddy", "ego"]
@@ -618,11 +625,10 @@ def render_html(inv, last=None, ctx=None):
                               "".join(verdict_metrics))
 
     # 各客户端加载上下文总览(用户最关心的口径:每个客户端启动时占用多少条)
-    load_rows = _client_load_rows(inv)
     load_cells = "".join(
         '<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td class="mut">{}</td></tr>'.format(
             esc(CLIENT_LABELS.get(c, c)), e, s, d, esc(n))
-        for c, e, s, d, n in load_rows) or '<tr><td colspan="5">无</td></tr>'
+        for c, e, s, d, n in view["load_rows"]) or '<tr><td colspan="5">无</td></tr>'
     load_sec = (
         '<details id="client-load"><summary><b>📱 各客户端加载上下文</b>'
         '<span class="cnt">启动即占用 name+description;同名多份=重复占用</span></summary>'
@@ -835,7 +841,7 @@ def render_md(inv, last=None, ctx=None):
          "",
          "| 客户端 | 加载条目 | 实际技能 | 重复条目 | 备注 |",
          "|---|---|---|---|---|"]
-    for _cl, _e, _s, _d, _n in _client_load_rows(inv):
+    for _cl, _e, _s, _d, _n in view["load_rows"]:
         L.append("| {} | {} | {} | {} | {} |".format(
             CLIENT_LABELS.get(_cl, _cl), _e, _s, _d, _n))
     shared_rows = _shared_library_rows(view)
@@ -982,8 +988,12 @@ def main(argv=None):
         "known": load_user_config(ddir),
         "queue": _load(ddir / "review-queue.json"),
         "groups": groups_cfg if isinstance(groups_cfg, dict) else {},
+        "claude_app_present": _claude_app_present(),
     }
     md, view = render_md(inv, last, ctx)
+    # F11:观察不完整必须如实呈现——operational_ok 反映 observation.complete,
+    # 退出码 2(数据不得当作可信),不再硬编码成功
+    obs_complete = bool((inv.get("observation") or {}).get("complete", True))
     if args.json:
         c = view["counts"]
         print(json.dumps({
@@ -992,14 +1002,22 @@ def main(argv=None):
             "verdicts": {g: c[g] for g in VERDICT_GROUPS},
             "unreviewed": c["unreviewed"], "red": c["red"], "yellow": c["yellow"],
             "updates": c["updates"],
-            "operational_ok": True, "health_status": inv.get("health_status", "ok"),
+            "operational_ok": obs_complete,
+            "health_status": inv.get("health_status", "ok"),
         }, ensure_ascii=False, indent=1))
+        if not obs_complete:
+            return 2
         return 1 if c["red"] else 0
     print(md)
+    if not obs_complete:
+        print("⚠️ 观察不完整({} 项):部分位置/实例可能漏扫,数据不得当作可信。".format(
+            len((inv.get("observation") or {}).get("issues", []))), file=sys.stderr)
     (ddir / "report.md").write_text(md + "\n", encoding="utf-8")
     (ddir / "report.html").write_text(render_html(inv, last, ctx), encoding="utf-8")
     print("\n💾 已存:data/report.md + data/report.html(双击浏览器打开;一键操作用 --serve)",
           file=sys.stderr)
+    if not obs_complete:
+        return 2
     return 1 if view["counts"]["red"] else 0
 
 

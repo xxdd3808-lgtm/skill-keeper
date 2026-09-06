@@ -296,8 +296,12 @@ def _extra_locations(data_dir: Path, home=None):
     return rows, issues
 
 
-def _scan_entry(location, root: Path, entry: Path, home):
-    """扫描 skills 根下的单个条目(目录或符号链接),返回 (instance dict, findings list)。"""
+def _scan_entry(location, root: Path, entry: Path, home, hash_cache=None):
+    """扫描 skills 根下的单个条目(目录或符号链接),返回 (instance dict, findings list)。
+
+    hash_cache(F13):同一轮扫描内按真实内容根复用指纹——同一 Skill 经多个客户端
+    符号链接出现时,正文与整树只哈希一次;读不出指纹的结果同样复用并各自报告。
+    """
     dir_name = entry.name
     is_link = entry.is_symlink()
     real = os.path.realpath(entry)
@@ -341,21 +345,31 @@ def _scan_entry(location, root: Path, entry: Path, home):
 
     base["is_skill"] = True
     base["content_status"] = "complete"
-    try:
-        base["tree_hash"] = tree_hash(real)
-    except FingerprintError as e:
-        # F05:部分读不到的树不得当作完整树;不给完整指纹,变更入口随之停用
-        base["tree_hash"] = ""
-        base["content_status"] = "unreadable"
-        detail = ";".join("{}({})".format(i.get("path"), i.get("code"))
-                          for i in (e.issues or [])[:3])
-        findings.append(_finding("content-unreadable", "yellow", base,
-                                 "内容不完整或不可读,本次不提供指纹: " + detail))
-    except OSError as e:
-        base["tree_hash"] = ""
-        base["content_status"] = "unreadable"
-        findings.append(_finding("content-unreadable", "yellow", base,
-                                 "内容不可读({})".format(type(e).__name__)))
+    cached = hash_cache.get(real) if hash_cache is not None else None
+    if cached is not None:
+        # 同一真实内容根在本轮已算过:复用指纹与完整性结论(F13),不再重复 I/O
+        base["tree_hash"], base["content_status"] = cached
+        if base["content_status"] != "complete":
+            findings.append(_finding("content-unreadable", "yellow", base,
+                                     "内容不完整或不可读(与同内容根的其他入口一致)"))
+    else:
+        try:
+            base["tree_hash"] = tree_hash(real)
+        except FingerprintError as e:
+            # F05:部分读不到的树不得当作完整树;不给完整指纹,变更入口随之停用
+            base["tree_hash"] = ""
+            base["content_status"] = "unreadable"
+            detail = ";".join("{}({})".format(i.get("path"), i.get("code"))
+                              for i in (e.issues or [])[:3])
+            findings.append(_finding("content-unreadable", "yellow", base,
+                                     "内容不完整或不可读,本次不提供指纹: " + detail))
+        except OSError as e:
+            base["tree_hash"] = ""
+            base["content_status"] = "unreadable"
+            findings.append(_finding("content-unreadable", "yellow", base,
+                                     "内容不可读({})".format(type(e).__name__)))
+        if hash_cache is not None:
+            hash_cache[real] = (base["tree_hash"], base["content_status"])
     try:
         with open(sk, encoding="utf-8", errors="ignore") as f:
             text = f.read(8000)
@@ -420,62 +434,50 @@ def _apply_ignore(findings, data_dir: Path):
 
 
 def _version_key(v):
-    """宽松版本比较键:'0.4.10' > '0.4.9'。"""
-    return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.-]", str(v or "0")))
+    """宽松版本比较键:'0.4.10' > '0.4.9'。(实现移入 observations,F10 统一口径)"""
+    from scripts.core.observations import _version_key as _vk
+    return _vk(v)
 
 
 def _effective_loaded(instances):
-    """插件缓存内同一插件多版本并存时,只有最高版本真正参与加载(按 ZCode/Codex 实测行为);
-    旧版本目录只是缓存残留。marketplace 参与坐标:同名插件跨 marketplace 互不比较。
-    返回 (参与加载的实例, 旧版本残留实例)。"""
-    best = {}
-    for i in instances:
-        if i.get("plugin_name"):
-            key = (i["location_id"], i.get("plugin_marketplace") or "", i["plugin_name"])
-            v = _version_key(i.get("plugin_version"))
-            if key not in best or v > best[key]:
-                best[key] = v
-    loaded, stale = [], []
-    for i in instances:
-        if i.get("plugin_name"):
-            key = (i["location_id"], i.get("plugin_marketplace") or "", i["plugin_name"])
-            if _version_key(i.get("plugin_version")) < best[key]:
-                stale.append(i)
-                continue
-        loaded.append(i)
-    return loaded, stale
+    """插件多版本只有最高版本参与加载(实现移入 observations,F10 统一口径)。"""
+    from scripts.core.observations import effective_loaded
+    return effective_loaded(instances)
 
 
 def _client_load_stats(instances, locations, reported_roots=None):
-    """每个客户端真实加载的技能条目数与同名重复(启动上下文口径)。"""
-    loaded, _ = _effective_loaded(instances)
+    """每个客户端全局启动上下文的加载统计(F10:与 load_contexts 同一评估模型)。
+
+    entries/技能数/重复全部来自 observations.evaluate_load 的全局上下文评估:
+    工作区位置只在对应项目被选中时参与加载,不占用启动上下文;插件旧版本在
+    评估内部统一过滤。未知客户端没有适配器规则,按其自报读取位置评估。
+    """
+    from scripts.core.observations import evaluate_load
+    loc_dicts = [dict(l) for l in locations]
     stats = {}
     for client in CLIENT_LABELS:
-        loc_ids = {l["location_id"] for l in locations if _location_in_client(l, client)}
-        insts = [i for i in loaded if i["is_skill"] and i["location_id"] in loc_ids]
-        by_name = {}
-        for i in insts:
-            by_name.setdefault(i["logical_name"], []).append(i)
-        dups = sorted(n for n, v in by_name.items() if len(v) > 1)
+        ev = evaluate_load(instances, loc_dicts, client, workspace=None)
+        entries = ev["eligible"]
+        dup_entries = sum(len(d["instance_ids"]) - 1 for d in ev["duplicates"])
         stats[client] = {
-            "entries": len(insts), "skills": len(by_name), "duplicates": dups,
-            "dup_entries": len(insts) - len(by_name),
+            "entries": entries, "skills": entries - dup_entries,
+            "duplicates": sorted(d["name"] for d in ev["duplicates"]),
+            "dup_entries": dup_entries,
         }
     # 未知客户端无需新适配器：按它自报读取的位置计算启动上下文。
     # 同一物理位置仍只扫描一次，reported_roots 只补客户端→位置关系。
     unknown_clients = sorted({r["client"] for r in (reported_roots or [])
                               if r["client"] not in CLIENT_LABELS})
     for client in unknown_clients:
-        loc_ids = {r["location_id"] for r in (reported_roots or []) if r["client"] == client
-                   and r.get("location_id")}
-        insts = [i for i in loaded if i["is_skill"] and i["location_id"] in loc_ids]
-        by_name = {}
-        for i in insts:
-            by_name.setdefault(i["logical_name"], []).append(i)
-        dups = sorted(n for n, rows in by_name.items() if len(rows) > 1)
-        stats[client] = {"entries": len(insts), "skills": len(by_name),
-                         "duplicates": dups, "dup_entries": len(insts) - len(by_name),
-                         "reported": True}
+        loc_ids = sorted({str(r["location_id"]) for r in (reported_roots or [])
+                          if r["client"] == client and r.get("location_id")})
+        ev = evaluate_load(instances, loc_dicts, client, workspace=None,
+                           eligible_location_ids=loc_ids)
+        entries = ev["eligible"]
+        dup_entries = sum(len(d["instance_ids"]) - 1 for d in ev["duplicates"])
+        stats[client] = {"entries": entries, "skills": entries - dup_entries,
+                         "duplicates": sorted(d["name"] for d in ev["duplicates"]),
+                         "dup_entries": dup_entries, "reported": True}
     return stats
 
 
@@ -505,17 +507,37 @@ def _structural_findings(instances, locations, data_dir, reported_roots=None):
         if inst["is_skill"]:
             by_name.setdefault(inst["logical_name"], []).append(inst)
 
+    # 重复加载发现与 client_load/load_contexts 同一评估模型(F10):
+    # 全局上下文的同名多份=重复占用启动上下文;工作区内部同名=打开该项目时
+    # 重复,消息标明"工作区"口径;跨项目同名不构成重复,不再误报。
+    from scripts.core.observations import evaluate_load
+    inst_by_id = {i["instance_id"]: i for i in loaded}
     for client in DUP_FINDING_CLIENTS:
-        loc_ids = {l["location_id"] for l in locations if _location_in_client(l, client)}
-        for name in sorted({n for n, v in by_name.items()
-                            if len([i for i in v if i["location_id"] in loc_ids]) > 1}):
-            insts = [i for i in by_name[name] if i["location_id"] in loc_ids]
+        ev = evaluate_load(loaded, locations, client, workspace=None)
+        for d in ev["duplicates"]:
+            insts = [inst_by_id[iid] for iid in d["instance_ids"]]
             locs = "、".join(i["display_path"].rsplit("/", 1)[0] for i in insts)
             findings.append({
                 "code": "duplicate-load", "severity": "yellow", "instance_id": insts[0]["instance_id"],
-                "skill": name, "location_id": insts[0]["location_id"],
+                "skill": d["name"], "location_id": insts[0]["location_id"],
                 "message": f"{CLIENT_LABELS[client]} 同名 {len(insts)} 份:{locs}"
                            f"(全部进入加载列表,重复占用启动上下文)",
+                "ignored": False, "related_ids": [i["instance_id"] for i in insts[1:]],
+            })
+
+    # 工作区位置内部同名:打开该项目时重复;标明工作区口径
+    ws_rows = {}
+    for inst in loaded:
+        if inst["is_skill"] and inst.get("kind") == "workspace":
+            ws_rows.setdefault((inst["location_id"], inst["logical_name"]), []).append(inst)
+    for (loc_id, name), insts in sorted(ws_rows.items()):
+        if len(insts) > 1:
+            locs = "、".join(i["display_path"].rsplit("/", 1)[0] for i in insts)
+            findings.append({
+                "code": "duplicate-load", "severity": "yellow", "instance_id": insts[0]["instance_id"],
+                "skill": name, "location_id": loc_id,
+                "message": f"工作区内同名 {len(insts)} 份:{locs}"
+                           f"(打开该项目时全部进入加载列表,重复占用上下文)",
                 "ignored": False, "related_ids": [i["instance_id"] for i in insts[1:]],
             })
 
@@ -609,19 +631,24 @@ def _structural_findings(instances, locations, data_dir, reported_roots=None):
 
 
 def _build_logical_skills(instances):
-    """v2 逻辑身份:同完整指纹(内容身份)合并;来源核实身份在 provenance 阶段叠加。"""
+    """v2 逻辑身份:同完整指纹(内容身份)合并;来源核实身份在 provenance 阶段叠加。
+
+    F13:读不出完整指纹的对象内容不一定相等——按稳定实例身份各自隔离成独立
+    逻辑条目,绝不按空哈希合并成一个身份(否则多个损坏对象互相吞并)。
+    """
     groups = {}
     for inst in instances:
         if not inst["is_skill"]:
             continue
-        groups.setdefault(inst["tree_hash"], []).append(inst)
+        key = inst["tree_hash"] or "isolated:" + str(inst["instance_id"])
+        groups.setdefault(key, []).append(inst)
     rows = []
     for th, insts in groups.items():
         lead = sorted(insts, key=lambda x: (x["load_priority"], x["directory_name"]))[0]
         rows.append({
             "logical_id": instance_id("logical", lead["logical_name"], th),
             "name": lead["logical_name"],
-            "tree_hash": th,
+            "tree_hash": lead["tree_hash"],
             "instance_ids": [i["instance_id"] for i in sorted(insts, key=lambda x: x["instance_id"])],
             "clients": sorted({i["client"] for i in insts}),
             "function": lead.get("function", ""),
@@ -716,6 +743,7 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
 
     instances, findings = [], []
     obs_issues = []
+    hash_cache = {}  # F13:real_path → (tree_hash, content_status),同轮复用
     for loc in locations:
         for root in discover_skill_roots(loc):
             try:
@@ -732,7 +760,7 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
                     # F05:本工具的事务保管目录(进行中/未清理的删除·更新暂存)
                     # 不是已安装 Skill,绝不计入盘点
                     continue
-                inst, f = _scan_entry(loc, root, entry, home)
+                inst, f = _scan_entry(loc, root, entry, home, hash_cache=hash_cache)
                 instances.append(inst)
                 findings.extend(f)
                 if inst.get("content_status") == "unreadable":
@@ -753,12 +781,17 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
     client_load = _client_load_stats(
         instances, [l.to_dict() for l in locations], reported_roots)
 
-    # 已有配置文件损坏(known-sources)也计入观察问题;可选文件未创建不算
+    # 已有配置文件损坏(known-sources / client-locations)也计入观察问题;
+    # 可选文件未创建不算。F11:登记配置损坏=可能有登记根被漏扫,
+    # 必须让 observation.complete=false,不得只进 config_issues 又报成功。
     ks_value, ks_issues = load_json_checked(Path(data_dir) / "known-sources.json", {})
     for issue in ks_issues:
         if issue.get("code") != "missing-file":
             obs_issues.append({"code": "config-corrupt", "source": "known-sources.json",
                                "reason": issue.get("reason") or issue.get("code")})
+    for issue in config_issues:
+        obs_issues.append({"code": "config-corrupt", "source": "client-locations.json",
+                           "reason": issue.get("detail") or issue.get("code")})
 
     loc_dicts = [l.to_dict() for l in locations]
     load_contexts = {}
