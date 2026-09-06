@@ -243,6 +243,31 @@ def candidate_pairs(inventory, min_similarity=0.32, index=None):
     return rows
 
 
+def similar_candidates_by_logical(inventory, min_similarity=0.32, cap=8, index=None):
+    """F07:一次过滤候选对,按两端 logical ID 建邻接表;返回 {logical_id: [候选行]}。
+
+    语义合同:每个 logical_id 的结果与"对该 Skill 单独调用 candidate_pairs 全库
+    过滤后取前 cap"逐字节一致(同分数、同理由、同上限、同稳定排序)——排序是
+    稳定排序,平分顺序由 pairs_by_ids 的确定性行序决定,与旧全局排序的子序列一致。
+    """
+    index = _index_or_build(inventory, index)
+    logicals = index["logicals"]
+    by_id = {lg.get("logical_id"): lg for lg in logicals}
+    adjacency = {lg.get("logical_id"): [] for lg in logicals}
+    for rec in index["pairs_by_ids"].values():
+        if rec["score"] < min_similarity:
+            continue
+        a_id, b_id = rec["a"], rec["b"]
+        adjacency[a_id].append({"logical_id": b_id, "name": by_id[b_id].get("name"),
+                                "score": rec["score"], "breakdown": rec["breakdown"]})
+        adjacency[b_id].append({"logical_id": a_id, "name": by_id[a_id].get("name"),
+                                "score": rec["score"], "breakdown": rec["breakdown"]})
+    for rows in adjacency.values():
+        rows.sort(key=lambda x: -x["score"])
+        del rows[cap:]
+    return adjacency
+
+
 def _same_identity(a_lg, b_lg, rep_a, rep_b, src_a, src_b):
     """同一 Skill 的不同安装形态:真副本 / 符号链接孪生 / 同仓库同路径的版本差。
 

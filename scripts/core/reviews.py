@@ -82,8 +82,10 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
     inst_by_id = {i["instance_id"]: i for i in inventory.get("instances", [])}
     reviews = normalize_reviews(existing_reviews)
     legacy = legacy_vetting if isinstance(legacy_vetting, dict) else {}
-    from .overlap import build_overlap_index
+    from .overlap import build_overlap_index, similar_candidates_by_logical
     overlap_index = build_overlap_index(inventory)
+    # F07:候选对一次分桶(邻接表),不再每个 Skill 全库过滤——队列从 O(N³) 降到 O(N²) 评分+O(N²) 一次分桶
+    similar_adjacency = similar_candidates_by_logical(inventory, index=overlap_index)
     dup_rows_all = exact_duplicate_groups(inventory)
     from .review_state import evaluate_review
     items = []
@@ -131,7 +133,7 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
                 "vetted_at": legacy_rec.get("vetted_at"),
                 "note": "v1 安检结论已按完整树指纹规则降级,复检后才算已安检",
             } if legacy_rec else None,
-            "similar_candidates": _similar_for(inventory, lg_id, index=overlap_index),
+            "similar_candidates": similar_adjacency.get(lg_id, []),
             "alternative_candidates": alternative_candidates(inventory, lg_id,
                                                              index=overlap_index),
             "exact_duplicates": [g for g in dup_rows_all if iid in g["instance_ids"]],
@@ -170,20 +172,6 @@ def _repo_snapshot(reputation, source):
         return None
     snap = flatten_repos(reputation).get(repo)
     return snap if isinstance(snap, dict) else None
-
-
-def _similar_for(inventory, logical_id, min_similarity=0.32, cap=8, index=None):
-    """可解释的相似候选(分项打分);与替代候选同一相似度门槛,宁缺毋滥。"""
-    from .overlap import candidate_pairs
-    rows = []
-    for p in candidate_pairs(inventory, min_similarity=min_similarity, index=index):
-        if p["a"] == logical_id:
-            rows.append({"logical_id": p["b"], "name": p["b_name"], "score": p["score"],
-                         "breakdown": p["breakdown"]})
-        elif p["b"] == logical_id:
-            rows.append({"logical_id": p["a"], "name": p["a_name"], "score": p["score"],
-                         "breakdown": p["breakdown"]})
-    return rows[:cap]
 
 
 def _public_review(prev):

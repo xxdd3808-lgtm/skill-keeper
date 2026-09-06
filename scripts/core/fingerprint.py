@@ -144,6 +144,13 @@ def canonical_manifest_document(manifest):
     }
 
 
+def tree_hash_from_manifest(manifest) -> str:
+    """与 tree_hash(root) 完全一致,但复用已算好的 manifest(任务3:同轮一次遍历)。"""
+    doc = canonical_manifest_document(manifest)
+    canonical = json.dumps(doc, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def tree_hash(root) -> str:
     """完整目录树 SHA-256(不截断)。内容、权限、路径、链接目标任一变化都会改变结果。
 
@@ -151,9 +158,7 @@ def tree_hash(root) -> str:
     不参与指纹——"根目录被换成符号链接/指向别处"由计划前置键 root_real、
     is_symlink 与执行期预检另行校验,本函数不重复承担该职责。
     """
-    doc = canonical_manifest_document(tree_manifest(root))
-    canonical = json.dumps(doc, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return tree_hash_from_manifest(tree_manifest(root))
 
 
 def instance_id(location_id: str, directory_name: str, real_path: str) -> str:

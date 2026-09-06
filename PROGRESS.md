@@ -132,3 +132,11 @@
 - **view 分离**:本机应用存在性等环境探测移到 main 输入收集(ctx.claude_app_present),render_html/render_md 只消费 view(反向验证:夹具触发探测分支时旧实现确实变红)。
 - **双布局完整入口回归**:显式数据目录(env)布局 CLI 全链路(doctor→scan→report→plan→apply→备份→restore)一次通过;新默认 ~/.skill-keeper 布局回归放进 test_packaging_install 真安装态执行(仓库 checkout 自身是 old-repo 布局,从仓库内无环境变量运行 CLI 会指向真实运行态——产品行为如此,测试绝不那样跑,已如实记录)。真实 data/ 零改动已核实(inventory mtime 未变)。
 - verify 356 项 0 失败 0 跳过。
+
+### 任务3 完成(2026-09-06):定点优化(F07 + 单轮复用)
+
+- **F07 候选对一次分桶**:overlap.similar_candidates_by_logical 一次过滤 pairs_by_ids 按两端 logical ID 建邻接表(稳定排序,平分顺序=确定性行序),build_review_queue 不再每个 Skill 全库过滤;删除 reviews._similar_for。语义冻结:优化前先固化 tests/fixtures/queue-candidates-baseline.json(8 技能小语料 + 40 技能密集语料的 similar/alternative 候选),优化后逐字节零差异;另加邻接表≡逐项全库过滤的逐字节等价测试(60 技能密集语料)。
+- **check_updates 单轮复用**:同仓库快照与同 (repo,source_dir,commit) 候选在一轮内只取一次(网络请求不随共享同一上游的逻辑数翻倍);本地侧 manifest 一次遍历同时得指纹与 diff 基础(fingerprint.tree_hash_from_manifest,与 tree_hash 完全一致)。
+- **备份展示**:实测列表 0.019s、非瓶颈,按任务书"仅在基准证明需要时"跳过,未做缓存(执行前真实哈希验证原样保留)。
+- **性能实测(同一 benchmark.py,与任务0同机同语料)**:80 项 0.149→0.026s;200 项 2.714→0.168s(16×);**400 项 38.044→0.792s(48×,达标 ≥8× 且 ≤5s)**;**800 项从"约 6 分钟未完成"→3.395s(达标 ≤30s)**,峰值 RSS 558.1 MiB。apply 前真实内容哈希验证未动。
+- verify 359 项 0 失败 0 跳过(冻结 233 ID 保留)。

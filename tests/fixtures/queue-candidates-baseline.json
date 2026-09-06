@@ -1,0 +1,7440 @@
+{
+ "__dense40__": {
+  "skill-000": {
+   "alternatives": [
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-001": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-002": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-003": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-004": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-005": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-006": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-007": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-008",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-008",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-008": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-009": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.614"
+     ],
+     "score": 0.614
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.614
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.875,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.614
+    }
+   ]
+  },
+  "skill-010": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-011": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-012": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-013": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-014": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-015": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-016": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-017": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-018": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-019": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-020": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-021": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-022": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-023": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-024": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-025": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-026": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-027": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-028": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-029": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-030": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-031": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-032": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-033": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-034": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-035": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-036": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-037": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-038": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  },
+  "skill-039": {
+   "alternatives": [
+    {
+     "name": "skill-000",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-001",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-002",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-003",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-004",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-005",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-006",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    },
+    {
+     "name": "skill-007",
+     "reasons": [
+      "similarity:0.607"
+     ],
+     "score": 0.607
+    }
+   ],
+   "similar": [
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-000",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-001",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-002",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-003",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-004",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-005",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-006",
+     "score": 0.607
+    },
+    {
+     "breakdown": {
+      "bins": 0.0,
+      "body": 0.824,
+      "description": 1.0,
+      "name": 0.333,
+      "source_path": 0.0,
+      "trigger": 1.0
+     },
+     "name": "skill-007",
+     "score": 0.607
+    }
+   ]
+  }
+ },
+ "alpha-helper": {
+  "alternatives": [
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "keyword-overlap:alpha(df2)",
+     "similarity:0.533"
+    ],
+    "score": 0.533
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.333,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.533
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.056,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.056,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.05,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "alpha-tool": {
+  "alternatives": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "keyword-overlap:alpha(df2)",
+     "similarity:0.533"
+    ],
+    "score": 0.533
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.499"
+    ],
+    "score": 0.499
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.375"
+    ],
+    "score": 0.375
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.333,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.533
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.105,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.499
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.167,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.375
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.045,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "beta-memo": {
+  "alternatives": [
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "keyword-overlap:beta(df2)",
+     "similarity:0.53"
+    ],
+    "score": 0.53
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.366"
+    ],
+    "score": 0.366
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.312,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.53
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.105,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.366
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.05,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "beta-notes": {
+  "alternatives": [
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "keyword-overlap:beta(df2)",
+     "similarity:0.53"
+    ],
+    "score": 0.53
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.375"
+    ],
+    "score": 0.375
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.312,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.53
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.167,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.375
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.056,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.048,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "clip-tool": {
+  "alternatives": [
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.499"
+    ],
+    "score": 0.499
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.105,
+     "description": 1.0,
+     "name": 0.333,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.499
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.05,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "delta-scan": {
+  "alternatives": [
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.366"
+    ],
+    "score": 0.366
+   },
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.358"
+    ],
+    "score": 0.358
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.105,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.366
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.056,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.053,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.358
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "gamma-fmt": {
+  "alternatives": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.357"
+    ],
+    "score": 0.357
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "protected-core",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.05,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.045,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.048,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.357
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "protected-core",
+    "score": 0.35
+   }
+  ]
+ },
+ "protected-core": {
+  "alternatives": [
+   {
+    "name": "alpha-helper",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "alpha-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "beta-memo",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "beta-notes",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "clip-tool",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "delta-scan",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   },
+   {
+    "name": "gamma-fmt",
+    "reasons": [
+     "similarity:0.35"
+    ],
+    "score": 0.35
+   }
+  ],
+  "similar": [
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-helper",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "alpha-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-memo",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "beta-notes",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "clip-tool",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "delta-scan",
+    "score": 0.35
+   },
+   {
+    "breakdown": {
+     "bins": 0.0,
+     "body": 0.0,
+     "description": 1.0,
+     "name": 0.0,
+     "source_path": 0.0,
+     "trigger": 1.0
+    },
+    "name": "gamma-fmt",
+    "score": 0.35
+   }
+  ]
+ }
+}

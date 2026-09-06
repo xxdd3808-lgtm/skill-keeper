@@ -17,7 +17,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if BASE not in sys.path:
     sys.path.insert(0, BASE)
 
-from scripts.core.fingerprint import tree_hash, tree_manifest          # noqa: E402
+from scripts.core.fingerprint import tree_hash, tree_hash_from_manifest, tree_manifest  # noqa: E402
 from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_runner  # noqa: E402
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
@@ -149,6 +149,11 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
     staging_root = validate_staging_root(staging_root, protected)
 
     differs, up_to_date, skipped = [], [], []
+    # 任务3(单轮复用):同一仓库的快照与同一 (repo, source_dir, commit) 的候选
+    # 在一轮检查里只取一次;apply 前的真实内容验证不受影响(staging 复用的目录
+    # 是内容寻址且本轮刚校验过的,计划/执行层仍会重新真实哈希)
+    snap_cache = {}
+    staged_cache = {}
     for logical in inventory.get("logical_skills", []):
         name = logical.get("name") or "?"
         inst = _pick_instance(inventory, logical)
@@ -167,10 +172,11 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
         if not repo:
             skipped.append({"name": name, "reason": "来源不明,没有可对比的上游(补 known-sources.json 或让我搜索候选)"})
             continue
-        # 先核本地:本地不存在/算不出指纹,就不发任何网络请求
+        # 先核本地:本地不存在/算不出指纹,就不发任何网络请求;清单一次遍历
+        # 同时得到完整指纹与 diff 基础(任务3:同轮指纹复用)
         try:
-            local_hash = tree_hash(inst["real_path"])
             local_manifest = tree_manifest(inst["real_path"])
+            local_hash = tree_hash_from_manifest(local_manifest)
         except (NotADirectoryError, OSError):
             skipped.append({"name": name, "reason": "本地内容缺失,无法核实"})
             continue
@@ -178,7 +184,10 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
             skipped.append({"name": name, "reason": "来源缺路径,无法定位上游目录"})
             continue
         source_dir = path[:-len("/SKILL.md")] if path.endswith("/SKILL.md") else path
-        snap = cached_repo_snapshot(repo, reputation_path, gh_runner)
+        snap = snap_cache.get(repo)
+        if snap is None:
+            snap = cached_repo_snapshot(repo, reputation_path, gh_runner)
+            snap_cache[repo] = snap
         commit_sha = snap.get("commit_sha")
         if not snap.get("ok") and not commit_sha:
             skipped.append({"name": name,
@@ -189,7 +198,11 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
         if not commit_sha:
             skipped.append({"name": name, "reason": "无法确定上游 commit,拒绝猜测"})
             continue
-        staged = stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner)
+        skey = (repo, source_dir, commit_sha)
+        staged = staged_cache.get(skey)
+        if staged is None:
+            staged = stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner)
+            staged_cache[skey] = staged
         if not staged.get("ok"):
             skipped.append({"name": name, "reason": "候选树拉取失败({})".format(staged.get("error"))})
             continue

@@ -127,5 +127,35 @@ class CheckUpdatesStagingTests(unittest.TestCase):
             self.assertTrue(kept.is_dir())
 
 
+    def test_same_repo_and_candidate_fetched_once_per_round(self):
+        """任务3:同一仓库快照与同一 (repo,dir,commit) 候选在一轮检查内只取一次
+        (两个逻辑共享同一上游时,网络请求不随逻辑数翻倍)。"""
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td)
+            data = home / "data"
+            data.mkdir()
+            (data / "known-sources.json").write_text(json.dumps(
+                {"dupe": {"type": "github", "repo": "example/dupe",
+                          "path": "skills/dupe/SKILL.md"}}), encoding="utf-8")
+
+            class Counting:
+                def __init__(self, inner):
+                    self.inner, self.calls = inner, []
+
+                def __call__(self, args):
+                    self.calls.append(" ".join(args))
+                    return self.inner(args)
+
+            gh = Counting(head_gh())
+            check(two_copy_inventory(home), data, data / "updates.json", gh,
+                  staging_root=home / "staging")
+            repo_calls = [c for c in gh.calls if c == "repos/example/dupe"]
+            tree_calls = [c for c in gh.calls if "git/trees" in c]
+            blob_calls = [c for c in gh.calls if "git/blobs" in c]
+            self.assertEqual(len(repo_calls), 1, "仓库快照每轮只取一次: " + str(repo_calls))
+            self.assertEqual(len(tree_calls), 1, "候选树每轮只取一次")
+            self.assertEqual(len(blob_calls), 1, "候选 blob 每轮只取一次")
+
+
 if __name__ == "__main__":
     unittest.main()

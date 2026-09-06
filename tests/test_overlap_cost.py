@@ -69,6 +69,85 @@ class OverlapEquivalenceTests(unittest.TestCase):
         self.assertEqual(view["alternatives"], gold["alternatives"], "替代候选必须等价")
         self.assertEqual(view["duplicate_groups"], gold["duplicate_groups"])
 
+    def test_queue_candidates_match_frozen_baseline(self):
+        """任务3(F07)语义冻结:优化只准改算法结构,队列的 similar/alternative
+        候选必须与优化前逐字节一致(两个语料:8 技能密集小语料 + 40 技能密集语料)。"""
+        gold = json.loads(
+            (Path(__file__).resolve().parents[1] /
+             "tests/fixtures/queue-candidates-baseline.json").read_text(encoding="utf-8"))
+        import tempfile
+
+        def queue_view(inv):
+            queue = build_review_queue(inv)
+            return {item["name"]: {
+                "similar": [{"name": r["name"], "score": r["score"],
+                             "breakdown": r["breakdown"]} for r in item["similar_candidates"]],
+                "alternatives": [{"name": c["name"], "score": c["score"],
+                                  "reasons": c["reasons"]}
+                                 for c in item["alternative_candidates"]],
+            } for item in queue["items"]}
+
+        with tempfile.TemporaryDirectory() as td:
+            inv = _corpus_inventory(td)
+            self.assertEqual(queue_view(inv),
+                             {k: v for k, v in gold.items() if k != "__dense40__"},
+                             "小语料队列候选必须与冻结基线零差异")
+
+        def _dense(td, n=40):
+            home = Path(td)
+            (home / "data").mkdir(exist_ok=True)
+            for i in range(n):
+                name = "skill-{:03d}".format(i)
+                body = ("Skill {} handles workflow {} with unique-{} tokens and "
+                        "shared vocabulary about reports scripts capture storage.").format(
+                            i, i, i)
+                d = write_skill(home / ".agents/skills", name, body=body)
+                (d / "run.py").write_text("# {}".format(name), encoding="utf-8")
+            from scripts.scan import build_inventory
+            return build_inventory(home, home / "data")
+
+        with tempfile.TemporaryDirectory() as td:
+            inv = _dense(td)
+            self.assertEqual(queue_view(inv), gold["__dense40__"],
+                             "密集语料队列候选必须与冻结基线零差异")
+
+    def test_adjacency_matches_per_skill_filtering(self):
+        """任务3(F07):邻接表一次分桶的结果必须与"每个 Skill 全库过滤"逐项一致
+        (同分数、同理由、同上限、同稳定排序)。"""
+        from scripts.core.overlap import (build_overlap_index, candidate_pairs,
+                                          similar_candidates_by_logical)
+
+        def _dense(td, n=60):
+            home = Path(td)
+            (home / "data").mkdir(exist_ok=True)
+            for i in range(n):
+                name = "skill-{:03d}".format(i)
+                body = ("Skill {} handles workflow {} with unique-{} tokens and "
+                        "shared vocabulary about reports scripts capture storage.").format(
+                            i, i, i)
+                d = write_skill(home / ".agents/skills", name, body=body)
+                (d / "run.py").write_text("# {}".format(name), encoding="utf-8")
+            from scripts.scan import build_inventory
+            return build_inventory(home, home / "data")
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            inv = _dense(td)
+            index = build_overlap_index(inv)
+            adjacency = similar_candidates_by_logical(inv, index=index)
+            for lg in inv["logical_skills"]:
+                lg_id = lg.get("logical_id")
+                rows = []
+                for p in candidate_pairs(inv, min_similarity=0.32, index=index):
+                    if p["a"] == lg_id:
+                        rows.append({"logical_id": p["b"], "name": p["b_name"],
+                                     "score": p["score"], "breakdown": p["breakdown"]})
+                    elif p["b"] == lg_id:
+                        rows.append({"logical_id": p["a"], "name": p["a_name"],
+                                     "score": p["score"], "breakdown": p["breakdown"]})
+                self.assertEqual(adjacency.get(lg_id, []), rows[:8],
+                                 "邻接表必须与逐项全库过滤逐字节一致: " + str(lg_id))
+
 
 class OverlapCostTests(unittest.TestCase):
     def _inventory_n(self, td, n):
