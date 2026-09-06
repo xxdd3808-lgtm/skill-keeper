@@ -13,6 +13,21 @@ Windows / macOS / Linux 都可以安装运行;已知客户端有精确适配器,
 - 想删不敢删:没有可验证的备份,不知道删了会不会弄坏别的客户端
 - 更新怕被坑:更怕"自动更新"装进来的不是你审过的内容
 
+## 统一命令
+
+`pip install .` 后用一个入口完成全部流程(参数与 scripts/*.py 完全一致,原样透传;旧入口继续有效):
+
+```bash
+skill-keeper scan [--json]      # 只读盘点
+skill-keeper report [--json] [--serve]
+skill-keeper updates [--json]   # 更新检查(只读)
+skill-keeper review queue [--all] / show / record    # 价值审查;queue 默认只列待办
+skill-keeper manage plan/vet/apply/status/recover/rescan
+skill-keeper doctor [--json]
+```
+
+退出码:**0=健康/无差异,1=有红色问题/有差异,2=运行失败或观察不完整**。
+
 ## 三种使用流程
 
 ### 流程一:直接扫描已知客户端
@@ -68,12 +83,13 @@ python3 scripts/scan.py --locations-json - --json
 
 ```bash
 python3 scripts/manage.py plan remove --instance-id <instance_id> --reason <理由> --json
+python3 scripts/manage.py vet <plan_id> --verdict safe --evidence <可核查依据> --json   # 更新候选安检记账
 python3 scripts/manage.py apply <plan_id> --digest <digest> --confirm --json
 python3 scripts/manage.py status/recover <plan_id> --json
 python3 scripts/verify.py   # 全量验收(0 失败 0 跳过)
 ```
 
-计划不可变、30 分钟过期;执行 = 互斥锁 → 目标指纹复核 → 真实目标预检 → 创建并验证备份(带 manifest)→ 精确移动 → 验证(失败自动回滚)→ 审计。恢复走两阶段计划,冲突不覆盖。自建白名单、应用内置(`builtin-app`,支持 `owner` 语义)、客户端自带/插件内容受保护。
+计划不可变、30 分钟过期;执行 = 互斥锁 → 目标指纹复核 → 其他计划未完成事务阻断 → 真实目标预检 → 创建并验证备份(带 manifest)→ 精确移动 → 验证(失败自动回滚)→ 审计。恢复走两阶段计划,冲突不覆盖。更新类计划必须先对计划本身安检记账(网页点击不构成安检;danger 直接废弃,warning 需二次确认)。自建白名单、应用内置(`builtin-app`,支持 `owner` 语义)、客户端自带/插件内容受保护;保护配置损坏时拒绝一切写操作。
 
 ## 安装
 
@@ -95,15 +111,16 @@ skill-keeper doctor --json            # 版本 / Python / 运行目录 / 锁后�
 
 ## 自动化接口
 
-`scan.py --json`、`report.py --json`、`check_updates.py --json`、`value_review.py queue --json`,退出码 **0=健康/无差异,1=有红色问题/有差异,2=运行失败或观察不完整**,可挂 cron / launchd 定期巡检。
+`skill-keeper scan/report/updates/review --json`(等价于 `scripts/*.py --json`),退出码 **0=健康/无差异,1=有红色问题/有差异,2=运行失败或观察不完整**,可挂 cron / launchd 定期巡检。
 
 ## 项目结构
 
 ```
 skill-keeper/
-├── SKILL.md                      # skill 定义(触发词、铁律、工作流、未知客户端通用流程)
+├── SKILL.md                      # skill 定义(触发词、命令、铁律、工作流摘要)
+├── docs/skill-manual.md          # 使用手册(数据文件、加载规则、来源口径、未知客户端细节)
 ├── scripts/
-│   ├── cli.py                    # 统一 CLI(scan/report/manage/doctor)
+│   ├── cli.py                    # 统一 CLI(scan/report/updates/review/manage/doctor)
 │   ├── scan.py                   # 多客户端发现 + 完整指纹 + 模型位置声明 → inventory(只读)
 │   ├── report.py / serve.py      # 报告与两阶段交互服务
 │   ├── check_updates.py          # 完整树更新检查(只读,暂存固定候选)

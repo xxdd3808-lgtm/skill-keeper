@@ -72,13 +72,22 @@ def cmd_queue(args):
                                reviews_store["reviews"],
                                legacy_vetting=_legacy_vetting(data_dir),
                                known_sources=load_user_config(data_dir))
+    # 任务4:默认体检是增量口径——只列待办(新增、内容或依赖已变化的项);
+    # 已有生效结论的项不在待办里,完整价值审查用 --all(队列仍含全部第三方项)
+    all_count = len(queue["items"])
+    queue["incremental"] = not getattr(args, "all", False)
+    if queue["incremental"]:
+        queue["items"] = [x for x in queue["items"]
+                          if x.get("previous_review_status") != "current"]
+    queue["total_third_party"] = all_count
     queue["generated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     atomic_write_json(output_path, queue)
     if args.json:
         print(json.dumps(queue, ensure_ascii=False, indent=1))
     else:
-        print("✅ 审查队列:{}/{} 个第三方 skill 待审查 → {}".format(
-            len(queue["items"]), len(inv.get("logical_skills", [])), output_path))
+        mode = "完整" if not queue["incremental"] else "增量(待办)"
+        print("✅ 审查队列[{}]:{}/{} 个第三方 skill 待审查 → {}".format(
+            mode, len(queue["items"]), all_count, output_path))
         for x in queue["items"]:
             print("   - {}({}):来源={},替代候选={} 个".format(
                 x["name"], x["instance_id"], x["provenance"]["type"],
@@ -151,15 +160,17 @@ def cmd_record(args):
     return 0
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description="第三方 Skill 价值审查队列")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p_queue = sub.add_parser("queue", help="生成/刷新审查队列")
+    p_queue = sub.add_parser("queue", help="生成/刷新审查队列(默认只列待办;--all 完整)")
     p_queue.add_argument("--inventory", default=None)
     p_queue.add_argument("--output", default=None)
     p_queue.add_argument("--data-dir", default=None,
                          help="个人配置目录(known-sources/self-built/vetted;默认项目 data/)")
+    p_queue.add_argument("--all", action="store_true",
+                         help="完整价值审查模式:包含已有生效结论的项")
     p_queue.add_argument("--json", action="store_true")
 
     p_show = sub.add_parser("show", help="查看单个待审查项")
@@ -176,7 +187,7 @@ def main():
                        help="默认 queue/记录文件的目录(默认项目 data/)")
     p_rec.add_argument("--json", action="store_true")
 
-    args = ap.parse_args()
+    args = ap.parse_args(list(sys.argv[1:]) if argv is None else list(argv))
     if args.cmd == "queue":
         sys.exit(cmd_queue(args))
     if args.cmd == "show":

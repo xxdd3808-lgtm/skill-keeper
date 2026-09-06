@@ -660,21 +660,31 @@ def _build_logical_skills(instances):
     return rows
 
 
-def _need_vet(instances, data_dir):
-    """需要安检的第三方实例 ID:来源核实为 third-party 且 review_required。"""
+def _need_vet(inventory, data_dir):
+    """需要安检的第三方实例 ID:来源核实为 third-party 且 review_required,
+    且没有当前生效的审查记录(任务4:默认体检只复核新增/内容或依赖变化项——
+    结论有效 = 目标内容未变、替代关系完好、政策版本一致,经 evaluate_review 判定)。"""
     from scripts.core.provenance import classify_provenance, load_user_config
+    from scripts.core.review_state import evaluate_review
+    from scripts.core.reviews import normalize_reviews
     known = load_user_config(data_dir)
     receipts = {}
-    for inst in instances:
+    for inst in inventory.get("instances", []):
         if inst.get("kind") in ("builtin", "plugin-cache"):
             receipts[str(inst.get("instance_id"))] = {"type": inst["kind"]}
+    store, _ = load_json_checked(Path(data_dir) / "value-reviews.json", {})
+    reviews = normalize_reviews(store.get("reviews") if isinstance(store, dict) else [])
     out = []
-    for inst in instances:
+    for inst in inventory.get("instances", []):
         if not inst.get("is_skill") or not inst.get("mutable"):
             continue
         prov = classify_provenance(inst, receipts, known)
-        if prov.get("review_required"):
-            out.append(str(inst["instance_id"]))
+        if not prov.get("review_required"):
+            continue
+        rec = reviews.get(str(inst.get("instance_id")))
+        if rec is not None and evaluate_review(rec, inventory, {}, {}).get("status") == "current":
+            continue
+        out.append(inst["instance_id"])
     return sorted(out)
 
 
@@ -968,7 +978,7 @@ def main(argv=None):
             "client_load": inv.get("client_load", {}),
             "red": red, "yellow": yellow, "junk_count": len(inv["instances"]) - sum(1 for i in inv["instances"] if i["is_skill"]),
             "ignored_issues": ignored_n,
-            "need_vet": _need_vet(inv["instances"], ddir),
+            "need_vet": _need_vet(inv, ddir),
             "observation_complete": obs_complete,
             "observation_issues": obs.get("issues", []),
             "operational_ok": inv["operational_ok"], "health_status": inv["health_status"],

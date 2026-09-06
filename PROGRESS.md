@@ -140,3 +140,11 @@
 - **备份展示**:实测列表 0.019s、非瓶颈,按任务书"仅在基准证明需要时"跳过,未做缓存(执行前真实哈希验证原样保留)。
 - **性能实测(同一 benchmark.py,与任务0同机同语料)**:80 项 0.149→0.026s;200 项 2.714→0.168s(16×);**400 项 38.044→0.792s(48×,达标 ≥8× 且 ≤5s)**;**800 项从"约 6 分钟未完成"→3.395s(达标 ≤30s)**,峰值 RSS 558.1 MiB。apply 前真实内容哈希验证未动。
 - verify 359 项 0 失败 0 跳过(冻结 233 ID 保留)。
+
+### 任务4 完成(2026-09-06):简化使用
+
+- **CLI 可发现性**:统一 CLI 补齐 `updates`(check_updates)与 `review`(value_review)入口,--help 列全 scan/report/updates/review/manage/doctor;check_updates/value_review 的 main 接受 argv 参数(与 scan/report 同风格);全部子命令支持 --json;scripts/*.py 旧入口原样兼容。红→绿:test_help_lists_all_capabilities / test_updates_and_review_subcommands_dispatch / test_updates_json_stable_exit_codes。
+- **默认体检=增量**:scan 的 need_vet 消费审查台账(evaluate_review 判定,结论有效=内容未变+替代关系完好+政策版本一致 → 不再要求重复安检);review queue 默认只输出待办(unvetted/needs-recheck),`--all` 为完整价值审查模式,队列 JSON 标注 incremental/total_third_party。红→绿:test_need_vet_ignores_currently_valid_reviews / test_queue_default_incremental_all_for_full_review。
+- **SKILL.md 精简**:20417 → 6959 字节(**-65.9%**,远超 ≥35% 门槛);保留路由/命令表/铁律(安全边界完整)/标准工作流/失败恢复/交付约定;数据文件表、加载规则、来源口径、未知客户端字段白名单、报告页面说明下沉到新增 `docs/skill-manual.md`(12971 字节)。test_migrations_docs 文档一致性断言通过。
+- 文档同步:README(统一命令节+vet 步骤+结构图)、docs/architecture.md(性能口径更新)、docs/changes.md(收尾轮条目)。
+- verify 364 项 0 失败 0 跳过。

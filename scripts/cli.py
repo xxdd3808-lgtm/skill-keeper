@@ -59,13 +59,16 @@ def cmd_doctor(as_json=False):
     return 0
 
 
-COMMANDS = ("scan", "report", "manage", "doctor")
+COMMANDS = ("scan", "report", "updates", "review", "manage", "doctor")
 _USAGE = """skill-keeper <command> [args...]
 
 命令(参数与对应 scripts/*.py 入口完全一致,原样透传):
   scan     扫描盘点(只读)
   report   价值审查报告
-  manage   plan/apply/status/recover/rescan
+  updates  更新检查:本地完整树 vs 固定上游 commit(只读)
+  review   第三方价值审查:queue 默认只列待办(新增/内容或依赖变化项),
+           --all 为完整价值审查;show/record 同 scripts/value_review.py
+  manage   plan/vet/apply/status/recover/rescan(与网页共用 service 层)
   doctor   运行环境自检(--json 输出版本/Python/运行目录/锁后端/已登记位置)
 """
 
@@ -84,6 +87,12 @@ def main(argv=None):
     if cmd == "report":
         from scripts import report
         return report.main(rest)
+    if cmd == "updates":
+        from scripts import check_updates
+        return check_updates.main(rest)
+    if cmd == "review":
+        from scripts import value_review
+        return value_review.main(rest)
     if cmd == "manage":
         from scripts import manage
         return manage.main(rest)

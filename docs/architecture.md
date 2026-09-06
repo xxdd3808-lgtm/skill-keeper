@@ -117,9 +117,14 @@ manifest 严格校验(schema/类型/权限/路径边界/唯一性/父子关系/�
 
 ## 性能口径
 
-审查队列一次读取全库正文、每对只评分一次(索引复用):80 个逻辑 Skill
-正文读取 ≤80、评分 ≤3160(2026-09-05 实测 reads=80 / scores=3160 / 0.15s);
-结果与冻结基线 `tests/fixtures/overlap-baseline.json` 等价。
+审查队列一次读取全库正文、每对只评分一次(索引复用),候选对一次过滤按两端
+logical ID 建邻接表(F07,2026-09-06):每个 Skill 的相似候选不再全库重过滤。
+同一密集语料实测(与审查基准同机):80 项 0.149→0.026s;200 项 2.714→0.168s;
+400 项 38.044→0.792s;800 项从"约 6 分钟未完成"→3.395s(峰值 RSS 558MiB)。
+正文读取 ≤80、评分 ≤3160(80 项:reads=80 / scores=3160 / 0.037s);结果与
+冻结基线 `tests/fixtures/overlap-baseline.json`、`tests/fixtures/queue-candidates-baseline.json`
+逐字节等价。check_updates 同轮内同仓库快照与同 (repo,dir,commit) 候选只取一次,
+本地清单一次遍历同时产出指纹与 diff 基础;apply 前真实内容哈希验证不变。
 
 ## 锁与边界
 

@@ -256,14 +256,14 @@ def check(inventory, data_dir, output_path, gh_runner=None, staging_root=None):
             "staging_cleanup": {k: staging_cleanup[k] for k in ("removed", "unowned", "errors")}}
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description="与上游比对完整内容树(只读)")
     ap.add_argument("--inventory", default=None, help="inventory v2 JSON 路径(默认 <data>/inventory.json)")
     ap.add_argument("--output", default=None, help="结果缓存路径(默认 <data>/updates.json)")
     ap.add_argument("--data-dir", default=None,
                     help="数据目录(默认 SKILL_KEEPER_DATA,否则旧仓库运行态或 ~/.skill-keeper/data)")
     ap.add_argument("--json", action="store_true", help="机器可读输出;退出码 0=无差异 1=有差异")
-    args = ap.parse_args()
+    args = ap.parse_args(list(sys.argv[1:]) if argv is None else list(argv))
 
     data_dir = Path(args.data_dir) if args.data_dir else default_data_dir()
     inventory_path = Path(args.inventory) if args.inventory else data_dir / "inventory.json"
