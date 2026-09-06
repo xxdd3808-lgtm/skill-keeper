@@ -1,7 +1,7 @@
 # skill-keeper 历史运维记事(事实记录,不代表当前能力)
 
 现行能力以 [architecture.md](architecture.md) 为准;原始设计见
-`docs/superpowers/specs/2026-08-31-skill-keeper-v2-design.md`。
+`docs/archive/superpowers/specs/2026-08-31-skill-keeper-v2-design.md`。
 
 ## 版本史(要点)
 

@@ -7,7 +7,7 @@
 
 ## 断点续跑须知(v4 开发期历史,2026-09-05)
 
-- 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
+- 计划来源:docs/archive/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/archive/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md;2026-09-06 归档)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
 - 开工基线(实测):HEAD `f858d2ba89d82acc93bcd78e30f3bc6ac1b24b04`,Python 3.9.6,分支 case1,verify 233 项 0 失败 0 skipped;工作树原有三份计划文档(untracked,随 Task 0 入库)。
 - 零退化合同:tests/fixtures/private-v311/(完全虚构,含 shared/Codex/WorkBuddy/Ego、自建、builtin owner、符号链接、重复加载、审查、备份、旧 CLI)+ tests/test_private_compatibility.py(9 项)。v4 各任务必须保持全绿。
 - 测试入口:`python3 scripts/verify.py`(独立复核后 313 项 / 0 失败 / 0 skipped；v3.1.1 的 233 个冻结 ID 全在；`python -m scripts.verify` 同口径,CI 使用)。
@@ -54,7 +54,7 @@
 
 ### 断点续跑须知(先读我)
 
-- 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-optimization.md(任务书:同目录 agent-brief)。按 Task 0–9 串行;每任务红→绿→全量 unittest→提交。
+- 计划来源:docs/archive/superpowers/plans/2026-09-05-skill-keeper-optimization.md(任务书:同目录 agent-brief)。按 Task 0–9 串行;每任务红→绿→全量 unittest→提交。
 - 测试入口:`python3 -m unittest discover -s tests`(当前 203 项全绿,0 skipped)。
 - 阶段门槛:A=Task 1–3(已完成);B=Task 7;C=Task 9。BLOCKED.md 当前"无"。
 - 注意:tests/test_review_lifecycle.py 曾被我一次坏编辑合并过行,已修复;不要再对该文件做"删尾随换行"类编辑。
