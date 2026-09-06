@@ -3,6 +3,7 @@
 ## 当前状态(v4.1.0,2026-09-06)
 
 - **v4.1.0 已发布**:main = codex/1 = tag = `1eb9345`,四平台 CI 全绿,[Release](https://github.com/xxdd3808-lgtm/skill-keeper/releases/tag/v4.1.0);verify 373 项全绿;BLOCKED.md=无。
+- 发布后收尾(2026-09-06 晚):main 快进至 `a677a7e`——022f3df SKILL.md 报告交付两件套、f4929ea verify 输出防污染、a677a7e 全项目 review 第二轮(3 个 P2 修复+归档 docs/reviews/2026-09-06-r2/)。现态权威见 AGENTS.md。
 - 现役文档:AGENTS.md(规则)、SKILL.md + docs/skill-manual.md(使用)、docs/architecture.md(架构)、docs/changes.md(版本演化)。本文件以下是开发期历史记录。
 
 ## 断点续跑须知(v4 开发期历史,2026-09-05)
