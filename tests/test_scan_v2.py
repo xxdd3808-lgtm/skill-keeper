@@ -240,6 +240,18 @@ class ClientLoadModelTests(unittest.TestCase):
         self.assertEqual(len(nested), 1, "嵌套技能树必须报 nested-skill-tree")
         self.assertIn("staging", nested[0]["message"])
 
+    def test_transaction_holding_dirs_are_not_inventory(self):
+        """F05:本工具的事务保管目录(.sk-txn-*)是进行中变更的暂存,不是已安装 Skill。"""
+        from scripts.scan import build_inventory
+        home, data = build_one_skill_home(self)
+        holding = home / ".agents/skills/.sk-txn-deadbeef-abc"
+        write_skill(holding, "ghost-from-holding", description="custody copy")
+        inv = build_inventory(home, data)
+        names = {i.get("directory_name") for i in inv["instances"]}
+        self.assertNotIn("ghost-from-holding", names,
+                         "事务保管目录绝不能计入盘点")
+        self.assertNotIn(str(holding), {i.get("path") for i in inv["instances"]})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,7 @@ from scripts.core.github import flatten_repos  # noqa: E402
 from scripts.core.io import load_json_checked  # noqa: E402
 from scripts.core.provenance import (classify_provenance, client_managed_advice,  # noqa: E402
                                      load_user_config)
+from scripts.core.review_state import evaluate_review  # noqa: E402
 from scripts.core.reviews import inventory_fingerprint  # noqa: E402
 from scripts.scan import CLIENT_LABELS  # noqa: E402
 from scripts.core.platform import user_home  # noqa: E402
@@ -51,8 +52,9 @@ REPO_SCOPE_NOTE = "GitHub 星数是仓库热度,不等于该 Skill 的真实使�
 
 
 def data_dir():
-    from scripts.core.runtime import default_data_dir
-    return default_data_dir()
+    """报告视图的数据目录:统一 RuntimePaths 解析(旧仓库/新安装/环境变量)。"""
+    from scripts.core.runtime import RuntimePaths
+    return RuntimePaths().data_dir
 
 
 def _load(path):
@@ -163,27 +165,38 @@ def build_view(inv, last, ctx):
 
     verdict_rows = {g: [] for g in VERDICT_GROUPS}
     unreviewed = []
-    # 审查记录按"逻辑 ID"归并(报告以逻辑 skill 展示);同名不同内容的逻辑各有各的结论
-    reviews_by_lg = {}
-    for rec in (ctx.get("value_reviews") or inv.get("value_reviews") or []):
-        if not isinstance(rec, dict) or not rec.get("logical_id"):
-            continue
-        prev = reviews_by_lg.get(rec["logical_id"])
-        if prev is None or str(rec.get("reviewed_at", "")) >= str(prev.get("reviewed_at", "")):
-            reviews_by_lg[rec["logical_id"]] = rec
+    # 审查记录按"稳定 instance ID"连接历史(F03):logical_id 随内容变化,
+    # 用它连接会把内容变化后的旧结论当成全新未审查对象;instance_id 不随内容变。
+    # 有效性判定统一走 review_state.evaluate_review,不再自算过期;
+    # "目标内容变化"(安检失效)与"替代品变化/消失"(删除建议失效)分开标注。
     seen_lg = set()
     for inst, _why in third_party:
         lg = _logical_of(inv, inst)
         if not lg or lg.get("logical_id") in seen_lg:
             continue
         seen_lg.add(lg.get("logical_id"))
-        rec = reviews_by_lg.get(lg.get("logical_id"))
-        stale = bool(rec and rec.get("skill_tree_hash") not in (None, lg.get("tree_hash")))
+        rec = None
+        for iid in lg.get("instance_ids", []):
+            cand = reviews.get(str(iid))
+            if cand and (rec is None or
+                         str(cand.get("reviewed_at", "")) >= str(rec.get("reviewed_at", ""))):
+                rec = cand
+        evaluation = evaluate_review(rec, inv, {}, reputation)
+        reasons = [str(r) for r in evaluation.get("reason_codes") or []]
+        row = {"inst": inst, "rec": rec,
+               "stale": bool(rec) and evaluation.get("status") != "current",
+               "stale_reasons": reasons,
+               "target_stale": any(r in ("target-missing", "target-content-changed",
+                                         "missing-review-snapshot", "policy-changed")
+                                   for r in reasons),
+               "alt_stale": any(r.startswith("alternative-") for r in reasons)}
         group = VERDICT_TO_GROUP.get((rec or {}).get("verdict") or "")
         if rec and group:
-            verdict_rows[group].append({"inst": inst, "rec": rec, "stale": stale})
+            verdict_rows[group].append(row)
         else:
-            unreviewed.append({"inst": inst, "rec": None, "stale": False})
+            unreviewed.append(row if rec else
+                              {"inst": inst, "rec": None, "stale": False,
+                               "stale_reasons": [], "target_stale": False, "alt_stale": False})
 
     findings_by_skill = {}
     findings_by_instance = {}
@@ -303,11 +316,18 @@ def review_card_html(view, row, group):
     h = ['<div class="card review-card">']
     head = '<div class="card-t"><b>{}</b> — {}</div>'.format(esc(name), esc(inst.get("function") or ""))
     badges = []
-    if stale:
-        badges.append('<span class="badge badge-red">⚠️ 结论已过期:内容变化后需重新审查</span>')
+    # F03:两类失效分开标注——目标内容变化(安检与结论都要重审)与
+    # 替代关系失效(内容安检仍有效,但"建议删除/优先另一个"的依据已不成立)
+    if row.get("target_stale"):
+        badges.append('<span class="badge badge-red">⚠️ 结论已过期:目标内容变化,需重新审查</span>')
+    elif row.get("alt_stale"):
+        badges.append('<span class="badge badge-red">🔁 删除建议已失效:替代品已变化或消失,需重新审查</span>')
     safety = (rec or {}).get("safety")
     if safety == "safe":
-        badges.append('<span class="badge badge-green">🛡️ 安检 safe</span>')
+        if row.get("target_stale"):
+            badges.append('<span class="badge badge-yellow">🛡️ 内容安检已过期(按旧内容判定)</span>')
+        else:
+            badges.append('<span class="badge badge-green">🛡️ 安检 safe</span>')
     elif safety == "warning":
         badges.append('<span class="badge badge-yellow">🛡️ 安检 warning</span>')
     elif safety == "danger":
@@ -477,85 +497,19 @@ def _attention_section(view):
         c["red"] + c["yellow"] + c["updates"], intro, "".join(parts))
 
 
-JS_BLOB = """
-function token(){return new URLSearchParams(location.search).get('t');}
-function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
-function toast(m){let t=document.getElementById('toast');t.textContent=m;t.className='show';clearTimeout(t._h);t._h=setTimeout(()=>t.className='',4000);}
-function copyText(s){(navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast('已复制命令')).catch(()=>{const ta=document.createElement('textarea');ta.value=s;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();toast('已复制命令');});}
-function openJump(hash){
-  if(!hash||hash.charAt(0)!=='#')return;
-  const target=document.getElementById(hash.slice(1));if(!target)return;
-  const reveal=()=>{
-    for(let p=target;p;p=p.parentElement){
-      if((p.tagName||'').toLowerCase()==='details'){
-        p.open=true;p.setAttribute('open','');
-      }
-    }
-  };
-  reveal();setTimeout(reveal,0);
-  history.replaceState(null,'',hash);
-  target.classList.remove('target-flash');void target.offsetWidth;target.classList.add('target-flash');
-  target.scrollIntoView({behavior:'smooth',block:'start'});
-}
-window.addEventListener('hashchange',()=>openJump(location.hash));
-window.addEventListener('DOMContentLoaded',()=>{if(location.hash)openJump(location.hash);});
-if(location.hash)openJump(location.hash);
-async function post(path,body){const t=token();const r=await fetch(path+(path.includes('?')?'&':'?')+'t='+encodeURIComponent(t),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){}return {status:r.status,j:j};}
-document.addEventListener('click',async e=>{
-  const jump=e.target.closest('a[data-jump]');
-  if(jump){e.preventDefault();openJump(jump.getAttribute('href'));return;}
-  const b=e.target.closest('button[data-act]');if(!b)return;
-  const act=b.dataset.act,id=b.dataset.id;
-  if(act==='copy'){copyText(b.dataset.cmd||'');toast('已复制命令');return;}
-  if(!token()){copyText(b.dataset.cmd||'');toast('静态模式:已复制等价命令');return;}
-  if(act==='remove'){
-    if(!confirm('为「'+b.dataset.name+'」生成删除计划?'))return;
-    b.disabled=true;
-    const pr=await post('/api/plan',{action:'remove',instance_ids:[id],reason:'报告建议(网页一键)'});
-    if(!pr.j||!pr.j.ok){toast('❌ 生成计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
-    const p=pr.j;
-    if(!confirm('计划摘要:'+p.summary+'\\n确认执行 digest: '+p.digest+'\\n(先自动备份;失败自动回滚)')){b.disabled=false;return;}
-    const ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
-    toast(ar.j&&ar.j.ok?'✅ 已执行,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
-    if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
-    return;
-  }
-  if(act==='restore'){
-    if(!confirm('为备份 '+b.dataset.backup+' 生成恢复计划?'))return;
-    b.disabled=true;
-    const pr=await post('/api/restore-plan',{backup_id:b.dataset.backup});
-    if(!pr.j||!pr.j.ok){toast('❌ '+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
-    const p=pr.j;
-    if(!confirm('计划摘要:'+p.summary+'\\n确认恢复 digest: '+p.digest+'\\n(目标已存在则冲突失败,不覆盖)')){b.disabled=false;return;}
-    const ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
-    toast(ar.j&&ar.j.ok?'✅ 已恢复,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
-    if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
-    return;
-  }
-  if(act==='update'){
-    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已安检;计划确认后才会执行)'))return;
-    b.disabled=true;
-    const pr=await post('/api/plan',{action:'update',instance_id:id});
-    if(!pr.j||!pr.j.ok){toast('❌ 生成更新计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
-    const p=pr.j;
-    if(!confirm('更新计划摘要:'+p.summary+'\n确认执行 digest: '+p.digest+'\n(旧版本自动备份;失败自动回滚)')){b.disabled=false;return;}
-    let ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
-    if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('warning')>=0){
-      if(!confirm('候选安检为 warning: '+ar.j.error+'\n确认接受风险并继续?')){b.disabled=false;return;}
-      ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true,accept_warning:true});
-    }
-    toast(ar.j&&ar.j.ok?'✅ 已更新,稍后自动刷新':'❌ '+(ar.j&&ar.j.error||'执行失败'));
-    if(ar.j&&ar.j.ok)setTimeout(()=>location.reload(),1500);else b.disabled=false;
-    return;
-  }
-  if(act==='ignore'){
-    if(!confirm('忽略这个问题?'))return;
-    const r=await post('/api/ignore',{name:b.dataset.name,match:b.dataset.match,confirm:true});
-    toast(r.j&&r.j.ok?'✅ 已忽略':'❌ '+(r.j&&r.j.error||'失败'));
-    if(r.j&&r.j.ok)setTimeout(()=>location.reload(),1200);
-  }
-});
-"""
+def _report_js() -> str:
+    """报告交互脚本(F01):真实 .js 资源,静态/服务模式共用同一份。
+
+    此前 JS 内嵌在 Python 三引号字符串里,`\\n` 与真实换行转义不一致,
+    更新分支生成非法 JavaScript,整段交互(跳转/复制/删除/恢复/更新)全部失效。
+    改为独立资源后不再有 Python 字符串转义层;安装包通过 package-data 分发。
+    """
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "report.js")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+JS_BLOB = _report_js()
 
 
 def _client_load_rows(inv):
@@ -712,13 +666,12 @@ def render_html(inv, last=None, ctx=None):
         note=esc(REPO_SCOPE_NOTE), sections="".join(sections), back=_back_top())
 
     # 全量明细表;groups.json 作为分类筛选维度(F08:此前有文件无消费者),
-    # 未登记目录名归入默认组「未分组」;分组不改价值结论与安全状态
-    groups_cfg, _ = load_json_checked(Path(data_dir()) / "groups.json", {})
+    # 未登记目录名归入默认组「未分组」;分组不改价值结论与安全状态。
+    # 分组配置由调用方按统一 RuntimePaths 读好放入 ctx(F04:渲染不做路径决定)
     group_of = {}
-    if isinstance(groups_cfg, dict):
-        for grp, names in groups_cfg.items():
-            for n in names if isinstance(names, list) else []:
-                group_of[str(n)] = str(grp)
+    for grp, names in ((ctx or {}).get("groups") or {}).items():
+        for n in names if isinstance(names, list) else []:
+            group_of[str(n)] = str(grp)
     rows = []
     for inst in view["inv"].get("instances", []):
         cls, _why = classify_instance(inst, set(), view.get("known"))
@@ -776,6 +729,10 @@ def render_html(inv, last=None, ctx=None):
         back=_back_top())
 
     extras = []
+    # F06:报告刷新与资产变更分离——刷新失败后可单独重试,不诱导重复执行变更
+    extras.append('<details><summary><b>🧰 运维</b></summary><div class="body">'
+                  '<p>{} <span class="mut">重跑扫描并刷新报告(只读);变更成功但刷新失败时用它补救。</span></p>'
+                  '</div></details>'.format(btn("🔄 刷新报告", "refresh", {})))
     if view["backups"]:
         bk_rows = "".join(
             '<p>• <code>{}</code>({} KB · {} · {}){} {}</p>'.format(
@@ -918,7 +875,12 @@ def render_md(inv, last=None, ctx=None):
             L.append("- 无")
         for row in rows:
             inst, rec = row["inst"], row["rec"]
-            stale = "(⚠️ 结论已过期,需重新审查)" if row["stale"] else ""
+            if row.get("target_stale"):
+                stale = "(⚠️ 结论已过期:目标内容变化,需重新审查)"
+            elif row.get("alt_stale"):
+                stale = "(🔁 删除建议已失效:替代品已变化或消失,需重新审查)"
+            else:
+                stale = ""
             alts = "、".join(_name_of_id(view, a) for a in (rec.get("alternatives") or []))
             L.append("- **{}**({}){} — {} 依据:{};替代:{};删除后可能失去:{};置信度:{}".format(
                 inst.get("logical_name"), inst.get("function") or "", stale,
@@ -956,12 +918,18 @@ def render_md(inv, last=None, ctx=None):
     return "\n".join(L), view
 
 
-def backups_list():
+def backups_list(backup_dir=None):
     """备份行统一 {backup_id, filename, path, kb, ts, verification_status}。
 
     API/命令一律使用 backup_id(不含前后缀);F08 修复:此前把整文件名当 id
-    传给 API,底层再拼 backup-<id>.tar.gz 造成双重前后缀,恢复按钮必失败。"""
-    backups = Path(BASE) / "backups"
+    传给 API,底层再拼 backup-<id>.tar.gz 造成双重前后缀,恢复按钮必失败。
+    F04:备份目录统一由 RuntimePaths 解析——旧仓库=仓库 backups/,新安装=
+    ~/.skill-keeper/backups,显式 data 目录=<data>/backups;不再写死代码根
+    (否则新安装的备份报告看不见、网页恢复找不到)。"""
+    if backup_dir is None:
+        from scripts.core.runtime import RuntimePaths
+        backup_dir = RuntimePaths().backup_dir
+    backups = Path(backup_dir)
     if not backups.is_dir():
         return []
     from scripts.core.backup import BackupError, verify_backup
@@ -989,7 +957,10 @@ def main(argv=None):
     args, rest = ap.parse_known_args(argv)
     if args.serve:
         return subprocess.run([sys.executable, os.path.join(BASE, "scripts", "serve.py")] + rest).returncode
-    ddir = data_dir()
+    # F04:整份报告只解析一次 RuntimePaths;inventory、备份、个人配置同源
+    from scripts.core.runtime import RuntimePaths
+    paths = RuntimePaths()
+    ddir = paths.data_dir
     inv = _load(ddir / "inventory.json")
     if not isinstance(inv, dict) or inv.get("schema_version") != 2:
         print("🛑 inventory 不是 v2(先跑 scan.py 重新扫描)")
@@ -997,16 +968,18 @@ def main(argv=None):
     last = _load(ddir / "inventory-last.json")
     update_store = _load(ddir / "updates.json") or {}
     reviews_store = _load(ddir / "value-reviews.json") or {}
+    groups_cfg, _ = load_json_checked(ddir / "groups.json", {})
     ctx = {
         "updates": update_store.get("differs", []) if isinstance(update_store, dict) else [],
         "updates_checked_at": update_store.get("checked_at") if isinstance(update_store, dict) else "",
         "ignore": _load(ddir / "ignore.json") or {},
-        "backups": backups_list(),
+        "backups": backups_list(paths.backup_dir),
         "value_reviews": reviews_store.get("reviews", []) if isinstance(reviews_store, dict) else [],
         "reputation": _load(ddir / "reputation.json") or {},
         "self_built": _self_built(ddir),
         "known": load_user_config(ddir),
         "queue": _load(ddir / "review-queue.json"),
+        "groups": groups_cfg if isinstance(groups_cfg, dict) else {},
     }
     md, view = render_md(inv, last, ctx)
     if args.json:

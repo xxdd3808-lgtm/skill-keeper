@@ -1,0 +1,39 @@
+{
+  "recover_without_lock": {
+    "recovery_while_exclusive_lock_held": "rolled-back",
+    "target_restored": true
+  },
+  "web_update_vet": {
+    "fresh_click_creates_another_plan": true,
+    "prior_candidate_vetted": true,
+    "result": "候选尚未安检:先完成安全复核并 record_candidate_vet,再应用"
+  },
+  "corrupt_locations": {
+    "config_issues": [
+      {
+        "code": "bad-client-locations",
+        "detail": "文件存在但已损坏(非合法 JSON)"
+      }
+    ],
+    "observation_complete": true,
+    "health_status": "ok"
+  },
+  "malformed_protection": {
+    "policy_healthy": true,
+    "remove_allowed": true
+  },
+  "partial_inventory_report": {
+    "exit_code": 0,
+    "operational_ok": true
+  },
+  "missing_inventory_update_check": {
+    "exit_code": 2,
+    "prior_result_preserved": false
+  },
+  "repeated_network_calls": {
+    "metadata_calls_1": 4,
+    "metadata_calls_2": 4,
+    "stage_calls_1": 2,
+    "stage_calls_2": 2
+  }
+}

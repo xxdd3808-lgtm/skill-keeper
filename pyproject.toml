@@ -17,5 +17,9 @@ skill-keeper = "scripts.cli:main"
 [tool.setuptools]
 packages = ["scripts", "scripts.core", "scripts.core.clients"]
 
+[tool.setuptools.package-data]
+# 报告交互脚本(F01):真实 .js 资源,静态/服务模式共用同一份,必须随包分发
+scripts = ["assets/*.js"]
+
 [tool.setuptools.dynamic]
 version = { attr = "scripts.__version__" }

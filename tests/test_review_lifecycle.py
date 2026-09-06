@@ -158,5 +158,115 @@ class LedgerIntegrityTests(unittest.TestCase):
                              "{corrupt", "损坏台账不得被空表覆盖")
 
 
+class StalenessIntegrationTests(unittest.TestCase):
+    """F03 回归:报告与队列必须统一调用 evaluate_review,历史按稳定实例 ID 连接。
+
+    病灶复现:审查时建议删除 demo、保留 alt;之后 alt 被删除——
+    旧报告按 logical_id 连接且只比目标哈希,继续显示"建议删除 + 安检 safe";
+    demo 内容变化时旧结论干脆消失,被当成全新未审查对象。
+    """
+
+    @staticmethod
+    def _inventory(demo_hash="a" * 64, with_alt=True, alt_hash="c" * 64,
+                   demo_lid="lg-demo"):
+        instances = [{"instance_id": "inst-demo", "tree_hash": demo_hash,
+                      "logical_name": "demo", "directory_name": "demo",
+                      "is_skill": True, "mutable": True, "kind": "user",
+                      "client": "shared", "location_id": "shared",
+                      "path": "/x/demo", "real_path": "/x/demo"}]
+        logicals = [{"logical_id": demo_lid, "name": "demo", "tree_hash": demo_hash,
+                     "instance_ids": ["inst-demo"]}]
+        if with_alt:
+            instances.append({"instance_id": "inst-alt", "tree_hash": alt_hash,
+                              "logical_name": "alt", "directory_name": "alt",
+                              "is_skill": True, "mutable": True, "kind": "user",
+                              "client": "shared", "location_id": "shared",
+                              "path": "/x/alt", "real_path": "/x/alt"})
+            logicals.append({"logical_id": "lg-alt", "name": "alt",
+                             "tree_hash": alt_hash, "instance_ids": ["inst-alt"]})
+        return {"schema_version": 2, "instances": instances,
+                "logical_skills": logicals, "locations": [], "findings": []}
+
+    @staticmethod
+    def _delete_record(alt_hash="c" * 64, demo_hash="a" * 64):
+        return {"review_id": "rv-del1", "instance_id": "inst-demo",
+                "logical_id": "lg-demo", "name": "demo", "verdict": "建议删除",
+                "reason": "功能被 alt 完全覆盖", "alternatives": ["lg-alt"],
+                "alternatives_state": {"lg-alt": {"tree_hash": alt_hash}},
+                "unique_capabilities": [], "loss_if_removed": "失去备用入口",
+                "confidence": "高", "evidence": ["功能对比:并集属于 alt", "alt 维护活跃"],
+                "skill_tree_hash": demo_hash, "inventory_fingerprint": "fp-1",
+                "reputation_snapshot_id": "rep-1", "review_snapshot_id": "rs-" + "1" * 12,
+                "reviewed_at": "2026-09-01 00:00:00", "reviewer_model": "model-x",
+                "safety": "safe", "note": ""}
+
+    def _demo_row(self, inv, reviews):
+        import scripts.report as report_mod
+        view = report_mod.build_view(inv, None, {"value_reviews": reviews})
+        rows = view["verdict_rows"]["建议删除"]
+        self.assertEqual(len(rows), 1, "建议删除组必须有且只有 demo")
+        return rows[0]
+
+    def test_alt_gone_marks_delete_advice_stale_but_history_visible(self):
+        reviews = [self._delete_record()]
+        row = self._demo_row(self._inventory(), reviews)
+        self.assertFalse(row["stale"])
+        self.assertFalse(row["alt_stale"])
+        # 删除 alt:目标内容未变,但"建议删除"的替代依据已不成立
+        row = self._demo_row(self._inventory(with_alt=False), reviews)
+        self.assertTrue(row["stale"])
+        self.assertTrue(row["alt_stale"], "替代品消失必须单独标注")
+        self.assertFalse(row["target_stale"], "目标内容未变,内容安检仍然有效")
+        import scripts.report as report_mod
+        html = report_mod.render_html(self._inventory(with_alt=False), None,
+                                      {"value_reviews": reviews})
+        self.assertIn("删除建议已失效", html)
+        self.assertIn("安检 safe", html, "内容安检有效与建议失效必须并存,不得混成单一绿标")
+
+    def test_target_change_keeps_history_via_stable_instance_id(self):
+        reviews = [self._delete_record()]
+        # 内容变化 → 新 logical_id,但 instance_id 不变:历史结论必须可见并标过期
+        row = self._demo_row(self._inventory(demo_hash="b" * 64, demo_lid="lg-demo-v2"),
+                             reviews)
+        self.assertTrue(row["target_stale"])
+        self.assertEqual(row["rec"]["review_id"], "rv-del1", "旧结论保留可见")
+        import scripts.report as report_mod
+        view = report_mod.build_view(self._inventory(demo_hash="b" * 64,
+                                                     demo_lid="lg-demo-v2"),
+                                     None, {"value_reviews": reviews})
+        self.assertEqual([r["inst"]["instance_id"] for r in view["unreviewed"]],
+                         ["inst-alt"],
+                         "demo 不得因内容变化被当成全新未审查(alt 本就未审)")
+
+    def test_queue_uses_evaluate_review_for_staleness(self):
+        from scripts.core.reviews import build_review_queue
+        reviews = [self._delete_record()]
+        queue = build_review_queue(self._inventory(with_alt=False),
+                                   existing_reviews=reviews)
+        items = {x["instance_id"]: x for x in queue["items"]}
+        self.assertEqual(items["inst-demo"]["previous_review_status"], "needs-recheck",
+                         "替代品消失后队列必须要求复核,不得沿用旧哈希口径判 current")
+        self.assertTrue(any(c.startswith("alternative-gone") for c in
+                            items["inst-demo"]["previous_review_reasons"]))
+
+    def test_record_review_takes_alternative_state_from_full_inventory(self):
+        """受保护替代品不进队列;记账时的依赖快照必须从全量安装索引取,否则永远误报。"""
+        from scripts.core.reviews import build_review_queue, record_review
+        inv = self._inventory()
+        queue = build_review_queue(inv, known_sources={"alt": {"type": "self-built"}})
+        self.assertEqual([x["instance_id"] for x in queue["items"]], ["inst-demo"],
+                         "受保护替代品不进入队列")
+        payload = {"instance_id": "inst-demo", "verdict": "建议删除",
+                   "reason": "功能被受保护的 alt 覆盖", "confidence": "高",
+                   "evidence": ["功能对比:并集属于 alt", "alt 为用户自建"],
+                   "loss_if_removed": "失去备用入口", "alternatives": ["lg-alt"]}
+        record = record_review(queue, payload, "model-x", inventory=inv)
+        self.assertEqual(record["alternatives_state"]["lg-alt"]["tree_hash"], "c" * 64,
+                         "替代品快照必须来自全量安装索引,不能记成未知")
+        record_no_inv = record_review(queue, payload, "model-x")
+        self.assertIsNone(record_no_inv["alternatives_state"]["lg-alt"]["tree_hash"],
+                          "未提供 inventory 时保持旧的降级行为(评估按需复核)")
+
+
 if __name__ == "__main__":
     unittest.main()

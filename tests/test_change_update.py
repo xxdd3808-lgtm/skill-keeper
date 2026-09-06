@@ -123,5 +123,118 @@ class ChangeUpdateTests(unittest.TestCase):
         self.assertEqual(env.last_audit()["rollback_status"], "restored")
 
 
+class WebVetFlowTests(unittest.TestCase):
+    """F09 回归:网页每次点击都新建计划,安检记录绑定 plan_id——
+    所以必须先对"本计划"记账再执行;CLI 与网页走同一 AppService 入口。"""
+
+    @staticmethod
+    def _materialize_inventory(env):
+        """AppService/ServiceContext 从磁盘读 inventory:update_env 的内存态先落盘。"""
+        import json as _json
+        env.data.mkdir(parents=True, exist_ok=True)
+        (env.data / "inventory.json").write_text(
+            _json.dumps(env.inventory, ensure_ascii=False), encoding="utf-8")
+
+    def test_service_vet_binds_new_plan_and_flow_completes(self):
+        from unittest import mock
+        from scripts.core.service import AppService
+        from scripts.core.runtime import RuntimePaths
+        env = update_env(self)
+        self._materialize_inventory(env)
+        paths = RuntimePaths(home=env.home, data_dir=env.data,
+                             backup_dir=env.home / "backups")
+        svc = AppService(paths)
+        plan = env.create_plan(candidate="v2")
+        # 未安检先执行 → 引擎拒绝(现状不变)
+        with self.assertRaises(ChangeError):
+            svc.apply_action(plan.plan_id, plan.digest, True)
+        # 对本计划记账后执行成功
+        vet = svc.vet_candidate(plan.plan_id, "safe", ["阅读了候选 SKILL.md 与差异"])
+        self.assertEqual(vet["candidate_hash"], env.v2_hash)
+        with mock.patch("scripts.core.service.publish_snapshot",
+                        return_value={"ok": True, "status": "fresh",
+                                      "snapshot_id": "x"}):
+            result = svc.apply_action(plan.plan_id, plan.digest, True)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["transaction_status"], "committed")
+        self.assertEqual(tree_hash(env.skill_path), env.v2_hash)
+
+    def test_service_vet_rejects_unknown_plan_and_bad_verdict(self):
+        from scripts.core.service import AppService
+        from scripts.core.runtime import RuntimePaths
+        env = update_env(self)
+        self._materialize_inventory(env)
+        paths = RuntimePaths(home=env.home, data_dir=env.data,
+                             backup_dir=env.home / "backups")
+        svc = AppService(paths)
+        with self.assertRaises(ChangeError):
+            svc.vet_candidate("plan-nothing", "safe", ["x"])
+        plan = env.create_plan(candidate="v2")
+        with self.assertRaises(ChangeError):
+            svc.vet_candidate(plan.plan_id, "danger", ["x"])
+        with self.assertRaises(ChangeError, msg="安检证据不能为空"):
+            svc.vet_candidate(plan.plan_id, "safe", [])
+
+    def test_serve_vet_endpoint_records_for_the_new_plan(self):
+        """网页流程:POST /api/plan 建新计划 → /api/vet 对该计划记账 → /api/apply 成功。"""
+        import json as _json
+        import threading
+        from http.client import HTTPConnection
+        from scripts import serve
+        env = update_env(self)
+        self._materialize_inventory(env)
+        (env.data / "report.html").write_text("<html><body>ok</body></html>",
+                                              encoding="utf-8")
+        httpd, token, ctx = serve.create_server(env.data, home=env.home)
+        th = threading.Thread(target=httpd.serve_forever, daemon=True)
+        th.start()
+        self.addCleanup(httpd.shutdown)
+
+        def post(path, body):
+            conn = HTTPConnection("127.0.0.1", httpd.server_port, timeout=10)
+            conn.request("POST", path + "?t=" + token,
+                         body=_json.dumps(body).encode(),
+                         headers={"Content-Type": "application/json"})
+            r = conn.getresponse()
+            payload = _json.loads(r.read() or b"{}")
+            conn.close()
+            return r.status, payload
+
+        # updates.json 里登记已暂存候选(模拟 check_updates 已跑完)
+        (env.data / "updates.json").write_text(_json.dumps({
+            "schema_version": 2,
+            "differs": [{"name": "demo", "instance_id": env.iid, "repo": "example/demo",
+                         "commit_sha": env.remote_head, "candidate_hash": env.v2_hash,
+                         "source_dir": "skills/demo",
+                         "staging_path": str(env.staging)}],
+        }), encoding="utf-8")
+        status, plan = post("/api/plan", {"action": "update", "instance_id": env.iid})
+        self.assertEqual(status, 200, plan)
+        self.assertEqual(plan["candidate_hash"], env.v2_hash,
+                         "计划公开字段必须带候选哈希,供安检步骤展示")
+        status, vet = post("/api/vet", {"plan_id": plan["plan_id"], "verdict": "safe",
+                                        "confirm": True})
+        self.assertEqual(status, 200, vet)
+        self.assertEqual(vet["candidate_hash"], env.v2_hash)
+        # 快照刷新会以 realpath 重算 instance_id(测试 fixture 与之不同口径),
+        # 本测试聚焦"安检续办",apply 期间把刷新 mock 成成功
+        from unittest import mock
+        with mock.patch("scripts.core.service.publish_snapshot",
+                        return_value={"ok": True, "status": "fresh",
+                                      "snapshot_id": "x"}):
+            status, applied = post("/api/apply", {"plan_id": plan["plan_id"],
+                                                  "digest": plan["digest"],
+                                                  "confirm": True})
+        self.assertEqual(status, 200, applied)
+        self.assertTrue(applied["ok"], applied)
+        self.assertEqual(applied["transaction_status"], "committed")
+        self.assertEqual(tree_hash(env.skill_path), env.v2_hash)
+        # 缺 confirm 的安检必须拒绝
+        status, plan2 = post("/api/plan", {"action": "update", "instance_id": env.iid})
+        self.assertEqual(status, 200)
+        status, _ = post("/api/vet", {"plan_id": plan2["plan_id"], "verdict": "safe"})
+        self.assertEqual(status, 400, "安检记账同样要求明确确认")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,7 @@ class PackagingInstallTests(unittest.TestCase):
                                  + installed.stdout[-1200:] + installed.stderr[-1200:])
         cls._home = Path(cls._td.name) / "home"
         cls._home.mkdir()
+        cls._venv_python = venv_python
 
     @classmethod
     def tearDownClass(cls):
@@ -82,6 +83,19 @@ class PackagingInstallTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr[-300:])
         text = r.stdout
         self.assertEqual(json.loads(text[text.index("{"):])["total"], 7)
+
+    def test_installed_package_ships_report_js(self):
+        """F01:报告交互脚本(.js 资源)必须随 pip install 分发并可加载。"""
+        code = ("import scripts.report as r, pathlib;"
+                "p = pathlib.Path(r.__file__).parent / 'assets' / 'report.js';"
+                "print(int(p.is_file()), len(r.JS_BLOB))")
+        r = subprocess.run([str(self._venv_python), "-c", code],
+                           capture_output=True, text=True, timeout=60,
+                           cwd=tempfile.gettempdir())
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        shipped, blob_len = r.stdout.strip().split()
+        self.assertEqual(shipped, "1", "scripts/assets/report.js 未进安装包")
+        self.assertGreater(int(blob_len), 0, "安装态 JS_BLOB 必须能从资源加载")
 
 
 if __name__ == "__main__":

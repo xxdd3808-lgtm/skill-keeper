@@ -47,4 +47,6 @@ python3 scripts/verify.py
 
 v4 已于 2026-09-05 发布:case1 经用户独立复核修复(验收器假成功、共享根声明关系丢失、模型根越界、Windows HOME 隔离、锁异常清理、输入回显边界)后 push,CI 修复 7 轮(归档 fsync 句柄、仓库布局冻结分支、Python 3.8 dict 合并、Windows UTF-8、fixture 链接绝对目标重建、3.12 mkdtemp 对 deny 的重试挂死——verify 增 faulthandler 看门狗、只读计划 replace 重试),四平台全绿后合并 main、tag v4.0.0 并发布 GitHub Release(166d1a9)。现役架构见 `docs/architecture.md`,版本演化见 `docs/changes.md`,执行证据见 `PROGRESS.md`,阻塞见 `BLOCKED.md`。
 
-后续发布仍需用户逐次授权 push/tag/release。
+2026-09-06 全面审查(docs/reviews/2026-09-06/,F01–F13)第一阶段已本地完成:F01 报告 JS 迁出为真实资源并纳入打包与语法验收、F02 GitHub 下载器兼容 tree 条目与折行 Base64、F03 审查有效性统一 evaluate_review(报告按稳定 instance ID 连接历史、区分安检失效与删除建议失效)、F04 备份/staging 全走 RuntimePaths、F05 恢复持锁+跨计划未完成事务按路径交集阻断+scan 跳过 .sk-txn-*、F06 提交后刷新失败只标 committed+stale 并提供单独刷新、F08 known-sources 内部条目损坏拒写、F09 网页/CLI 更新流程对新建计划先安检记账(manage.py vet、/api/vet)。verify 338 项全绿;待 push 后由 CI 出四平台证据。
+
+下一步(审查第二/三/四阶段,均未执行):统一 RuntimePaths/AppService/LoadEvaluation 数据口径(F10–F13)、报告输入/view/展示分离、F07 队列近立方工作量定点优化、Skill 首页精简。后续发布仍需用户逐次授权 push/tag/release。

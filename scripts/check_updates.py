@@ -22,24 +22,21 @@ from scripts.core.github import cached_repo_snapshot, fetch_skill_tree, gh_cli_r
 from scripts.core.io import atomic_write_json, load_json_checked       # noqa: E402
 from scripts.core.provenance import classify_provenance, load_user_config  # noqa: E402
 from scripts.core.runtime import default_data_dir                      # noqa: E402
-from scripts.core.platform import user_home                            # noqa: E402
 from scripts.core.staging import (StagingBoundaryError, cleanup_staging,   # noqa: E402
                                   record_ownership, validate_staging_root)
 from scripts.scan import parse_frontmatter                              # noqa: E402
 
 
 def staging_root_for(output_path=None):
-    """候选暂存根。绝不能落在任何客户端会递归扫描的技能目录下——2026-09-02 实测,
+    """候选暂存根(F04:统一 RuntimePaths,不再自建平台缓存路径)。
+
+    绝不能落在任何客户端会递归扫描的技能目录下——2026-09-02 实测,
     ZCode 的「已安装技能」面板会顺着 ~/.agents/skills/skill-keeper 符号链接递归扫描,
     把仓库 data/staging 里的候选树当技能重复列出(aihot/brainstorming 各出现两次)。
-    默认放系统缓存目录;测试用 SKILL_KEEPER_STAGING 指向临时目录。"""
-    env = os.environ.get("SKILL_KEEPER_STAGING")
-    if env:
-        return Path(env)
-    home = user_home()
-    if sys.platform == "darwin":
-        return home / "Library/Caches/skill-keeper/staging"
-    return home / ".cache/skill-keeper/staging"
+    统一解析:环境变量 SKILL_KEEPER_STAGING > 旧仓库平台缓存 > 新安装
+    ~/.skill-keeper/cache/staging;与 CLI/网页/报告同一套解析,消除路径漂移。"""
+    from scripts.core.runtime import RuntimePaths
+    return RuntimePaths().staging_dir
 
 
 def stage_candidate(repo, source_dir, commit_sha, staging_root, gh_runner):

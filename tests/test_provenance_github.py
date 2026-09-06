@@ -18,6 +18,12 @@ def b64(data: bytes) -> str:
     return base64.b64encode(data).decode()
 
 
+def b64_wrapped(data: bytes) -> str:
+    """GitHub Git Blobs API 的真实形状:Base64 每 60 字符一个换行(F02)。"""
+    enc = base64.b64encode(data).decode()
+    return "\n".join(enc[i:i + 60] for i in range(0, len(enc), 60))
+
+
 class FakeGh:
     """可注入的 gh api 替身:按端点精确匹配返回 (code, body)。"""
 
@@ -168,6 +174,65 @@ class ProvenanceGithubTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             result = fetch_skill_tree("x/y", "skills/nope", "c1", Path(td), FakeGh(base))
             self.assertFalse(result["ok"])
+
+    def test_recursive_tree_with_subdirectories_materializes(self):
+        """F02:递归树必然含 type=tree 目录条目;带子目录的 Skill 必须能物化。"""
+        gh = FakeGh({
+            "repos/o/r/git/trees/abc123?recursive=1": {"tree": [
+                {"path": "skills", "type": "tree", "sha": "t0"},
+                {"path": "skills/demo", "type": "tree", "sha": "t1"},
+                {"path": "skills/demo/SKILL.md", "type": "blob", "sha": "b3",
+                 "mode": "100644"},
+                {"path": "skills/demo/scripts", "type": "tree", "sha": "t2"},
+                {"path": "skills/demo/scripts/run.py", "type": "blob", "sha": "b1",
+                 "mode": "100644"},
+            ]},
+            "repos/o/r/git/blobs/b1": {"content": b64_wrapped(b"print('ok')\n"),
+                                       "encoding": "base64"},
+            "repos/o/r/git/blobs/b3": {"content": b64(b"---\nname: demo\ndescription: d\n---\nhello\n"),
+                                       "encoding": "base64"},
+        })
+        with tempfile.TemporaryDirectory() as td:
+            result = fetch_skill_tree("o/r", "skills/demo", "abc123", Path(td), gh)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["files"], 2)
+            self.assertEqual((Path(td) / "scripts/run.py").read_bytes(), b"print('ok')\n")
+            self.assertTrue((Path(td) / "SKILL.md").is_file())
+
+    def test_github_wrapped_base64_blobs_are_decoded(self):
+        """F02:GitHub Base64 自带换行(20KB 正文约 454 个);validate 解码不得拒绝。"""
+        long_body = ("# " + "x" * 200 + "\n").encode()
+        gh = FakeGh({
+            "repos/o/r/git/trees/abc123?recursive=1": {"tree": [
+                {"path": "skills/demo/SKILL.md", "type": "blob", "sha": "b3",
+                 "mode": "100644"},
+            ]},
+            "repos/o/r/git/blobs/b3": {"content": b64_wrapped(
+                b"---\nname: demo\ndescription: d\n---\n" + long_body),
+                "encoding": "base64"},
+        })
+        with tempfile.TemporaryDirectory() as td:
+            result = fetch_skill_tree("o/r", "skills/demo", "abc123", Path(td), gh)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual((Path(td) / "SKILL.md").read_bytes(),
+                             b"---\nname: demo\ndescription: d\n---\n" + long_body)
+
+    def test_submodule_entry_is_still_rejected(self):
+        """F02 放行的是合法目录(tree);submodule(commit)必须继续明确拒绝。"""
+        base = {
+            "repos/x/y/git/trees/c1?recursive=1": {"tree": [
+                {"path": "skills/demo/SKILL.md", "type": "blob", "sha": "b3",
+                 "mode": "100644"},
+                {"path": "skills/demo/vendor", "type": "commit", "sha": "c9"},
+            ]},
+            "repos/x/y/git/blobs/b3": {"content": b64(b"---\nname: demo\ndescription: d\n---\nx\n"),
+                                       "encoding": "base64"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            result = fetch_skill_tree("x/y", "skills/demo", "c1", Path(td), FakeGh(base))
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["error"], "unsupported-submodule")
+            self.assertEqual(result["path"], "vendor")
 
     def test_snapshot_failure_is_structured_stale(self):
         snap = repo_snapshot("owner/none", FakeGh({}))

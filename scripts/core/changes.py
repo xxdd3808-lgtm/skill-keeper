@@ -639,32 +639,93 @@ def _append_audit_safe(event, context, state):
             _txn.write_transaction(context, state)
 
 
+# 未完成事务的阶段(F05):任何写入口都必须尊重其路径占用
+UNFINISHED_PHASES = ("prepared", "mutating", "rolling-back", "recovery-required")
+
+
+def _norm_real(path) -> str:
+    """跨平台可比路径:realpath 解析链接 + normcase 统一大小写(Windows)。"""
+    return os.path.normcase(os.path.realpath(os.path.abspath(os.fspath(path))))
+
+
+def _paths_overlap(a: str, b: str) -> bool:
+    """同一路径或父子路径包含关系(F05:目标与保管路径有交集即冲突)。"""
+    return a == b or a.startswith(b + os.sep) or b.startswith(a + os.sep)
+
+
+def _assert_no_conflicting_transactions(context, plan_id, target_paths) -> None:
+    """F05:其他计划的未完成事务占用相关路径时,拒绝新的物理变更。
+
+    此前执行器只检查当前 plan_id 自己的事务,另一个计划留下的未完成事务
+    可以与本次变更交叉操作同一目标;互斥约束必须在计划之间也成立。
+    """
+    tdir = _txn.transactions_dir(context)
+    if not tdir.is_dir():
+        return
+    mine = [_norm_real(p) for p in (target_paths or []) if p]
+    if not mine:
+        return
+    for f in sorted(tdir.glob("*.json")):
+        other_id = f.stem
+        if other_id == plan_id:
+            continue
+        try:
+            other = _txn.read_transaction(other_id, context)
+        except _txn.TransactionError:
+            continue  # 损坏事务由它自己的 apply/recover 负责拒绝
+        if not isinstance(other, dict) or other.get("phase") not in UNFINISHED_PHASES:
+            continue
+        blockers = []
+        for t in other.get("targets", []) or []:
+            if isinstance(t, dict):
+                blockers += [t.get("path"), t.get("holding_path")]
+        blockers.append(other.get("candidate_holding"))
+        for blocker in blockers:
+            if not blocker:
+                continue
+            b = _norm_real(blocker)
+            if any(_paths_overlap(m, b) for m in mine):
+                raise ChangeError(
+                    "检测到未完成事务 {} 占用相关路径({}),先运行 manage.py recover {} "
+                    "或人工检查 data/transactions,再执行本计划".format(other_id, blocker, other_id))
+
+
 def recover_transaction(plan_id, context) -> dict:
     """把已授权事务恢复到原状态:只撤销本事务落地的对象,绝不激活新候选。
 
     对象冲突时保留实体并标 recovery-required(阻止后续相关写操作);审计记录恢复结果。
+    F05:恢复也是一种写入口,全程持有变更互斥锁——否则恢复可与正在执行的
+    变更重叠,移动/清理同一批文件。
     """
     row = _load_plan(plan_id, context)  # 授权依据;过期不影响恢复(恢复只回退,不前进)
+    lock = FileLock(context.lock_path)
     try:
-        state = _txn.read_transaction(plan_id, context)
-    except _txn.TransactionError as e:
-        raise ChangeError(str(e))
-    if state is None:
-        raise ChangeError("该计划没有事务记录,无需恢复")
-    if state.get("phase") in ("prepared", "mutating", "rolling-back", "recovery-required"):
-        undo = {"remove": _undo_remove, "update": _undo_update,
-                "restore": _undo_restore}[state.get("action")]
-        problems = undo(state)
-        _record_problems(context, state, problems)
-        append_audit({"action": str(state.get("action")), "plan_id": str(plan_id),
-                      "status": "recovered" if not problems else "recovery-required",
-                      "rollback_status": "restored" if not problems else "recovery-required",
-                      "backup_id": state.get("backup_id"),
-                      "reason": "recover_transaction: " + str(state.get("reason") or "")},
-                     context.audit_path)
-    elif state.get("phase") == "committed":
-        _cleanup_holdings(context, state)  # 已提交:只清理保管残留,不做物理恢复
-    return state
+        lock.acquire()
+    except (BlockingIOError, OSError):
+        raise LockBusy("另一个 skill-keeper 变更或恢复正在进行,请稍后再试")
+    try:
+        try:
+            state = _txn.read_transaction(plan_id, context)
+        except _txn.TransactionError as e:
+            raise ChangeError(str(e))
+        if state is None:
+            raise ChangeError("该计划没有事务记录,无需恢复")
+        if state.get("phase") in UNFINISHED_PHASES:
+            undo = {"remove": _undo_remove, "update": _undo_update,
+                    "restore": _undo_restore}[state.get("action")]
+            problems = undo(state)
+            _record_problems(context, state, problems)
+            append_audit({"action": str(state.get("action")), "plan_id": str(plan_id),
+                          "status": "recovered" if not problems else "recovery-required",
+                          "rollback_status": "restored" if not problems else "recovery-required",
+                          "backup_id": state.get("backup_id"),
+                          "reason": "recover_transaction: " + str(state.get("reason") or "")},
+                         context.audit_path)
+        elif state.get("phase") == "committed":
+            _cleanup_holdings(context, state)  # 已提交:只清理保管残留,不做物理恢复
+        return state
+    finally:
+        lock.release()
 
 
 def _preflight_parents(target_paths, plan_id):
@@ -774,6 +835,9 @@ def apply_plan(plan_id, digest, confirm, context, accept_warning=False) -> dict:
         _check_preconditions(row, inventory, policy)
         by_id = {i.get("instance_id"): i for i in inventory.get("instances", [])}
         targets = [by_id[i] for i in row.get("target_ids", [])]
+        # F05:其他计划的未完成事务占用相关路径时,先恢复它们,拒绝交叉执行
+        _assert_no_conflicting_transactions(context, plan_id,
+                                            [inst["path"] for inst in targets])
         # Task 4:真实目标预检 —— 在每个目标同目录实际验证创建/rename/fsync,
         # 失败在备份与任何移动发生之前中止(此时目标从未被动过)。
         _preflight_parents([inst["path"] for inst in targets], plan_id)
@@ -872,10 +936,30 @@ def _policy_check_restore_targets(row, inventory, policy):
             raise ChangeError("恢复执行期策略复核未通过: " + str(verdict.get("message")))
 
 
+def _restore_txn_targets(entries, inventory) -> list:
+    """按备份 manifest 解出恢复目标路径(F05:与状态落盘解耦,先查冲突再写状态)。"""
+    from .paths import PathScopeError, confined_destination
+    loc_map = {str(l.get("location_id")): l.get("path")
+               for l in inventory.get("locations", [])}
+    txn_targets = []
+    for e in entries:
+        root = loc_map.get(str(e.get("location_id")))
+        if not root:
+            raise ChangeError("备份位置未登记,无法恢复: " + str(e.get("location_id")))
+        try:
+            dest = confined_destination(root, str(e["original_relative_path"]))
+        except PathScopeError as exc:
+            raise ChangeError("恢复目标越界,拒绝落地: " + str(exc))
+        txn_targets.append({"instance_id": str(e["instance_id"]), "path": str(dest),
+                            "kind": str(e.get("type")),
+                            "expected_hash": str(e.get("tree_hash")),
+                            "published": False})
+    return txn_targets
+
+
 def _prepare_restore_state(row, inventory, context) -> dict:
     """恢复动作的事务准备:重新核对归档绑定,把目标实体清单写入事务状态。"""
     from .backup import BackupError, verify_backup
-    from .paths import PathScopeError, confined_destination
     pre = dict(row.get("preconditions", []))
     backup_path = str(pre.get("backup_path") or "")
     if not os.path.isfile(backup_path):
@@ -893,21 +977,10 @@ def _prepare_restore_state(row, inventory, context) -> dict:
     entries = (info.get("manifest") or {}).get("entries", [])
     if _restore_targets_document(entries) != str(pre.get("restore_targets")):
         raise ChangeError("备份目标集合与计划确认时的不一致,拒绝执行,请重新生成恢复计划")
-    loc_map = {str(l.get("location_id")): l.get("path")
-               for l in inventory.get("locations", [])}
-    txn_targets = []
-    for e in entries:
-        root = loc_map.get(str(e.get("location_id")))
-        if not root:
-            raise ChangeError("备份位置未登记,无法恢复: " + str(e.get("location_id")))
-        try:
-            dest = confined_destination(root, str(e["original_relative_path"]))
-        except PathScopeError as exc:
-            raise ChangeError("恢复目标越界,拒绝落地: " + str(exc))
-        txn_targets.append({"instance_id": str(e["instance_id"]), "path": str(dest),
-                            "kind": str(e.get("type")),
-                            "expected_hash": str(e.get("tree_hash")),
-                            "published": False})
+    txn_targets = _restore_txn_targets(entries, inventory)
+    # F05:任何状态落盘之前先做跨计划冲突检查,不留半截状态
+    _assert_no_conflicting_transactions(context, row.get("plan_id"),
+                                        [t["path"] for t in txn_targets])
     state = _txn.new_state(row, "restore", txn_targets, backup_id=str(pre.get("backup_id")))
     _txn.write_transaction(context, state)
     return state

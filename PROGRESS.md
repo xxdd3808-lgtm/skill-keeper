@@ -93,3 +93,18 @@
 - ResourceWarning 基线 24 条(Task 9 处理)。
 - evaluate_review 尚未接入 report.py/queue 渲染(Task 7)。
 - Task 8 冻结候选 gold fixture 未建(先于改算法)。
+
+## 全面审查修复·第一阶段(2026-09-06)
+
+依据 docs/reviews/2026-09-06/README.md(F01–F13),本轮执行第一阶段「修通用户真正走的路径」:F01–F06、F08、F09。基线 9c5c5eb,分支 codex/1,本地提交(未 push,发布仍需用户授权)。
+
+- **F01 报告 JS 语法错误**:交互脚本从 Python 三引号字符串迁出为真实资源 `scripts/assets/report.js`(更新分支 `\n` 转义不一致导致整段 JS 解析失败、所有按钮失效);pyproject package-data 随包分发;新增 tests/test_report_frontend.py:最终产物 node --check(CI 四平台有 node)+ 纯 Python「字符串字面量裸换行」扫描器兜底 + data-act→JS 分支合同 + 静态/服务共用同一资源。
+- **F02 GitHub 下载器**:递归树合法 `type=tree` 目录条目放行(仍做路径安全/重复校验,submodule 继续拒绝);Base64 先剥离协议允许的空白再 validate=True 严格解码(GitHub 按 60 字符折行)。真实形状 fixture:带目录条目的树 + 折行 Base64。
+- **F03 有效性统一**:报告 build_view 改按稳定 instance ID 连接历史(内容变化不再把旧结论当全新未审查对象),全部走 review_state.evaluate_review;「目标内容变化」与「替代品变化/消失」分开标注(安检失效 vs 删除建议失效,不再单一绿标);队列 build_review_queue 同样接入 evaluate_review 并回填 previous_review_reasons;record_review 支持 inventory 参数——受保护替代品的依赖快照从全量安装索引取,不再记成未知;value_review record CLI 自动附带 inventory。
+- **F04 路径统一**:report.main/backups_list、serve.ServiceContext、check_updates.staging_root_for 全部只经 RuntimePaths 解析(旧仓库/新安装 ~/.skill-keeper/显式 env 三态一致),消除报告看不见备份、跨入口恢复找不到备份、staging 平台缓存漂移;render_html 的 groups.json 改由 ctx 传入。
+- **F05 并发合同**:recover_transaction 全程持变更互斥锁;apply 前新增 _assert_no_conflicting_transactions——其他计划未完成事务占用相关路径(prepared/mutating/rolling-back/recovery-required,目标/保管/candidate 保管路径父子交集,Windows normcase)即拒绝并指出阻断计划;恢复目标解耦出 _restore_txn_targets(冲突检查先于状态落盘);scan 跳过 .sk-txn-* 保管目录不计入盘点。
+- **F06 提交后刷新失败**:publish_snapshot 捕获 TimeoutExpired/OSError 返回结构化 stale;AppService.apply_action 再兜一层异常——响应永远 committed+stale,不谎报普通失败;serve 新增「🔄 刷新报告」按钮+refresh 分支,run_scan_report 继承 paths 环境、退出码 0/1 都算运行成功、超时/启动失败返回 False。
+- **F08 保护配置**:known-sources.json 内部条目损坏(值非对象/缺非空 type)→ load_policy 判 unhealthy 并报出来源+条目名,plan/apply 一律拒绝;只读盘点(load_user_config)保持宽容。
+- **F09 安检续办**:网页流程改为 计划→对本计划安检记账(/api/vet,plan_id+candidate_hash 绑定不变)→确认执行;计划公开字段带 candidate_hash/repo/commit_sha;CLI 新增 `manage.py vet <plan_id> --verdict safe|warning --evidence ...`;网页与服务层共用 AppService.vet_candidate。
+- 验收:`python3 scripts/verify.py` 338 项 0 失败 0 跳过(233 冻结 ID 保留),`git diff --check` 通过。新增/强化回归:frontend 合同 4 项、GitHub 真实形状 3 项、政策损坏条目 1 项、审查生命周期集成 4 项、并发合同 3 项、路径一致/刷新失败 4 项、vet 流程 4 项、scan 保管目录 1 项、打包携带 JS 1 项。
+- 未验证(如实):真实浏览器点击回归未跑(语法/合同层已覆盖);四平台 CI 需 push 后由 Actions 给出最终证据;F07/F10–F13 与报告视图分离属第二/三阶段,尚未执行。

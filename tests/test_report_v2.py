@@ -79,14 +79,25 @@ class ReportV2Tests(unittest.TestCase):
             self.assertIn('id="{}"'.format(target), html)
         self.assertIn('href="#health-yellow"', html)
         self.assertIn('href="#update-review"', html)
-        self.assertNotIn('href="#verdict-delete"', html,
-                         "零值结论只展示为不可点击指标")
+        # F03 修正后,fixture 的审查记录按稳定 instance ID 连接(旧代码按
+        # logical_id 连接,漏掉所有只带 instance_id 的记录,五个结论组全是零值);
+        # word 的"建议删除"现在必须可点击落点
+        self.assertIn('href="#verdict-delete"', html)
         self.assertIn("待更新/复核", html)
         self.assertIn("上次检查:2026-09-02 10:00:00", html)
         self.assertIn('<details id="protected-skills">', html,
                       "大区块默认收起,避免报告打开即被长表淹没")
         self.assertIn('<details id="instance-details">', html)
         self.assertIn("function openJump(hash)", html)
+        # 零值结论只展示为不可点击指标:用没有任何审查记录的夹具单独验证
+        empty = v2_report_fixture()
+        empty["value_reviews"] = []
+        empty_html = render_html(empty, None, {
+            "updates": empty["updates"],
+            "updates_checked_at": "2026-09-02 10:00:00",
+        })
+        self.assertNotIn('href="#verdict-delete"', empty_html,
+                         "零值结论只展示为不可点击指标")
 
     def test_shared_library_section_lists_skills_verdicts_and_reach(self):
         """用户反馈(2026-09-05):哪些 Skill 放在共享库,事实埋在明细表 client 列

@@ -210,5 +210,82 @@ class RecoveryContractTests(unittest.TestCase):
         self.assertTrue(env.skill_path.exists(), "状态损坏必须拒绝执行")
 
 
+class ConcurrencyContractTests(unittest.TestCase):
+    """F05 回归:恢复也必须持变更锁;未完成事务必须在计划之间阻断相关写操作。"""
+
+    @staticmethod
+    def _unfinished_state(env, plan):
+        from scripts.core import transactions as txn
+        targets = [{"instance_id": env.iid, "path": str(env.skill_path),
+                    "kind": "dir", "original_hash": env.inventory["instances"][0]["tree_hash"],
+                    "holding_path": txn.holding_path(str(env.skill_path.parent),
+                                                     plan.plan_id, env.iid[:8]),
+                    "moved": False, "published": False}]
+        return txn.new_state(plan.to_dict(), "remove", targets)
+
+    def test_recover_refuses_while_change_lock_is_held(self):
+        from scripts.core.io import FileLock
+        from tests.test_change_remove import change_env
+        env = change_env(self)
+        plan = env.remove_plan()
+        txn_dir = env.data / "transactions"
+        txn_dir.mkdir(parents=True, exist_ok=True)
+        state = self._unfinished_state(env, plan)
+        from scripts.core import transactions as txn
+        txn.write_transaction(env.context, state)
+        lock = FileLock(env.context.lock_path)
+        lock.acquire()  # 模拟另一个变更正在执行
+        try:
+            with self.assertRaises(ChangeError, msg="锁被占用时恢复必须拒绝"):
+                recover_transaction(plan.plan_id, env.context)
+        finally:
+            lock.release()
+        self.assertTrue(os.path.lexists(str(env.skill_path)),
+                        "被拒绝的恢复不得移动任何文件")
+        result = recover_transaction(plan.plan_id, env.context)
+        self.assertEqual(result["phase"], "rolled-back", "锁释放后恢复应正常完成")
+
+    def test_apply_blocked_by_other_plans_unfinished_transaction(self):
+        from tests.test_change_remove import change_env
+        env = change_env(self)
+        plan_a = env.remove_plan()
+        plan_b = env.remove_plan()  # 同一目标的第二个计划
+        self.assertNotEqual(plan_a.plan_id, plan_b.plan_id)
+        from scripts.core import transactions as txn
+        txn_dir = env.data / "transactions"
+        txn_dir.mkdir(parents=True, exist_ok=True)
+        txn.write_transaction(env.context, self._unfinished_state(env, plan_a))
+        with self.assertRaises(ChangeError) as cm:
+            apply_plan(plan_b.plan_id, plan_b.digest, True, env.context)
+        self.assertIn(plan_a.plan_id, str(cm.exception),
+                      "必须指出阻断来源计划,而不是笼统失败")
+        self.assertTrue(env.skill_path.exists(), "阻断时不得改动目标")
+        # 计划 A 恢复后,计划 B 才能继续
+        recover_transaction(plan_a.plan_id, env.context)
+        result = apply_plan(plan_b.plan_id, plan_b.digest, True, env.context)
+        self.assertTrue(result["ok"])
+        self.assertFalse(os.path.lexists(str(env.skill_path)))
+
+    def test_unrelated_unfinished_transaction_does_not_block(self):
+        from tests.test_change_remove import change_env
+        from tests.helpers import write_skill
+        env = change_env(self)
+        other = write_skill(env.agents_root, "other-skill", body="other")
+        plan_a = env.remove_plan()
+        plan_b = env.remove_plan()
+        # 计划 A 的事务目标改成另一个不相干目录
+        from scripts.core import transactions as txn
+        state = self._unfinished_state(env, plan_a)
+        state["targets"][0]["path"] = str(other)
+        state["targets"][0]["holding_path"] = txn.holding_path(
+            str(other.parent), plan_a.plan_id, "x")
+        txn_dir = env.data / "transactions"
+        txn_dir.mkdir(parents=True, exist_ok=True)
+        txn.write_transaction(env.context, state)
+        result = apply_plan(plan_b.plan_id, plan_b.digest, True, env.context)
+        self.assertTrue(result["ok"], "无路径交集的未完成事务不得阻断其他变更")
+        self.assertTrue(other.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -104,12 +104,42 @@ class AppService:
         with self._process_lock:
             result = apply_plan(str(plan_id), str(digest), confirm, ctx,
                                 accept_warning=accept_warning is True)
-        # 提交后刷新快照;刷新失败不改变事务事实,只标注报告过期
-        snap = publish_snapshot(self.paths)
+        # 提交后刷新快照;刷新失败不改变事务事实,只标注报告过期(F06:
+        # publish_snapshot 内部已转结构化失败,这里再兜一层异常,双保险)
+        try:
+            snap = publish_snapshot(self.paths)
+        except Exception as e:  # 刷新的任何预期失败都不得改写已提交的事实
+            snap = {"ok": False, "status": "stale", "snapshot_id": None,
+                    "error": type(e).__name__ + ": " + str(e)[:120]}
         result["snapshot_status"] = snap.get("status")
         result["snapshot_id"] = snap.get("snapshot_id")
         if not snap.get("ok"):
-            result["message"] = "变更已完成,报告刷新失败(附属状态待修复): " + str(snap.get("error"))
+            result["message"] = "变更已完成,报告刷新失败(可单独重试刷新): " + str(snap.get("error"))
         else:
             result["message"] = "已执行: " + str(result.get("action", ""))
         return result
+
+    # ---------- vet(F09) ----------
+    def vet_candidate(self, plan_id, verdict, evidence) -> dict:
+        """候选安检记账:绑定指定计划的 candidate_hash。
+
+        网页与 CLI 共用本入口;此前网页流程每次点击都新建计划,而安检记录绑定
+        plan_id,导致"先安检后 apply"在网页上永远卡住。
+        """
+        from .changes import record_candidate_vet
+        plan_id = str(plan_id or "")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", plan_id):
+            raise ChangeError("plan_id 格式不合法")
+        plan_path = self.paths.data_dir / "change-plans" / (plan_id + ".json")
+        row, issues = load_json_checked(plan_path, {})
+        if issues or not isinstance(row, dict):
+            raise ChangeError("计划不存在: " + plan_id)
+        pre = {}
+        for pair in row.get("preconditions", []) or []:
+            if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                pre[str(pair[0])] = pair[1]
+        candidate_hash = str(pre.get("candidate_hash") or "")
+        if not candidate_hash:
+            raise ChangeError("该计划没有绑定的候选,无需安检")
+        return record_candidate_vet(plan_id, candidate_hash, verdict, evidence,
+                                    plans_dir=self.paths.data_dir / "change-plans")

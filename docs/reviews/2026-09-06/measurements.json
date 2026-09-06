@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-06",
+  "commit": "9c5c5eb",
+  "production_code_same_as_release": "166d1a9",
+  "environment": {"os": "macOS 26.6.2", "arch": "arm64", "python": "3.9.6", "node": "24.14.0"},
+  "verification": {"tests": 313, "failures": 0, "errors": 0, "skipped": 0, "seconds": 20.886, "frozen_test_ids_present": 233, "additional_checks_ok": true},
+  "real_home": {"logical_skills": 108, "instances": 158, "scan_seconds": 0.760, "review_queue_items": 31, "queue_seconds": 0.213, "instrumented_scan_seconds": 1.049, "file_hash_calls": 3785, "unique_real_files_hashed": 2631, "total_hashed_MiB": 438.0, "backup_list_seconds": 0.019, "backup_rows": 12},
+  "dense_corpus": [
+    {"n": 80, "index_seconds": 0.015, "queue_seconds": 0.150, "rss_max_MiB": 28.7},
+    {"n": 200, "index_seconds": 0.087, "queue_seconds": 2.912, "rss_max_MiB": 54.4},
+    {"n": 400, "index_seconds": 0.381, "queue_seconds": 39.752, "rss_max_MiB": 148.6},
+    {"n": 800, "status": "interrupted_after_approximately_six_minutes", "completion_seconds": null, "observed_process_rss_MiB": 510.0}
+  ],
+  "dense_corpus_note": "Uses OverlapCostTests._inventory_n; all third-party; shared descriptions produce many qualifying pairs. Single-run observations, not universal latency or a p95 benchmark. 800 was interrupted, not a completed timing.",
+  "profile_n200": {"queue_seconds_with_profiler": 4.556, "similar_for_cumulative_seconds": 4.285, "candidate_pairs_calls": 200, "candidate_pairs_cumulative_seconds": 3.821, "build_overlap_index_seconds": 0.143},
+  "github_public_api": {"repo": "xxdd3808-lgtm/skill-keeper", "ref": "166d1a9", "recursive_tree_entries": 162, "entry_types": ["blob", "tree"], "SKILL_md_blob_bytes": 20417, "blob_base64_newlines": 454},
+  "javascript_syntax": {"command": "node --check on exported scripts.report.JS_BLOB", "exit_code": 1, "exported_js_error_line": 62, "error": "SyntaxError: Invalid or unexpected token"}
+}

@@ -119,6 +119,25 @@ class ApplyTimePolicyTests(unittest.TestCase):
         self.assertFalse(policy["healthy"])
         self.assertTrue(policy["issues"])
 
+    def test_inner_corrupt_entry_blocks_writes(self):
+        """F08:内部条目损坏(值不是对象/缺 type)必须整体拒写,不得静默降级成 unknown。"""
+        env = change_env(self)
+        # 病灶形状:想给 demo 登记保护,把条目值写成了字符串
+        register(env, {"demo": "self-built"})
+        policy = load_policy(env.data)
+        self.assertFalse(policy["healthy"], "条目损坏必须判为不健康,而不是放开保护")
+        self.assertTrue(any(i.get("reason") == "invalid-entry" and i.get("entry") == "demo"
+                            for i in policy["issues"]), policy["issues"])
+        with self.assertRaises(ChangeError, msg="损坏条目不得让删除放行"):
+            env.remove_plan()
+        self.assertTrue(env.skill_path.exists(), "保护配置损坏时不得有任何写操作")
+        # 缺 type 的对象条目同样算损坏
+        register(env, {"demo": {"repo": "example/demo"}})
+        self.assertFalse(load_policy(env.data)["healthy"])
+        # 合法条目保持健康;_comment 不参与校验
+        register(env, {"_comment": "x", "demo": {"type": "github", "repo": "example/demo"}})
+        self.assertTrue(load_policy(env.data)["healthy"])
+
     def test_check_action_contract(self):
         env = change_env(self)
         policy = load_policy(env.data)

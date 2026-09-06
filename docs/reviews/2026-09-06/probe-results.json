@@ -1,0 +1,70 @@
+{
+  "github_contract": {
+    "normal_tree": {
+      "ok": false,
+      "error": "unsupported-tree-entry",
+      "path": "scripts",
+      "commit_sha": "fixed"
+    },
+    "wrapped_base64": {
+      "ok": false,
+      "error": "blob-error: Error",
+      "path": "SKILL.md",
+      "commit_sha": "fixed"
+    },
+    "flat_control_ok": true
+  },
+  "review_lifecycle": {
+    "alternative_removed": {
+      "evaluator": "needs-recheck",
+      "report_stale": false,
+      "report_verdict": "建议删除",
+      "green_badge": true
+    },
+    "target_changed": {
+      "evaluator": "needs-recheck",
+      "report_unreviewed": 1,
+      "report_historical_verdict_rows": 0
+    }
+  },
+  "load_consistency": {
+    "two_distinct_workspaces": {
+      "legacy_client_entries": 2,
+      "context_eligible": 0,
+      "duplicate_findings": 1
+    },
+    "old_plugin_version": {
+      "client_entries": 1,
+      "context_eligible": 2
+    }
+  },
+  "fingerprint_and_identity": {
+    "physical_skill_files": 1,
+    "file_hash_calls": 2,
+    "root_chmod_changes_hash": false,
+    "unreadable_skills": 3,
+    "unreadable_logical_count": 1
+  },
+  "runtime_paths": {
+    "cli_backup_relative": ".skill-keeper/backups",
+    "web_backup_relative": ".skill-keeper/data/backups",
+    "declared_staging_relative": ".skill-keeper/cache/staging",
+    "actual_staging_relative": "Library/Caches/skill-keeper/staging"
+  },
+  "post_commit_refresh_timeout": {
+    "service_response": "TimeoutExpired",
+    "target_removed": true,
+    "transaction_phase": "committed"
+  },
+  "outstanding_transaction_gate": {
+    "prior_phase": "recovery-required",
+    "new_plan_allowed": true,
+    "target_removed": true
+  },
+  "update_stale_inventory_rollback": {
+    "plan_binds_current_hash": true,
+    "restored_actual_content": true,
+    "rollback_phase": "recovery-required",
+    "error": "更新后验证失败,已回滚到旧版本"
+  }
+}

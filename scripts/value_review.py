@@ -113,8 +113,12 @@ def cmd_record(args):
     if pissues or not isinstance(payload, dict):
         print(json.dumps({"ok": False, "error": "审查文件缺失或不是 JSON 对象"}, ensure_ascii=False))
         return 2
+    # F03:替代品依赖快照需要全量安装索引(受保护替代品不进队列);
+    # inventory 缺失时降级为按队列取,评估会按需复核,绝不假装修过
+    inventory, _ = load_json_checked(data_dir / "inventory.json", {})
+    inventory = inventory if isinstance(inventory, dict) and inventory.get("logical_skills") else None
     try:
-        saved = record_review(queue, payload, args.model)
+        saved = record_review(queue, payload, args.model, inventory=inventory)
     except ValueError as e:
         print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
         return 1

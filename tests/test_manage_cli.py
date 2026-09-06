@@ -69,6 +69,60 @@ class ManageCliTests(unittest.TestCase):
             r = self._run(self._env(Path(td)), "recover", "plan-nope", "--json")
             self.assertNotEqual(r.returncode, 0)
 
+    def test_vet_subcommand_feeds_update_plan_apply(self):
+        """F09:CLI 安检记账绑定当前计划;plan → vet → apply 全程走统一入口。"""
+        from scripts.core.fingerprint import tree_hash
+
+        def write_skill_md(path, body):
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "SKILL.md").write_text(
+                "---\nname: demo\ndescription: d\nversion: 1.0.0\n---\n" + body,
+                encoding="utf-8")
+            return path
+
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            env = self._env(td)
+            demo = write_skill_md(td / ".agents/skills/demo", "v1")
+            r = self._run(env, "rescan", "--json")
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            inv = json.loads((td / "data/inventory.json").read_text())
+            iid = inv["instances"][0]["instance_id"]
+            # 已暂存候选 v2(模拟 check_updates 产物)
+            staging = write_skill_md(td / "stage" / "cand-v2", "v2 body")
+            (td / "data/updates.json").write_text(json.dumps({
+                "schema_version": 2,
+                "differs": [{"name": "demo", "instance_id": iid,
+                             "repo": "example/demo", "commit_sha": "head-x",
+                             "candidate_hash": tree_hash(staging),
+                             "source_dir": "skills/demo",
+                             "staging_path": str(staging)}],
+            }), encoding="utf-8")
+
+            r = self._run(env, "plan", "update", "--instance", iid, "--json")
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            plan = json.loads(r.stdout[r.stdout.index("{"):])
+
+            # 未安检不得应用
+            r = self._run(env, "apply", plan["plan_id"], "--digest", plan["digest"],
+                          "--confirm", "--json")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("v1", (demo / "SKILL.md").read_text(encoding="utf-8"))
+
+            r = self._run(env, "vet", plan["plan_id"], "--verdict", "safe",
+                          "--evidence", "CLI 复核:已阅读候选全文与差异", "--json")
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            vet = json.loads(r.stdout[r.stdout.index("{"):])
+            self.assertTrue(vet["ok"])
+
+            r = self._run(env, "apply", plan["plan_id"], "--digest", plan["digest"],
+                          "--confirm", "--json")
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            result = json.loads(r.stdout[r.stdout.index("{"):])
+            self.assertEqual(result["transaction_status"], "committed")
+            self.assertIn("v2 body", (demo / "SKILL.md").read_text(encoding="utf-8"),
+                          "更新后安装的必须是已安检候选")
+
 
 if __name__ == "__main__":
     unittest.main()

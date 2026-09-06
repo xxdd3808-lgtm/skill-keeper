@@ -28,6 +28,7 @@ from scripts.core.models import SCHEMA_VERSION, Location  # noqa: E402
 from scripts.core.platform import (expand_user_path, is_absolute_path,        # noqa: E402
                                    is_strictly_within, user_home)
 from scripts.core.runtime import default_data_dir  # noqa: E402
+from scripts.core.transactions import HOLDING_PREFIX  # noqa: E402
 
 HOME = str(user_home())
 LOCK_FILE = os.path.join(HOME, ".agents/.skill-lock.json")
@@ -727,6 +728,10 @@ def build_inventory(home, data_dir, workspace=None, model_roots=None) -> dict:
                                    "reason": type(e).__name__})
                 continue
             for entry in entries:
+                if entry.name.startswith(HOLDING_PREFIX):
+                    # F05:本工具的事务保管目录(进行中/未清理的删除·更新暂存)
+                    # 不是已安装 Skill,绝不计入盘点
+                    continue
                 inst, f = _scan_entry(loc, root, entry, home)
                 instances.append(inst)
                 findings.extend(f)

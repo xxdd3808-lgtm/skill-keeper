@@ -53,6 +53,16 @@ def cmd_apply(args):
     return 0
 
 
+def cmd_vet(args):
+    """候选安检记账(F09):绑定指定计划;网页与 CLI 走同一服务入口。"""
+    result = AppService(_paths(args)).vet_candidate(args.plan_id, args.verdict,
+                                                    list(args.evidence or []))
+    _emit({"ok": True, "vet": result})
+    print("下一步: manage.py apply {} --digest <digest> --confirm".format(args.plan_id),
+          file=sys.stderr)
+    return 0
+
+
 def cmd_status(args):
     paths = _paths(args)
     state = read_transaction(args.plan_id, _ctx(paths))
@@ -109,6 +119,15 @@ def main(argv=None):
     p_apply.add_argument("--accept-warning", action="store_true")
     p_apply.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     p_apply.set_defaults(func=cmd_apply)
+
+    p_vet = sub.add_parser("vet", help="候选安检记账(绑定计划;update 计划应用前必做)")
+    p_vet.add_argument("plan_id")
+    p_vet.add_argument("--verdict", required=True, choices=["safe", "warning"],
+                       help="safe=无风险;warning=有风险,应用时还需 --accept-warning")
+    p_vet.add_argument("--evidence", action="append", default=[],
+                       help="可核查依据(来源/阅读记录/对比结论),可重复")
+    p_vet.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
+    p_vet.set_defaults(func=cmd_vet)
 
     p_status = sub.add_parser("status", help="查看计划/事务状态")
     p_status.add_argument("plan_id")

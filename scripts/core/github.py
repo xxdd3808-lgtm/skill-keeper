@@ -176,6 +176,15 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
         if mtype == "commit":
             return {"ok": False, "error": "unsupported-submodule", "path": rel,
                     "commit_sha": commit_sha}
+        if mtype == "tree":
+            # F02:递归树本来就含目录条目(Git Trees API),合法目录必须放行,
+            # 否则带子目录的 Skill 无法物化;仍参与路径安全与重复校验,不产生文件行
+            if not _safe_rel(rel):
+                return {"ok": False, "error": "unsafe-path", "path": rel, "commit_sha": commit_sha}
+            if rel in seen_paths:
+                return {"ok": False, "error": "duplicate-path", "path": rel, "commit_sha": commit_sha}
+            seen_paths.add(rel)
+            continue
         if mtype != "blob":
             return {"ok": False, "error": "unsupported-tree-entry", "path": rel,
                     "commit_sha": commit_sha}
@@ -206,7 +215,10 @@ def fetch_skill_tree(repo, source_dir, commit_sha, dest, gh_runner):
             blob = json.loads(bo)
             if blob.get("encoding") != "base64":
                 return {"ok": False, "error": "unsupported-blob-encoding", "path": rel, "commit_sha": commit_sha}
-            content = base64.b64decode(blob.get("content") or "", validate=True)
+            # F02:GitHub 的 Base64 按协议带换行(每 60 字符);先剔除协议允许的
+            # 空白再严格解码(validate=True),其余非法字符仍然拒绝
+            raw_b64 = str(blob.get("content") or "")
+            content = base64.b64decode("".join(raw_b64.split()), validate=True)
             if blob.get("size") is not None and int(blob["size"]) != len(content):
                 return {"ok": False, "error": "blob-size-mismatch", "path": rel,
                         "commit_sha": commit_sha}

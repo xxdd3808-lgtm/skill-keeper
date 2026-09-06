@@ -35,36 +35,27 @@ from scripts.core.changes import (ChangeContext, ChangeError, LockBusy,  # noqa:
                                   create_restore_plan, create_update_plan)
 from scripts.core.io import atomic_write_json, load_json_checked   # noqa: E402
 from scripts.core.provenance import load_user_config               # noqa: E402
-from scripts.core.runtime import default_data_dir                  # noqa: E402
-from scripts.core.platform import user_home                        # noqa: E402
 
 MAX_BODY = 64 * 1024
 SERVER_VERSION = "skill-keeper/2.0"
 
 
 class ServiceContext:
-    """服务的运行环境:数据目录、引擎上下文、进程内互斥锁。"""
+    """服务的运行环境:统一 RuntimePaths 解析(F04)、引擎上下文、进程内互斥锁。"""
 
     def __init__(self, data_dir, home=None, backup_dir=None):
-        self.data_dir = Path(data_dir)
-        self.home = user_home(home)
-        base = Path(BASE)
-        self.backup_dir = (Path(backup_dir) if backup_dir else
-                           (base / "backups" if self.data_dir == base / "data"
-                            else self.data_dir / "backups"))
-        self.engine = ChangeContext(
-            data_dir=self.data_dir,
-            plans_dir=self.data_dir / "change-plans",
-            backup_dir=self.backup_dir,
-            audit_path=self.data_dir / "audit-v2.jsonl",
-            lock_path=self.data_dir / ".change.lock",
-            load_inventory=self._load_inventory)
-        self.process_lock = threading.Lock()
         from scripts.core.runtime import RuntimePaths
+        # F04:所有路径(数据/备份/staging)只在这里解析一次,报告、引擎、
+        # 子进程刷新全部继承同一份;不再各自给 data/backups 拼一套默认值
+        self.paths = RuntimePaths(home=home, data_dir=Path(data_dir), backup_dir=backup_dir)
+        self.data_dir = self.paths.data_dir
+        self.home = self.paths.home
+        self.backup_dir = self.paths.backup_dir
+        self.engine = ChangeContext(load_inventory=self._load_inventory,
+                                    **self.paths.engine_kwargs())
+        self.process_lock = threading.Lock()
         from scripts.core.service import AppService
-        paths = RuntimePaths(home=self.home, data_dir=self.data_dir,
-                             backup_dir=self.backup_dir)
-        self.service = AppService(paths)
+        self.service = AppService(self.paths)
 
     def _load_inventory(self):
         inv, issues = load_json_checked(self.data_dir / "inventory.json", {})
@@ -73,19 +64,54 @@ class ServiceContext:
         return inv
 
 
-def run_scan_report():
-    r1 = subprocess.run([sys.executable, os.path.join(BASE, "scripts", "scan.py")],
-                        capture_output=True, text=True, timeout=180)
-    r2 = subprocess.run([sys.executable, os.path.join(BASE, "scripts", "report.py")],
-                        capture_output=True, text=True, timeout=180)
-    return r1.returncode == 0 and r2.returncode == 0
+def run_scan_report(paths=None):
+    """重跑 scan + report(F06):继承传入 paths 的环境,退出码 0/1 都算运行成功
+    (1=扫描完成但有红灯,不是运行失败);超时/启动失败返回 False。"""
+    env = paths.subprocess_env(home=str(paths.home)) if paths is not None else None
+    for script in ("scan.py", "report.py"):
+        try:
+            r = subprocess.run([sys.executable, os.path.join(BASE, "scripts", script)],
+                               capture_output=True, text=True, timeout=180, env=env)
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+        if r.returncode not in (0, 1):
+            return False
+    return True
 
 
 def _plan_public(row):
-    """计划对浏览器可见的最小信息(不含路径细节)。"""
+    """计划对浏览器可见的最小信息(不含路径细节)。
+
+    F09:candidate_hash/repo/commit_sha 供网页安检步骤展示"安检对象就是
+    本计划绑定的固定候选"。"""
+    pre = {}
+    for pair in row.get("preconditions", []) or []:
+        if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            pre[str(pair[0])] = pair[1]
     return {"ok": True, "plan_id": row.get("plan_id"), "digest": row.get("digest"),
             "action": row.get("action"), "summary": row.get("summary"),
-            "expires_at": row.get("expires_at"), "targets": list(row.get("target_ids", []))}
+            "expires_at": row.get("expires_at"), "targets": list(row.get("target_ids", [])),
+            "candidate_hash": str(pre.get("candidate_hash") or "") or None,
+            "repo": str(pre.get("repo") or "") or None,
+            "commit_sha": str(pre.get("commit_sha") or "") or None}
+
+
+def _handle_vet(ctx, body):
+    """候选安检记账(F09):绑定 body 指定的计划,网页更新流程的必经步骤。
+
+    此前网页每次点击都新建计划,而安检记录绑定 plan_id+candidate_hash,
+    "先安检后 apply"在网页上永远对不上;现在计划建立后先对本计划记账再执行。
+    """
+    if body.get("confirm") is not True:
+        raise ChangeError("缺少明确确认:confirm 必须是布尔 true")
+    evidence = body.get("evidence")
+    if isinstance(evidence, str):
+        evidence = [evidence]
+    if not evidence:
+        # 用户在网页确认即人工复核;依据记录"谁在哪确认",不虚构阅读细节
+        evidence = ["网页人工安检:用户在交互报告页确认接受该候选"]
+    return ctx.service.vet_candidate(str(body.get("plan_id") or ""),
+                                      str(body.get("verdict") or ""), evidence)
 
 
 def _handle_plan(ctx, body):
@@ -254,6 +280,9 @@ def _build_handler(ctx, token):
             try:
                 if u.path == "/api/plan":
                     return self._send(200, _handle_plan(ctx, body))
+                if u.path == "/api/vet":
+                    with ctx.process_lock:
+                        return self._send(200, _handle_vet(ctx, body))
                 if u.path == "/api/apply":
                     if body.get("confirm") is not True:
                         raise ChangeError("缺少明确确认:confirm 必须是布尔 true")
@@ -264,7 +293,7 @@ def _build_handler(ctx, token):
                     return self._send(200, _handle_plan(ctx, body))
                 if u.path == "/api/rescan":
                     with ctx.process_lock:
-                        ok = run_scan_report()
+                        ok = run_scan_report(ctx.service.paths)
                     if ok:
                         return self._send(200, {"ok": True, "message": "已重扫并刷新报告"})
                     return self._send(500, {"ok": False, "error": "重扫失败,请手动跑 scan.py"})
@@ -315,7 +344,7 @@ def _handle_ignore(ctx, body):
     else:
         cur.pop(name, None)
     atomic_write_json(path, cur)
-    run_scan_report()
+    run_scan_report(ctx.service.paths)
     return {"ok": True, "message": "已更新忽略规则并刷新报告"}
 
 
@@ -351,11 +380,12 @@ def create_server(data_dir, home=None, port=0, backup_dir=None):
 def main():
     argv = sys.argv[1:]
     port = int(argv[argv.index("--port") + 1]) if "--port" in argv else 0
-    data_dir = os.environ.get("SKILL_KEEPER_DATA") or str(default_data_dir())
-    ok = run_scan_report()
+    from scripts.core.runtime import RuntimePaths
+    paths = RuntimePaths()
+    ok = run_scan_report(paths)
     if not ok:
         print("⚠️ 启动前重扫失败,报告可能不是最新", file=sys.stderr)
-    httpd, token, _ctx = create_server(data_dir, port=port)
+    httpd, token, _ctx = create_server(paths.data_dir, port=port)
     url = "http://127.0.0.1:{}/?t={}".format(httpd.server_port, token)
     print("✅ skill-keeper 交互报告(v2 plan/apply):" + url, flush=True)
     print("   仅本机可访问;所有变更动作走 计划→确认→备份→执行→验证 流程;Ctrl+C 退出", flush=True)

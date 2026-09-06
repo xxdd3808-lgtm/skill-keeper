@@ -35,6 +35,8 @@ def load_policy(data_dir) -> dict:
 
     known-sources.json / self-built.txt 都是可选文件:不存在 ≠ 损坏;
     已存在但读不出合法结构 = 损坏,healthy=False,写操作必须拒绝。
+    F08:顶层是对象但内部条目损坏(值不是对象、或缺非空 type 字符串)同样算损坏
+    ——此前被静默改写成 {"type":"unknown"},等于把用户的类型错误当成放开保护。
     """
     data_dir = Path(data_dir)
     issues = []
@@ -54,7 +56,11 @@ def load_policy(data_dir) -> dict:
     for key, value in known.items():
         if key == "_comment":
             continue
-        merged[key] = value if isinstance(value, dict) else {"type": "unknown"}
+        if not isinstance(value, dict) or not str(value.get("type") or "").strip():
+            issues.append({"source": "known-sources.json", "code": ISSUE_CORRUPT,
+                           "reason": "invalid-entry", "entry": str(key)[:60]})
+            continue
+        merged[key] = value
     try:
         text = (data_dir / "self-built.txt").read_text(encoding="utf-8")
     except FileNotFoundError:

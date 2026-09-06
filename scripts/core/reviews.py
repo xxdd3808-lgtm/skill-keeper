@@ -85,6 +85,7 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
     from .overlap import build_overlap_index
     overlap_index = build_overlap_index(inventory)
     dup_rows_all = exact_duplicate_groups(inventory)
+    from .review_state import evaluate_review
     items = []
     for logical in inventory.get("logical_skills", []):
         lg_id = logical.get("logical_id")
@@ -94,10 +95,11 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
         rep = st["representative"]
         iid = rep.get("instance_id")
         prev = reviews.get(iid)
-        review_status = "unvetted"
-        if prev:
-            review_status = "current" if prev.get("skill_tree_hash") == rep.get("tree_hash") \
-                else "needs-recheck"
+        # F03:有效性判定统一走 review_state.evaluate_review,
+        # 不再自算另一套"哈希相等"口径(替代品变化/消失也要触发复核)
+        evaluation = evaluate_review(prev, inventory, {}, reputation)
+        review_status = {"current": "current", "needs-recheck": "needs-recheck"}.get(
+            evaluation.get("status"), "unvetted") if prev else "unvetted"
         safety = (prev or {}).get("safety")
         legacy_rec = legacy.get(str(rep.get("directory_name"))) or legacy.get(iid)
         if safety is None and legacy_rec:
@@ -123,6 +125,7 @@ def build_review_queue(inventory, reputation=None, existing_reviews=None, legacy
             "provenance": st["source"],
             "repo_snapshot": _repo_snapshot(reputation, st["source"]),
             "safety_status": safety or ("needs-recheck" if review_status == "needs-recheck" else "unvetted"),
+            "previous_review_reasons": evaluation.get("reason_codes") or [],
             "legacy_vetting": {
                 "previous_verdict": legacy_rec.get("previous_verdict"),
                 "vetted_at": legacy_rec.get("vetted_at"),
@@ -223,8 +226,12 @@ def _normalize_alternatives(queue, payload, target_logical):
     return normalized
 
 
-def record_review(queue, review_payload, reviewer_model):
-    """校验并落成一条审查记录;任何缺证据的结论在这里被拒绝。"""
+def record_review(queue, review_payload, reviewer_model, inventory=None):
+    """校验并落成一条审查记录;任何缺证据的结论在这里被拒绝。
+
+    inventory(F03):提供时替代品依赖快照从全量安装索引取树哈希——受保护
+    替代品不进队列,只看队列会把它们的版本记成未知,评估永远误报需复核。
+    """
     payload = dict(review_payload or {})
     items = {x["instance_id"]: x for x in queue.get("items", [])}
     iid = str(payload.get("instance_id") or "")
@@ -280,11 +287,14 @@ def record_review(queue, review_payload, reviewer_model):
     if submitted_hash is not None and str(submitted_hash) != str(item.get("tree_hash", "")):
         raise ValueError("提交的 skill_tree_hash 与队列目标不一致:必须核对当前对象后再记账")
     # 替代品依赖快照:记录采纳时的内容版本,供 evaluate_review 判定过期;
-    # 候选没有完整条目行时记录未知(评估按需复核处理,绝不假装修过)
+    # 优先全量安装索引(F03),候选没有完整条目行时记录未知(评估按需复核处理,
+    # 绝不假装修过)
     items_by_lid = {str(x.get("logical_id")): x for x in queue.get("items", [])}
+    inv_lg_by_lid = {str(l.get("logical_id")): l
+                     for l in (inventory or {}).get("logical_skills", [])}
     alternatives_state = {}
     for lid in alternatives:
-        th = (items_by_lid.get(lid) or {}).get("tree_hash")
+        th = (inv_lg_by_lid.get(lid) or items_by_lid.get(lid) or {}).get("tree_hash")
         alternatives_state[lid] = {"tree_hash": str(th) if th else None}
     review_snapshot_id = "rs-" + hashlib.sha256(
         "{}|{}|{}".format(iid, item.get("tree_hash", ""),

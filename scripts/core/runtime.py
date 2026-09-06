@@ -130,14 +130,23 @@ def publish_snapshot(paths, timeout=300) -> dict:
 
     返回 {ok, snapshot_id, status: fresh|stale, error?};snapshot_id 取
     inventory.json 的 mtime+size(同周期幂等);失败时旧快照保留并标 stale。
+    F06:超时/启动失败会抛 TimeoutExpired/OSError 而不是返回退出码——
+    在这里转成结构化失败,绝不把"变更已提交、刷新超时"逃成上层异常。
     """
     env = paths.subprocess_env(home=str(paths.home))
     results = []
     for script in ("scan.py", "report.py"):
-        r = subprocess.run([sys.executable, str(BASE / "scripts" / script)],
-                           capture_output=True, text=True, timeout=timeout, env=env)
+        try:
+            r = subprocess.run([sys.executable, str(BASE / "scripts" / script)],
+                               capture_output=True, text=True, timeout=timeout, env=env)
+        except subprocess.TimeoutExpired:
+            results.append((script, "timeout"))
+            break  # 扫描超时后重跑报告只会重复旧快照,直接失败
+        except OSError as e:
+            results.append((script, "spawn-failed:" + type(e).__name__))
+            break
         results.append((script, r.returncode))
-    failed = [name for name, rc in results if rc not in (0, 1)]
+    failed = ["{}({})".format(name, rc) for name, rc in results if rc not in (0, 1)]
     inv_path = paths.data_dir / "inventory.json"
     if failed or not inv_path.is_file():
         return {"ok": False, "status": "stale", "snapshot_id": _snapshot_id(inv_path),
