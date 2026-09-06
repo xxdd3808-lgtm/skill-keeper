@@ -18,7 +18,7 @@ python3 scripts/manage.py status/recover <plan_id> --json
 python3 scripts/verify.py
 ```
 
-当前版本 4.0.0。统一 CLI 与 `scripts/*.py` 参数一致；退出码 0=健康/无差异，1=有红色问题/有差异，2=失败或观察不完整。
+当前版本 4.1.0。统一 CLI 与 `scripts/*.py` 参数一致；退出码 0=健康/无差异，1=有红色问题/有差异，2=失败或观察不完整。
 
 ## 技术栈
 

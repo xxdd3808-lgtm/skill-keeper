@@ -170,3 +170,8 @@
 6. **发布对象未定**(scripts/__init__.py=4.0.0 与 tag v4.0.0 并存):按授权流程在"合并 main 后、打 tag 前"确定;**建议 4.1.0**(新增 CLI 命令与行为变化,非破坏性);届时 bump `scripts/__init__.py` + SKILL.md version 字段并同步 test_migrations_docs 断言、补 Release 内容。本提交不改版本号。
 - 两条既有断言锁的是被否决的 manage.py 形态(test_update_flow_pauses_for_formal_vetting / test_static_commands_are_runnable),按新合同更新为 skill-keeper 形态——语义更严而非放宽。
 - verify **373 项** 0 失败 0 跳过;`git diff --check` 通过。
+
+## v4.1.0 发布(2026-09-06)
+
+- 发布流程(用户一次性完整授权):独立复核通过 → push codex/1(6517ade) → 四平台 CI 全绿(同 SHA,run 34026191088) → FF 合并 main 并 push(9c5c5eb..6517ade) → main CI 全绿(run 34026353569,同 SHA) → 版本 4.1.0 同步(本提交) → 验证 CI 后 tag v4.1.0 + GitHub Release。
+- 版本同步:scripts/__init__.py、SKILL.md、AGENTS.md、docs/changes.md(v4.1.0 条目);test_migrations_docs 的版本断言改为动态比对 scripts.__version__(防漂移,比硬编码更严)。

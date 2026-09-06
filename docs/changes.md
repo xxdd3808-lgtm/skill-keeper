@@ -57,6 +57,18 @@
   updates/review 入口,默认体检改增量口径(need_vet/queue 消费审查台账),SKILL.md
   精简 66%(细节下沉 docs/skill-manual.md)。详见 PROGRESS.md 对应节。
 
+- **v4.1.0(2026-09-06)**:全面审查修复发布。安全:报告 JS 抽成真实资源并纳入打包与
+  node 语法验收(F01);GitHub 下载器兼容目录条目与折行 Base64(F02);审查有效性统一
+  evaluate_review、报告按稳定 instance ID 连接历史并区分两类失效(F03);备份/staging
+  全走 RuntimePaths(F04);恢复持锁+跨计划未完成事务阻断+损坏事务 fail-closed(F05);
+  提交后刷新失败只标 committed+stale(F06);保护配置条目损坏拒写(F08);网页安检必须
+  携带可核查证据、占位文本后端拒绝(F09/复核);审查记录保存并比对政策版本(复核)。
+  数据口径:F10–F13(加载模型唯一化、观察不完整各入口退出 2、回滚基准=计划前置哈希、
+  指纹按真实根复用+空哈希隔离)+报告 view 分离。性能:候选对一次分桶,400 项队列
+  38.0s→0.79s(48×),800 项 6 分钟→3.4s,语义冻结零差异。使用:统一 CLI 补
+  updates/review,默认体检改增量口径,SKILL.md 精简 66%(细节下沉 docs/skill-manual.md),
+  复制命令全部改安装态 `skill-keeper`。
+
 ## 历史教训(规则来源)
 
 1. **安全规则必须在执行边界生效,不能依赖调用者传参**——builtin-app 绕过事件。
