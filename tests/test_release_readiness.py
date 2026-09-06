@@ -113,7 +113,7 @@ class DocContractTests(unittest.TestCase):
         self.assertNotIn("第二/三/四阶段,均未执行", text,
                          "AGENTS.md 不得仍声称第二至第四阶段未执行")
         self.assertIn("收尾轮", text)
-        self.assertIn("364", text, "AGENTS.md 状态段必须反映当前验收数字")
+        self.assertIn("373", text, "AGENTS.md 状态段必须反映当前验收数字")
 
 
 if __name__ == "__main__":

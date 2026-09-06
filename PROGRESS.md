@@ -1,6 +1,11 @@
 # PROGRESS — skill-keeper v4 精简开源泛化(2026-09-05)
 
-## 断点续跑须知(先读我)
+## 当前状态(v4.1.0,2026-09-06)
+
+- **v4.1.0 已发布**:main = codex/1 = tag = `1eb9345`,四平台 CI 全绿,[Release](https://github.com/xxdd3808-lgtm/skill-keeper/releases/tag/v4.1.0);verify 373 项全绿;BLOCKED.md=无。
+- 现役文档:AGENTS.md(规则)、SKILL.md + docs/skill-manual.md(使用)、docs/architecture.md(架构)、docs/changes.md(版本演化)。本文件以下是开发期历史记录。
+
+## 断点续跑须知(v4 开发期历史,2026-09-05)
 
 - 计划来源:docs/superpowers/plans/2026-09-05-skill-keeper-open-source-upgrade.md(任务书:同目录 agent-brief;设计:docs/superpowers/specs/2026-09-05-skill-keeper-open-source-design.md)。按 Task 0–5 串行;每任务红测试→最小实现→相关测试→`python3 scripts/verify.py`→文档→小提交;阶段门槛全绿自动继续。
 - 开工基线(实测):HEAD `f858d2ba89d82acc93bcd78e30f3bc6ac1b24b04`,Python 3.9.6,分支 case1,verify 233 项 0 失败 0 skipped;工作树原有三份计划文档(untracked,随 Task 0 入库)。

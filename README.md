@@ -83,7 +83,7 @@ python3 scripts/scan.py --locations-json - --json
 
 ```bash
 python3 scripts/manage.py plan remove --instance-id <instance_id> --reason <理由> --json
-python3 scripts/manage.py vet <plan_id> --verdict safe --evidence <可核查依据> --json   # 更新候选安检记账
+skill-keeper manage vet <plan_id> --verdict safe --evidence <可核查依据> --json   # 更新候选安检记账
 python3 scripts/manage.py apply <plan_id> --digest <digest> --confirm --json
 python3 scripts/manage.py status/recover <plan_id> --json
 python3 scripts/verify.py   # 全量验收(0 失败 0 跳过)

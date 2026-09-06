@@ -6,16 +6,13 @@
 
 ```bash
 pip install .
-skill-keeper doctor --json
-skill-keeper scan --json
-skill-keeper scan --root CLIENT=PATH --json
-python3 scripts/report.py [--serve]
-python3 scripts/check_updates.py
-python3 scripts/value_review.py queue
-python3 scripts/manage.py plan remove/update/restore --json
-python3 scripts/manage.py apply <plan_id> --digest <digest> --confirm --json
-python3 scripts/manage.py status/recover <plan_id> --json
-python3 scripts/verify.py
+skill-keeper scan [--json]                 # 盘点(只读;--root CLIENT=PATH 声明未知客户端)
+skill-keeper report [--json] [--serve]     # 价值审查报告
+skill-keeper updates [--json]              # 更新检查(只读)
+skill-keeper review queue/show/record [--json]   # 价值审查(默认增量待办;--all 完整)
+skill-keeper manage plan/vet/apply/status/recover/rescan [--json]
+skill-keeper doctor [--json]               # 环境自检
+python3 scripts/verify.py                  # 全量验收(判卷入口)
 ```
 
 当前版本 4.1.0。统一 CLI 与 `scripts/*.py` 参数一致；退出码 0=健康/无差异，1=有红色问题/有差异，2=失败或观察不完整。
@@ -47,6 +44,6 @@ python3 scripts/verify.py
 
 v4 已于 2026-09-05 发布(tag v4.0.0,Release 166d1a9,四平台 CI 全绿)。现役架构见 `docs/architecture.md`,版本演化见 `docs/changes.md`,使用细节见 `docs/skill-manual.md`,执行证据见 `PROGRESS.md`,阻塞见 `BLOCKED.md`。
 
-2026-09-06 全面审查(docs/reviews/2026-09-06/,F01–F13)**收尾轮已全部修完**:第一阶段 F01–F06/F08/F09;独立复核封住的 3 个缺口(网页安检不得用 confirm 造证据、其他事务损坏 fail-closed、审查记录保存并比对 review_policy_version);第二阶段 F10–F13(加载模型统一 evaluate_load、观察不完整各入口退出 2、回滚基准=计划前置哈希、指纹按真实根复用+空哈希身份隔离)+报告 view 分离;第三阶段定点优化(F07 候选邻接表,语义冻结零差异);第四阶段(统一 CLI 补 updates/review、need_vet/queue 默认增量体检、SKILL.md 精简 66% 细节下沉 docs/skill-manual.md)。独立复核的 6 个发布阻断项(SKILL.md frontmatter/更新顺序、复制命令安装态 CLI、占位证据后端拒绝、AGENTS 状态同步、版本计划)已修复。verify **364 项**全绿。
+2026-09-06 全面审查(docs/reviews/2026-09-06/,F01–F13)**收尾轮已全部修完**:第一阶段 F01–F06/F08/F09;独立复核封住的 3 个缺口(网页安检不得用 confirm 造证据、其他事务损坏 fail-closed、审查记录保存并比对 review_policy_version);第二阶段 F10–F13(加载模型统一 evaluate_load、观察不完整各入口退出 2、回滚基准=计划前置哈希、指纹按真实根复用+空哈希身份隔离)+报告 view 分离;第三阶段定点优化(F07 候选邻接表,语义冻结零差异);第四阶段(统一 CLI 补 updates/review、need_vet/queue 默认增量体检、SKILL.md 精简 66% 细节下沉 docs/skill-manual.md)。独立复核的 6 个发布阻断项(SKILL.md frontmatter/更新顺序、复制命令安装态 CLI、占位证据后端拒绝、AGENTS 状态同步、版本计划)已修复。verify **373 项**全绿。
 
-下一步(等用户逐次授权):① push codex/1 → ② 复核同 SHA 四平台 CI 全绿后合并 main → ③ 确定新版本(建议 4.1.0:在合并 main 后、打 tag 前 bump scripts/__init__.py 与 SKILL.md version 字段并同步 test_migrations_docs 断言,补 Release 内容)→ ④ 授权 tag/Release。
+v4.1.0 已于 2026-09-06 发布(main=tag=1eb9345,四平台 CI 全绿,[Release](https://github.com/xxdd3808-lgtm/skill-keeper/releases/tag/v4.1.0))。当前无进行中工作;后续方向按真实使用反馈决定(新一轮审查、SKILL 触发词调优)。发布流程注意:main 受保护,新 SHA 需先经分支 CI 出全绿再快进 main。
