@@ -6,6 +6,8 @@
 - record_review:safety 枚举、reviewer_model 非空、提交 hash 与队列目标一致、快照 ID;
 - 台账读改写持锁;台账损坏不得默认为空再覆盖。
 """
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -189,7 +191,10 @@ class LedgerIntegrityTests(unittest.TestCase):
                                       data_dir=str(td), queue=str(td / "review-queue.json"),
                                       reviews_out=str(td / "value-reviews.json"),
                                       json=True)
-            rc = cmd_record(args)
+            # 进程内调用 cmd_record 的错误结论走 print——接住,避免污染真实验收
+            # (尤其 --json)的共享 stdout;结果以返回码与台账文件为准。
+            with contextlib.redirect_stdout(io.StringIO()):
+                rc = cmd_record(args)
             self.assertEqual(rc, 2, "台账损坏必须拒绝记账")
             self.assertEqual((td / "value-reviews.json").read_text(encoding="utf-8"),
                              "{corrupt", "损坏台账不得被空表覆盖")

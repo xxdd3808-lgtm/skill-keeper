@@ -1,4 +1,6 @@
 """Task 9:verify.py 自身必须可信——故意失败/仅跳过/空目录都返回非 0。"""
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
@@ -64,7 +66,10 @@ class VerifySelfValidationTests(unittest.TestCase):
                 mock.patch.object(verify, "check_install_smoke",
                                   return_value={"ok": True}), \
                 mock.patch.object(sys, "argv", ["verify.py"]):
-            with self.assertRaises(SystemExit) as caught:
+            # 进程内调用 main() 会把"⛔ 未通过"结论打到共享 stdout,污染真实验收
+            # 的输出(含 --json);必须接住。SystemExit 仍需冒出供断言。
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    self.assertRaises(SystemExit) as caught:
                 verify.main()
         self.assertNotEqual(caught.exception.code, 0)
 

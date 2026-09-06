@@ -6,6 +6,8 @@
   政策版本一致)的第三方不再要求重复安检;默认体检 = 新增/变化/依赖失效项;
 - value_review queue 默认只输出待办(unvetted/needs-recheck),--all 才是完整模式。
 """
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -119,7 +121,10 @@ class IncrementalReviewTests(unittest.TestCase):
             args = argparse.Namespace(inventory=str(td / "inventory.json"),
                                       output=str(td / "review-queue.json"),
                                       data_dir=str(td), json=False, all=False)
-            self.assertEqual(cmd_queue(args), 0)
+            # 进程内调用 cmd_queue 会把"✅ 审查队列"横幅打到共享 stdout,污染
+            # 真实验收(尤其 --json)的输出;接住,结论从产物文件断言。
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(cmd_queue(args), 0)
             incremental = json.loads((td / "review-queue.json").read_text())
             self.assertEqual([x["name"] for x in incremental["items"]], [],
                              "默认体检:已有生效结论的项不进待办队列")
@@ -127,7 +132,8 @@ class IncrementalReviewTests(unittest.TestCase):
             args = argparse.Namespace(inventory=str(td / "inventory.json"),
                                       output=str(td / "review-queue-all.json"),
                                       data_dir=str(td), json=False, all=True)
-            self.assertEqual(cmd_queue(args), 0)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(cmd_queue(args), 0)
             full = json.loads((td / "review-queue-all.json").read_text())
             self.assertEqual([x["name"] for x in full["items"]], ["demo"],
                              "--all 完整模式必须包含全部第三方项")

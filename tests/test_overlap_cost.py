@@ -5,6 +5,7 @@
 """
 import json
 import os
+import sys
 import time
 import unittest
 from pathlib import Path
@@ -178,8 +179,9 @@ class OverlapCostTests(unittest.TestCase):
             self.assertLessEqual(pairs.call_count, 80 * 79 // 2,
                                  "每对只评一次:实测 {}".format(pairs.call_count))
             self.assertEqual(len(queue["items"]), 80)
+            # 横幅走 stderr:CI 日志保留性能证据,但不污染 verify --json 的 stdout
             print("\n[F09] 80 logical skills: reads={} pair_scores={} wall={:.3f}s".format(
-                reads.call_count, pairs.call_count, elapsed))
+                reads.call_count, pairs.call_count, elapsed), file=sys.stderr)
 
 
 if __name__ == "__main__":
