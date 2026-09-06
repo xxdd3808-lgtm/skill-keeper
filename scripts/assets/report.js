@@ -30,6 +30,24 @@ function afterApply(ar,b,okMsg){
     }
   }else{toast('❌ '+(ar.j&&ar.j.error||'执行失败'));b.disabled=false;}
 }
+function showVetPanel(p){
+  const old=document.getElementById('vet-panel');if(old)old.remove();
+  const vetCmd='python3 scripts/manage.py vet '+p.plan_id+' --verdict safe --evidence "填写可核查依据:已读候选全文/来源核对/差异结论"';
+  const applyCmd='python3 scripts/manage.py apply '+p.plan_id+' --digest '+p.digest+' --confirm';
+  const host=document.getElementById('vet-panel-host')||document.body;
+  const div=document.createElement('div');
+  div.className='vet-panel';div.id='vet-panel';
+  div.innerHTML='<div class="card"><div class="card-t"><b>🔄 更新计划已建立(30 分钟内有效):</b> '+esc(p.summary)+'</div>'
+    +'<p>候选: '+esc((p.repo||'?')+'@'+(p.commit_sha||'fixed-candidate'))+' · digest '+esc(p.digest)+'</p>'
+    +'<p><b>第 1 步 安检</b>(需要可核查证据;网页点击不构成安检):'
+    +' <button class="btn" data-act="copy" data-cmd="'+esc(vetCmd)+'">📋 复制安检命令</button></p>'
+    +'<p><code>'+esc(vetCmd)+'</code></p>'
+    +'<p><b>第 2 步 执行</b>: <button class="btn" data-act="vet-continue" data-plan="'+esc(p.plan_id)+'" data-digest="'+esc(p.digest)+'">▶ 我已完成安检,继续执行</button>'
+    +' <button class="btn" data-act="copy" data-cmd="'+esc(applyCmd)+'">📋 复制执行命令</button></p>'
+    +'<p class="mut">计划不可变;随时可关掉页面,稍后在终端运行上面的命令续办。</p></div>';
+  host.prepend(div);
+  div.scrollIntoView({behavior:'smooth',block:'center'});
+}
 document.addEventListener('click',async e=>{
   const jump=e.target.closest('a[data-jump]');
   if(jump){e.preventDefault();openJump(jump.getAttribute('href'));return;}
@@ -68,24 +86,24 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(act==='update'){
-    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已暂存;计划确认后才会执行)'))return;
+    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已暂存;安检通过并确认后才会执行)'))return;
     b.disabled=true;
     const pr=await post('/api/plan',{action:'update',instance_id:id});
     if(!pr.j||!pr.j.ok){toast('❌ 生成更新计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
-    const p=pr.j;
-    const src=(p.repo||'?')+'@'+(p.commit_sha||'fixed-candidate');
-    if(!confirm('更新计划摘要:'+p.summary+'\n候选: '+src+'\n\n第 1/2 步 安检(绑定本计划 '+p.plan_id+'):\n是否已核对候选来源与差异摘要,判为 safe?\n[确定]=safe [取消]=再看下一步')){b.disabled=false;return;}
-    let verdict='safe';
-    if(!confirm('判为 safe 已确认。若你想改记 warning(有风险,应用时还需二次确认),请点[确定];维持 safe 点[取消]。')){
-      verdict='warning';
+    b.disabled=false;
+    showVetPanel(pr.j);
+    return;
+  }
+  if(act==='vet-continue'){
+    const plan=b.dataset.plan,digest=b.dataset.digest;
+    b.disabled=true;
+    let ar=await post('/api/apply',{plan_id:plan,digest:digest,confirm:true});
+    if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('安检')>=0){
+      toast('❌ 尚未安检:先在终端运行第 1 步的 vet 命令,再点继续');b.disabled=false;return;
     }
-    const vr=await post('/api/vet',{plan_id:p.plan_id,verdict:verdict,confirm:true});
-    if(!vr.j||!vr.j.ok){toast('❌ 安检记账失败:'+(vr.j&&vr.j.error||'请求失败'));b.disabled=false;return;}
-    if(!confirm('安检已记账('+verdict+')。第 2/2 步 执行:\n确认 digest '+p.digest+'\n(旧版本自动备份;失败自动回滚)')){b.disabled=false;return;}
-    let ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
     if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('warning')>=0){
       if(!confirm('候选安检为 warning: '+ar.j.error+'\n确认接受风险并继续?')){b.disabled=false;return;}
-      ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true,accept_warning:true});
+      ar=await post('/api/apply',{plan_id:plan,digest:digest,confirm:true,accept_warning:true});
     }
     afterApply(ar,b,'✅ 已更新,稍后自动刷新');
     return;

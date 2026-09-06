@@ -300,6 +300,7 @@ def record_review(queue, review_payload, reviewer_model, inventory=None):
         "{}|{}|{}".format(iid, item.get("tree_hash", ""),
                           queue.get("inventory_fingerprint", "")).encode("utf-8")
     ).hexdigest()[:12]
+    from .review_state import REVIEW_POLICY_VERSION
     return {
         "review_id": review_id,
         "instance_id": iid,
@@ -317,6 +318,7 @@ def record_review(queue, review_payload, reviewer_model, inventory=None):
         "inventory_fingerprint": queue.get("inventory_fingerprint", ""),
         "reputation_snapshot_id": queue.get("reputation_snapshot_id", ""),
         "review_snapshot_id": review_snapshot_id,
+        "review_policy_version": REVIEW_POLICY_VERSION,
         "reviewed_at": now,
         "reviewer_model": reviewer_model,
         "safety": safety,

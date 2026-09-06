@@ -286,6 +286,22 @@ class ConcurrencyContractTests(unittest.TestCase):
         self.assertTrue(result["ok"], "无路径交集的未完成事务不得阻断其他变更")
         self.assertTrue(other.exists())
 
+    def test_corrupt_other_transaction_blocks_apply_fail_closed(self):
+        """任务1缺口2:任何其他事务状态损坏时,新资产写必须失败关闭。
+
+        损坏文件无法证明该事务是否已结束——放行等于可能交叉操作同一目标。
+        """
+        from tests.test_change_remove import change_env
+        env = change_env(self)
+        plan = env.remove_plan()
+        txn_dir = env.data / "transactions"
+        txn_dir.mkdir(parents=True, exist_ok=True)
+        (txn_dir / "plan-corrupt.json").write_text("{broken", encoding="utf-8")
+        with self.assertRaises(ChangeError) as cm:
+            apply_plan(plan.plan_id, plan.digest, True, env.context)
+        self.assertIn("plan-corrupt", str(cm.exception), "必须指出损坏的事务文件")
+        self.assertTrue(env.skill_path.exists(), "fail-closed:目标绝不能被删除")
+
 
 if __name__ == "__main__":
     unittest.main()

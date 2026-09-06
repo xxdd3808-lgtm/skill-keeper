@@ -34,6 +34,7 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 .btn:hover{background:#f3f4f6} .btn:disabled{opacity:.5}
 .btn-danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c} .btn-ghost{color:#6b7280}
 .attention-list{display:grid;gap:7px;margin:8px 0}.attention-row{border-left:4px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px 10px}.attention-red{border-left-color:#ef4444}.attention-yellow{border-left-color:#eab308}.attention-update{border-left-color:#3b82f6}.attention-head{display:flex;align-items:center;gap:6px}.attention-row p{margin:4px 0;font-size:13px}.all-clear{color:#15803d;margin:8px 0}
+.vet-panel{position:sticky;top:10px;z-index:5;background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:12px 14px;margin:10px 0;box-shadow:0 4px 14px rgba(180,83,9,.15)}.vet-panel p{margin:6px 0;font-size:13px}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2937;color:#fff;border-radius:99px;padding:8px 18px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:80%}
 #toast.show{opacity:.95}
 @media(max-width:760px){body{margin:14px auto}.dashboard{grid-template-columns:1fr}.cards{grid-template-columns:1fr}table{display:block;overflow-x:auto;white-space:nowrap}}
@@ -49,6 +50,7 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 <details id="instance-details"><summary><b>📋 安装实例明细</b><span class="cnt">6 个实例 / 6 个逻辑 Skill</span></summary><table><tr><th>Skill</th><th>分组</th><th>功能</th><th>客户端</th><th>位置类型</th><th>健康</th><th>操作</th></tr><tr id="instance-fff6fff6fff6fff6fff6"><td><b>docx</b> <span class="badge">受保护</span></td><td>未分组</td><td>客户端自带的 Word 文档处理能力</td><td>Codex</td><td>builtin</td><td><span class="badge badge-green">✅</span></td><td><span class="mut">受保护</span></td></tr><tr id="instance-aaa1aaa1aaa1aaa1aaa1"><td><b>word</b></td><td>未分组</td><td>生成 Word 周报</td><td>共享库</td><td>user</td><td><span class="badge badge-green">✅</span></td><td><button class="btn btn-danger" data-act="remove" data-id="aaa1aaa1aaa1aaa1aaa1" data-name="word" data-cmd="python3 scripts/manage.py plan remove --instance-id aaa1aaa1aaa1aaa1aaa1 --reason &#x27;报告建议,请补充或修改理由&#x27;">🗑️ 删</button></td></tr><tr id="instance-bbb2bbb2bbb2bbb2bbb2"><td><b>mystery</b></td><td>未分组</td><td>未知</td><td>共享库</td><td>user</td><td><span class="badge badge-green">✅</span></td><td><button class="btn btn-danger" data-act="remove" data-id="bbb2bbb2bbb2bbb2bbb2" data-name="mystery" data-cmd="python3 scripts/manage.py plan remove --instance-id bbb2bbb2bbb2bbb2bbb2 --reason &#x27;报告建议,请补充或修改理由&#x27;">🗑️ 删</button></td></tr><tr id="instance-ccc3ccc3ccc3ccc3ccc3"><td><b>notes-pro</b></td><td>未分组</td><td>本地笔记与速记</td><td>共享库</td><td>user</td><td><span class="badge badge-green">✅</span></td><td><button class="btn btn-danger" data-act="remove" data-id="ccc3ccc3ccc3ccc3ccc3" data-name="notes-pro" data-cmd="python3 scripts/manage.py plan remove --instance-id ccc3ccc3ccc3ccc3ccc3 --reason &#x27;报告建议,请补充或修改理由&#x27;">🗑️ 删</button></td></tr><tr id="instance-ddd4ddd4ddd4ddd4ddd4"><td><b>tabfmt</b></td><td>未分组</td><td>整理表格格式</td><td>共享库</td><td>user</td><td><span class="badge badge-green">✅</span></td><td><button class="btn btn-danger" data-act="remove" data-id="ddd4ddd4ddd4ddd4ddd4" data-name="tabfmt" data-cmd="python3 scripts/manage.py plan remove --instance-id ddd4ddd4ddd4ddd4ddd4 --reason &#x27;报告建议,请补充或修改理由&#x27;">🗑️ 删</button></td></tr><tr id="instance-eee5eee5eee5eee5eee5"><td><b>clipmgr</b></td><td>未分组</td><td>管理剪贴板历史</td><td>共享库</td><td>user</td><td><span class="badge badge-yellow">依赖命令缺失: demo-bin(skill 可能跑不全)</span></td><td><button class="btn btn-danger" data-act="remove" data-id="eee5eee5eee5eee5eee5" data-name="clipmgr" data-cmd="python3 scripts/manage.py plan remove --instance-id eee5eee5eee5eee5eee5 --reason &#x27;报告建议,请补充或修改理由&#x27;">🗑️ 删</button></td></tr></table><a class="back-top" href="#report-top" data-jump>回到顶部 ↑</a></details>
 <h3>其他</h3><details><summary><b>🧰 运维</b></summary><div class="body"><p><button class="btn " data-act="refresh">🔄 刷新报告</button> <span class="mut">重跑扫描并刷新报告(只读);变更成功但刷新失败时用它补救。</span></p></div></details>
 <p style="color:#9ca3af;font-size:12px">由 skill-keeper v2 生成 · 所有删除/恢复都走 计划→确认→备份→执行→验证 两阶段流程,永不自动执行 · 一键操作需 <code>report.py --serve</code>(静态打开时按钮复制等价命令)</p>
+<div id="vet-panel-host"></div>
 <div id="toast"></div>
 <script>function token(){return new URLSearchParams(location.search).get('t');}
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
@@ -81,6 +83,24 @@ function afterApply(ar,b,okMsg){
       toast(okMsg);setTimeout(()=>location.reload(),1500);
     }
   }else{toast('❌ '+(ar.j&&ar.j.error||'执行失败'));b.disabled=false;}
+}
+function showVetPanel(p){
+  const old=document.getElementById('vet-panel');if(old)old.remove();
+  const vetCmd='python3 scripts/manage.py vet '+p.plan_id+' --verdict safe --evidence "填写可核查依据:已读候选全文/来源核对/差异结论"';
+  const applyCmd='python3 scripts/manage.py apply '+p.plan_id+' --digest '+p.digest+' --confirm';
+  const host=document.getElementById('vet-panel-host')||document.body;
+  const div=document.createElement('div');
+  div.className='vet-panel';div.id='vet-panel';
+  div.innerHTML='<div class="card"><div class="card-t"><b>🔄 更新计划已建立(30 分钟内有效):</b> '+esc(p.summary)+'</div>'
+    +'<p>候选: '+esc((p.repo||'?')+'@'+(p.commit_sha||'fixed-candidate'))+' · digest '+esc(p.digest)+'</p>'
+    +'<p><b>第 1 步 安检</b>(需要可核查证据;网页点击不构成安检):'
+    +' <button class="btn" data-act="copy" data-cmd="'+esc(vetCmd)+'">📋 复制安检命令</button></p>'
+    +'<p><code>'+esc(vetCmd)+'</code></p>'
+    +'<p><b>第 2 步 执行</b>: <button class="btn" data-act="vet-continue" data-plan="'+esc(p.plan_id)+'" data-digest="'+esc(p.digest)+'">▶ 我已完成安检,继续执行</button>'
+    +' <button class="btn" data-act="copy" data-cmd="'+esc(applyCmd)+'">📋 复制执行命令</button></p>'
+    +'<p class="mut">计划不可变;随时可关掉页面,稍后在终端运行上面的命令续办。</p></div>';
+  host.prepend(div);
+  div.scrollIntoView({behavior:'smooth',block:'center'});
 }
 document.addEventListener('click',async e=>{
   const jump=e.target.closest('a[data-jump]');
@@ -120,24 +140,24 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(act==='update'){
-    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已暂存;计划确认后才会执行)'))return;
+    if(!confirm('为「'+b.dataset.name+'」生成更新计划?(候选须已暂存;安检通过并确认后才会执行)'))return;
     b.disabled=true;
     const pr=await post('/api/plan',{action:'update',instance_id:id});
     if(!pr.j||!pr.j.ok){toast('❌ 生成更新计划失败:'+(pr.j&&pr.j.error||'请求失败'));b.disabled=false;return;}
-    const p=pr.j;
-    const src=(p.repo||'?')+'@'+(p.commit_sha||'fixed-candidate');
-    if(!confirm('更新计划摘要:'+p.summary+'\n候选: '+src+'\n\n第 1/2 步 安检(绑定本计划 '+p.plan_id+'):\n是否已核对候选来源与差异摘要,判为 safe?\n[确定]=safe [取消]=再看下一步')){b.disabled=false;return;}
-    let verdict='safe';
-    if(!confirm('判为 safe 已确认。若你想改记 warning(有风险,应用时还需二次确认),请点[确定];维持 safe 点[取消]。')){
-      verdict='warning';
+    b.disabled=false;
+    showVetPanel(pr.j);
+    return;
+  }
+  if(act==='vet-continue'){
+    const plan=b.dataset.plan,digest=b.dataset.digest;
+    b.disabled=true;
+    let ar=await post('/api/apply',{plan_id:plan,digest:digest,confirm:true});
+    if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('安检')>=0){
+      toast('❌ 尚未安检:先在终端运行第 1 步的 vet 命令,再点继续');b.disabled=false;return;
     }
-    const vr=await post('/api/vet',{plan_id:p.plan_id,verdict:verdict,confirm:true});
-    if(!vr.j||!vr.j.ok){toast('❌ 安检记账失败:'+(vr.j&&vr.j.error||'请求失败'));b.disabled=false;return;}
-    if(!confirm('安检已记账('+verdict+')。第 2/2 步 执行:\n确认 digest '+p.digest+'\n(旧版本自动备份;失败自动回滚)')){b.disabled=false;return;}
-    let ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true});
     if(ar.j&&ar.j.error&&String(ar.j.error).indexOf('warning')>=0){
       if(!confirm('候选安检为 warning: '+ar.j.error+'\n确认接受风险并继续?')){b.disabled=false;return;}
-      ar=await post('/api/apply',{plan_id:p.plan_id,digest:p.digest,confirm:true,accept_warning:true});
+      ar=await post('/api/apply',{plan_id:plan,digest:digest,confirm:true,accept_warning:true});
     }
     afterApply(ar,b,'✅ 已更新,稍后自动刷新');
     return;

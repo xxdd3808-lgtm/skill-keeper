@@ -654,10 +654,10 @@ def _paths_overlap(a: str, b: str) -> bool:
 
 
 def _assert_no_conflicting_transactions(context, plan_id, target_paths) -> None:
-    """F05:其他计划的未完成事务占用相关路径时,拒绝新的物理变更。
+    """F05/任务1缺口2:其他计划的未完成事务占用相关路径时,拒绝新的物理变更。
 
-    此前执行器只检查当前 plan_id 自己的事务,另一个计划留下的未完成事务
-    可以与本次变更交叉操作同一目标;互斥约束必须在计划之间也成立。
+    fail-closed:任何其他事务状态文件损坏都直接拒绝——损坏意味着无法证明
+    该事务是否已结束,放行等于可能交叉操作同一目标;绝不静默跳过。
     """
     tdir = _txn.transactions_dir(context)
     if not tdir.is_dir():
@@ -671,8 +671,10 @@ def _assert_no_conflicting_transactions(context, plan_id, target_paths) -> None:
             continue
         try:
             other = _txn.read_transaction(other_id, context)
-        except _txn.TransactionError:
-            continue  # 损坏事务由它自己的 apply/recover 负责拒绝
+        except _txn.TransactionError as e:
+            raise ChangeError(
+                "检测到损坏的事务状态文件({}),无法证明该事务已结束,"
+                "拒绝执行新变更;请先人工检查 data/transactions: {}".format(other_id, e))
         if not isinstance(other, dict) or other.get("phase") not in UNFINISHED_PHASES:
             continue
         blockers = []

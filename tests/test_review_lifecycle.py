@@ -24,6 +24,7 @@ def inventory_with(iid, tree_hash, logical_id="lg-1", name="demo"):
 
 
 def sample_record(iid="inst-1", tree_hash="a" * 64, logical_id="lg-1"):
+    from scripts.core.review_state import REVIEW_POLICY_VERSION
     return {"review_id": "rv-abc123", "instance_id": iid, "logical_id": logical_id,
             "name": "demo", "verdict": "保留", "reason": "维护活跃且功能独立",
             "alternatives": [], "confidence": "high",
@@ -33,17 +34,21 @@ def sample_record(iid="inst-1", tree_hash="a" * 64, logical_id="lg-1"):
             "reviewed_at": "2026-09-01 00:00:00", "reviewer_model": "model-x",
             "safety": "safe", "note": "",
             "review_snapshot_id": "rs-" + "0" * 12,
+            "review_policy_version": REVIEW_POLICY_VERSION,
             "alternatives_state": {}}
 
 
-POLICY = {"review_policy_version": "p-1"}
+POLICY = {"review_policy_version": "p-1"}  # 依赖提取测试用:显式自定义版本
+# 评估类测试的"当前政策":与记录版本一致才可能判 current(任务1缺口3语义)
+from scripts.core.review_state import REVIEW_POLICY_VERSION as _RPV
+POLICY_CURRENT = {"review_policy_version": _RPV}
 
 
 class EvaluateReviewTests(unittest.TestCase):
     def test_content_change_expires_with_history_visible(self):
         record = sample_record()
         inv = inventory_with("inst-1", "b" * 64)  # 内容已变
-        state = evaluate_review(record, inv, POLICY, {})
+        state = evaluate_review(record, inv, POLICY_CURRENT, {})
         self.assertEqual(state["status"], "needs-recheck")
         self.assertIn("target-content-changed", state["reason_codes"])
         self.assertEqual(state["previous_record"]["review_id"], record["review_id"],
@@ -52,7 +57,7 @@ class EvaluateReviewTests(unittest.TestCase):
     def test_same_content_stays_current(self):
         record = sample_record()
         inv = inventory_with("inst-1", "a" * 64)
-        state = evaluate_review(record, inv, POLICY, {})
+        state = evaluate_review(record, inv, POLICY_CURRENT, {})
         self.assertEqual(state["status"], "current")
         self.assertEqual(state["reason_codes"], [])
 
@@ -60,7 +65,7 @@ class EvaluateReviewTests(unittest.TestCase):
         record = sample_record()
         record.pop("review_snapshot_id")
         inv = inventory_with("inst-1", "a" * 64)
-        state = evaluate_review(record, inv, POLICY, {})
+        state = evaluate_review(record, inv, POLICY_CURRENT, {})
         self.assertEqual(state["status"], "needs-recheck")
         self.assertIn("missing-review-snapshot", state["reason_codes"])
 
@@ -70,7 +75,7 @@ class EvaluateReviewTests(unittest.TestCase):
         record["alternatives_state"] = {"lg-2": {"tree_hash": "c" * 64}}
         # 目标未变,替代品消失
         inv = inventory_with("inst-1", "a" * 64)
-        state = evaluate_review(record, inv, POLICY, {})
+        state = evaluate_review(record, inv, POLICY_CURRENT, {})
         self.assertEqual(state["status"], "needs-recheck")
         self.assertTrue(any(c.startswith("alternative-gone") for c in state["reason_codes"]),
                         state["reason_codes"])
@@ -81,13 +86,13 @@ class EvaluateReviewTests(unittest.TestCase):
                      "instance_ids": ["inst-1"]},
                     {"logical_id": "lg-2", "name": "alt", "tree_hash": "d" * 64,
                      "instance_ids": ["inst-2"]}]}
-        state2 = evaluate_review(record, inv2, POLICY, {})
+        state2 = evaluate_review(record, inv2, POLICY_CURRENT, {})
         self.assertTrue(any(c.startswith("alternative-changed") for c in state2["reason_codes"]),
                         state2["reason_codes"])
         # 无关 Skill(C)变化不拖累
         record_c_free = sample_record()
         inv3 = inventory_with("inst-1", "a" * 64)
-        self.assertEqual(evaluate_review(record_c_free, inv3, POLICY, {})["status"],
+        self.assertEqual(evaluate_review(record_c_free, inv3, POLICY_CURRENT, {})["status"],
                          "current")
 
     def test_review_dependencies_contract(self):
@@ -131,6 +136,38 @@ class RecordReviewHardeningTests(unittest.TestCase):
         self.assertTrue(record.get("review_snapshot_id"))
         self.assertEqual(record["skill_tree_hash"], "a" * 64)
         self.assertEqual(record["alternatives_state"]["lg-2"]["tree_hash"], "c" * 64)
+
+    def test_record_saves_actual_policy_version(self):
+        """任务1缺口3:record_review 落盘必须带实际 review_policy_version。"""
+        from scripts.core.review_state import REVIEW_POLICY_VERSION
+        record = record_review(self._queue(), {
+            "instance_id": "inst-1", "verdict": "观察", "confidence": "中",
+            "evidence": ["source: example"], "safety": "safe"}, "model-x")
+        self.assertEqual(record.get("review_policy_version"), REVIEW_POLICY_VERSION,
+                         "记账必须保存实际政策版本,评估才有比对依据")
+
+    def test_unprovable_policy_version_expires(self):
+        """任务1缺口3:政策版本缺失(旧记录不可证明)或与当前不一致都必须 needs-recheck。"""
+        from scripts.core.review_state import REVIEW_POLICY_VERSION, evaluate_review
+        inv = inventory_with("inst-1", "a" * 64)
+        # 缺版本字段:同一内容也不再当作有效结论
+        rec = sample_record()
+        rec.pop("review_policy_version")
+        state = evaluate_review(rec, inv, {}, {})
+        self.assertEqual(state["status"], "needs-recheck")
+        self.assertIn("policy-version-unproven", state["reason_codes"])
+        # 版本与当前政策不一致
+        rec2 = sample_record()
+        rec2["review_policy_version"] = "review-policy-v0"
+        state2 = evaluate_review(rec2, inv, {}, {})
+        self.assertEqual(state2["status"], "needs-recheck")
+        self.assertIn("policy-changed", state2["reason_codes"])
+        # 当前政策显式带版本时按传入政策比对
+        rec3 = sample_record()
+        rec3["review_policy_version"] = "review-policy-v0"
+        state3 = evaluate_review(rec3, inv, {"review_policy_version": "review-policy-v0"}, {})
+        self.assertEqual(state3["status"], "current",
+                         "评估按'记录版本==当前政策版本'判定,不是只对常量")
 
 
 class LedgerIntegrityTests(unittest.TestCase):
@@ -189,6 +226,7 @@ class StalenessIntegrationTests(unittest.TestCase):
 
     @staticmethod
     def _delete_record(alt_hash="c" * 64, demo_hash="a" * 64):
+        from scripts.core.review_state import REVIEW_POLICY_VERSION
         return {"review_id": "rv-del1", "instance_id": "inst-demo",
                 "logical_id": "lg-demo", "name": "demo", "verdict": "建议删除",
                 "reason": "功能被 alt 完全覆盖", "alternatives": ["lg-alt"],
@@ -197,6 +235,7 @@ class StalenessIntegrationTests(unittest.TestCase):
                 "confidence": "高", "evidence": ["功能对比:并集属于 alt", "alt 维护活跃"],
                 "skill_tree_hash": demo_hash, "inventory_fingerprint": "fp-1",
                 "reputation_snapshot_id": "rep-1", "review_snapshot_id": "rs-" + "1" * 12,
+                "review_policy_version": REVIEW_POLICY_VERSION,
                 "reviewed_at": "2026-09-01 00:00:00", "reviewer_model": "model-x",
                 "safety": "safe", "note": ""}
 

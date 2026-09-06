@@ -788,6 +788,7 @@ td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top}
 .btn:hover{background:#f3f4f6} .btn:disabled{opacity:.5}
 .btn-danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c} .btn-ghost{color:#6b7280}
 .attention-list{display:grid;gap:7px;margin:8px 0}.attention-row{border-left:4px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px 10px}.attention-red{border-left-color:#ef4444}.attention-yellow{border-left-color:#eab308}.attention-update{border-left-color:#3b82f6}.attention-head{display:flex;align-items:center;gap:6px}.attention-row p{margin:4px 0;font-size:13px}.all-clear{color:#15803d;margin:8px 0}
+.vet-panel{position:sticky;top:10px;z-index:5;background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:12px 14px;margin:10px 0;box-shadow:0 4px 14px rgba(180,83,9,.15)}.vet-panel p{margin:6px 0;font-size:13px}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2937;color:#fff;border-radius:99px;padding:8px 18px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:80%}
 #toast.show{opacity:.95}
 @media(max-width:760px){body{margin:14px auto}.dashboard{grid-template-columns:1fr}.cards{grid-template-columns:1fr}table{display:block;overflow-x:auto;white-space:nowrap}}
@@ -803,6 +804,7 @@ __PROTECTED__
 __TABLE__
 <h3>其他</h3>__EXTRAS__
 <p style="color:#9ca3af;font-size:12px">由 skill-keeper v2 生成 · 所有删除/恢复都走 计划→确认→备份→执行→验证 两阶段流程,永不自动执行 · 一键操作需 <code>report.py --serve</code>(静态打开时按钮复制等价命令)</p>
+<div id="vet-panel-host"></div>
 <div id="toast"></div>
 <script>__JS__</script>
 </body></html>"""

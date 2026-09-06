@@ -176,7 +176,8 @@ class WebVetFlowTests(unittest.TestCase):
             svc.vet_candidate(plan.plan_id, "safe", [])
 
     def test_serve_vet_endpoint_records_for_the_new_plan(self):
-        """网页流程:POST /api/plan 建新计划 → /api/vet 对该计划记账 → /api/apply 成功。"""
+        """任务1缺口1:/api/vet 必须携带可核查证据——空证据拒绝,绝不为网页确认
+        自动造依据;流程改为 计划→正式安检(CLI/API 带证据)→apply。"""
         import json as _json
         import threading
         from http.client import HTTPConnection
@@ -212,8 +213,16 @@ class WebVetFlowTests(unittest.TestCase):
         self.assertEqual(status, 200, plan)
         self.assertEqual(plan["candidate_hash"], env.v2_hash,
                          "计划公开字段必须带候选哈希,供安检步骤展示")
+        # 空证据必须拒绝:confirm 不等于 safe,网页不得自动造证据
+        status, refused = post("/api/vet", {"plan_id": plan["plan_id"],
+                                            "verdict": "safe", "confirm": True})
+        self.assertEqual(status, 400, refused)
+        self.assertIn("证据", refused.get("error", ""))
+        # 带可核查证据才放行
         status, vet = post("/api/vet", {"plan_id": plan["plan_id"], "verdict": "safe",
-                                        "confirm": True})
+                                        "confirm": True,
+                                        "evidence": ["已读候选全文与差异",
+                                                     "来源 example/demo@cafe-head 核对一致"]})
         self.assertEqual(status, 200, vet)
         self.assertEqual(vet["candidate_hash"], env.v2_hash)
         # 快照刷新会以 realpath 重算 instance_id(测试 fixture 与之不同口径),

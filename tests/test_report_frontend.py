@@ -118,10 +118,17 @@ class ReportFrontendTests(unittest.TestCase):
             self.assertIn("act==='%s'" % act, report_mod.JS_BLOB,
                           "data-act=%s 在交互脚本里没有处理分支" % act)
 
-    def test_update_flow_dialogs_carry_single_line_escapes(self):
-        """F01 的直接病灶:更新分支 confirm 串里的换行必须是 \\n 转义,不能是裸换行。"""
+    def test_update_flow_pauses_for_formal_vetting(self):
+        """任务1缺口1:网页不得把 confirm 当 safe 安检。
+
+        交互脚本必须暂停并给出可续办的正式 CLI 流程(manage.py vet,需要
+        可核查证据),浏览器绝不携带 verdict 调 /api/vet 造记录。
+        """
         js = report_mod.JS_BLOB
-        self.assertIn("第 1/2 步 安检", js, "更新流程必须包含绑定本计划的安检步骤")
+        self.assertIn("manage.py vet", js, "更新流程必须给出正式安检命令")
+        self.assertIn("vet-continue", js, "安检后的续办执行必须有处理分支")
+        self.assertNotIn("/api/vet", js,
+                         "浏览器脚本不得直接记账安检:confirm 不等于 safe")
         _assert_no_bare_newline_in_strings(js)
 
 

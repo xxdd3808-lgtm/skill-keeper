@@ -97,19 +97,22 @@ def _plan_public(row):
 
 
 def _handle_vet(ctx, body):
-    """候选安检记账(F09):绑定 body 指定的计划,网页更新流程的必经步骤。
+    """候选安检记账(F09/任务1缺口1):绑定 body 指定的计划。
 
-    此前网页每次点击都新建计划,而安检记录绑定 plan_id+candidate_hash,
-    "先安检后 apply"在网页上永远对不上;现在计划建立后先对本计划记账再执行。
+    安检结论必须携带可核查证据——confirm 只表示"确实要记账",绝不等于 safe;
+    空 evidence 一律拒绝,绝不自动生成"网页确认"式依据。浏览器流程在计划
+    建立后暂停并给出可续办的正式 CLI 命令(manage.py vet)。
     """
     if body.get("confirm") is not True:
         raise ChangeError("缺少明确确认:confirm 必须是布尔 true")
     evidence = body.get("evidence")
     if isinstance(evidence, str):
-        evidence = [evidence]
+        evidence = [evidence] if evidence.strip() else []
     if not evidence:
-        # 用户在网页确认即人工复核;依据记录"谁在哪确认",不虚构阅读细节
-        evidence = ["网页人工安检:用户在交互报告页确认接受该候选"]
+        raise ChangeError(
+            "安检结论必须携带可核查证据(evidence 不能为空);网页点击不构成安检,"
+            "请用正式流程: python3 scripts/manage.py vet {} --verdict safe "
+            "--evidence <你的核查依据>".format(str(body.get("plan_id") or "<plan_id>")))
     return ctx.service.vet_candidate(str(body.get("plan_id") or ""),
                                       str(body.get("verdict") or ""), evidence)
 

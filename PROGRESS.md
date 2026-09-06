@@ -108,3 +108,17 @@
 - **F09 安检续办**:网页流程改为 计划→对本计划安检记账(/api/vet,plan_id+candidate_hash 绑定不变)→确认执行;计划公开字段带 candidate_hash/repo/commit_sha;CLI 新增 `manage.py vet <plan_id> --verdict safe|warning --evidence ...`;网页与服务层共用 AppService.vet_candidate。
 - 验收:`python3 scripts/verify.py` 338 项 0 失败 0 跳过(233 冻结 ID 保留),`git diff --check` 通过。新增/强化回归:frontend 合同 4 项、GitHub 真实形状 3 项、政策损坏条目 1 项、审查生命周期集成 4 项、并发合同 3 项、路径一致/刷新失败 4 项、vet 流程 4 项、scan 保管目录 1 项、打包携带 JS 1 项。
 - 未验证(如实):真实浏览器点击回归未跑(语法/合同层已覆盖);四平台 CI 需 push 后由 Actions 给出最终证据;F07/F10–F13 与报告视图分离属第二/三阶段,尚未执行。
+
+## 全面审查修复·收尾轮开工回执(2026-09-06,任务书驱动)
+
+- 基线实测:codex/1 @ aadcdba 干净;verify 338 项 0 失败 0 跳过(⛔ 行是 test_verify_acceptance 故意注入的反向探针,非真失败);benchmark 80=0.149s / 200=2.714s / 400=38.044s(RSS 149.1MiB),与审查记录同量级。
+- 顺序:任务1 三个安全缺口(网页安检不得用 confirm 造证据/其他事务损坏 fail-closed/record_review 保存并比对政策版本)+真实浏览器全链路 → 任务2 F10–F13 数据口径统一 → 任务3 F07 等定点优化(400 项 ≥8 倍且 ≤5s,800 项 ≤30s,语义零差异) → 任务4 CLI/SKILL.md 精简 → 任务5 本地收尾;每阶段独立 commit,不 push。
+- 最大风险:①F03 语义收紧(政策版本不可证明=needs-recheck)会让存量记录批量过期,报告语义变化需与"结论正确>性能"取舍一致;②400→800 项性能目标依赖语料密集度,若 800 项超 30s 需按"结果比基线差则回滚该项"处理;③浏览器验收受 confirm() 原生对话框自动化限制。
+
+### 任务1 完成(2026-09-06):封住第一阶段的假绿
+
+- 缺口1(网页安检):/api/vet 空 evidence 一律 400,删除"网页确认=自动造证据"逻辑;JS 更新流程改为 计划建立→暂停展示安检面板(可复制的正式 `manage.py vet` 命令+可续办执行命令)→「我已完成安检,继续执行」按钮,网页脚本不再携带 verdict 调 /api/vet。红→绿:test_serve_vet_endpoint(空证据 400)、test_update_flow_pauses_for_formal_vetting 先 5 连红后全绿。
+- 缺口2(fail-closed):其他事务状态文件损坏 → 新资产写操作拒绝并指出损坏文件(此前静默跳过)。红→绿:test_corrupt_other_transaction_blocks_apply_fail_closed。
+- 缺口3(政策版本):record_review 保存实际 review_policy_version;evaluate_review 缺版本=policy-version-unproven、不一致=policy-changed,均 needs-recheck;当前政策版本可显式传入比对。红→绿:test_record_saves_actual_policy_version/test_unprovable_policy_version_expires。旧测试夹具补齐版本字段(语义更严,非放宽)。
+- 浏览器验收(IAB 真实点击,临时 HOME/DATA/STAGING,confirm 用记录式替身模拟用户点确定——IAB 后端会自动取消原生对话框,已如实记录):①顶部指标跳转 hash=#verdict-unreviewed+区块展开在视口;②「复制安检命令」剪贴板捕获完整 vet 命令;③更新续办:面板展示 plan-20260906-161351-de58f985+正式命令→未安检点继续被拒("❌ 尚未安检")→CLI 带 evidence 安检→点继续→v2 落盘+事务 committed;④删除 demo→两段 confirm→committed+刷新失败诚实 toast→点刷新报"❌ 重扫失败"→修复可读性后再刷新成功→报告出现备份行;⑤恢复按钮→demo 回原位(demo body v1 落盘)。
+- verify 341 项 0 失败 0 跳过(基线 233 保留)。

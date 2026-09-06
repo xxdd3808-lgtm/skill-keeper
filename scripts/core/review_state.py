@@ -44,6 +44,9 @@ def evaluate_review(record, inventory, policy, reputation) -> dict:
     """评估一条审查记录当前是否仍有效;返回 {status, reason_codes, previous_record}。
 
     status ∈ current / needs-recheck / unreviewed(record 为 None 时)。
+    政策版本比对(任务1缺口3):记录必须能证明自己的 review_policy_version——
+    缺失(旧记录不可证明)按 policy-version-unproven 过期;与当前政策不一致
+    按 policy-changed 过期;当前政策未显式给版本时以 REVIEW_POLICY_VERSION 为准。
     """
     if not record:
         return {"status": "unreviewed", "reason_codes": ["no-record"],
@@ -67,8 +70,12 @@ def evaluate_review(record, inventory, policy, reputation) -> dict:
             reasons.append("alternative-gone:" + str(lid))
         elif current_hash != recorded_hash:
             reasons.append("alternative-changed:" + str(lid))
-    if str(record.get("review_policy_version") or REVIEW_POLICY_VERSION) \
-            != REVIEW_POLICY_VERSION:
+    recorded_version = str(record.get("review_policy_version") or "").strip()
+    current_version = str((policy or {}).get("review_policy_version")
+                          or REVIEW_POLICY_VERSION)
+    if not recorded_version:
+        reasons.append("policy-version-unproven")
+    elif recorded_version != current_version:
         reasons.append("policy-changed")
     return {"status": "needs-recheck" if reasons else "current",
             "reason_codes": reasons, "previous_record": record}
