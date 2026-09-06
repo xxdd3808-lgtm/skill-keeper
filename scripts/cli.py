@@ -3,7 +3,9 @@
 
   skill-keeper scan [--json]      多客户端适配器发现 + 完整树指纹 → inventory(只读)
   skill-keeper report [--json]    价值审查报告(data/report.md + report.html)
-  skill-keeper manage ...         plan/apply/status/recover/rescan(与网页共用 service 层)
+  skill-keeper updates [--json]   更新检查:本地完整树 vs 固定上游 commit(只读)
+  skill-keeper review queue/show/record   第三方价值审查(queue 默认增量待办)
+  skill-keeper manage ...         plan/vet/apply/status/recover/rescan(与网页共用 service 层)
   skill-keeper doctor [--json]    版本、Python、运行目录、锁后端、已登记位置
 
 旧入口 `python3 scripts/*.py` 继续有效,与新 CLI 调用同一 service/引擎层;

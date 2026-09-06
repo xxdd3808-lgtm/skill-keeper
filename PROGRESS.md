@@ -148,3 +148,12 @@
 - **SKILL.md 精简**:20417 → 6959 字节(**-65.9%**,远超 ≥35% 门槛);保留路由/命令表/铁律(安全边界完整)/标准工作流/失败恢复/交付约定;数据文件表、加载规则、来源口径、未知客户端字段白名单、报告页面说明下沉到新增 `docs/skill-manual.md`(12971 字节)。test_migrations_docs 文档一致性断言通过。
 - 文档同步:README(统一命令节+vet 步骤+结构图)、docs/architecture.md(性能口径更新)、docs/changes.md(收尾轮条目)。
 - verify 364 项 0 失败 0 跳过。
+
+### 任务5 完成(2026-09-06):本地收尾
+
+- **仓库外临时 venv 安装验收**:`pip install .` 到 /tmp/sk-final-venv,从 /tmp 运行安装态 CLI:`--help` 列全六个命令;`doctor --json` 新默认布局(~/.skill-keeper/{data,cache/staging,backups});scan/report/updates --json 全通(temp HOME,1 技能)。
+- **安装态浏览器 smoke**(真实 IAB 点击):报告页正常渲染(截图存档),交互脚本存活(toast/afterApply 函数在),「🔄 刷新报告」真实点击→rescan 成功→自动重载(补丁变量被清空+页面 JS 重新初始化即为重载证据)。
+- **最终数字**:verify 364 项 / 0 失败 / 0 错误 / 0 跳过(冻结 233 ID 保留);`git diff --check` 干净;BLOCKED.md = 无;未 push / 未合并 / 未打 tag / 未发 Release。
+- 提交列表(本收尾轮):aadcdba(第一阶段修复,任务书前基线)→ fea9a30(任务1)→ e20bb39(任务2)→ e40b26e(任务3)→ 750df63(任务4)→ 本提交(任务5 收尾)。
+- 性能前后(同 benchmark 同语料):80 项 0.149→0.026s;200 项 2.714→0.168s;400 项 38.044→0.792s(48×);800 项 ~6 分钟未完成→3.395s / RSS 558MiB。
+- 仍需领导授权的动作:push、CI 四平台复核、合并 main、打 tag、发 Release。
