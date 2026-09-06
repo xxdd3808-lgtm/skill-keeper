@@ -5,7 +5,8 @@
 - 只绑 127.0.0.1;所有 API 需要随机 token(常量时间比较);POST 校验 Origin;
 - 请求体上限 64 KiB;confirm 必须是 JSON 布尔 true,字符串 "false" 一律拒绝;
 - 所有响应带 nosniff/no-referrer/DENY/Permissions-Policy;HTML 另带白名单式 CSP
-  (交互脚本通过带 token 的同源资源加载,不用 unsafe-inline/unsafe-eval);
+  (交互脚本通过带 token 的同源资源加载,不使用 unsafe-inline/unsafe-eval;
+  样式仍允许 style-src unsafe-inline,仅覆盖报告自产内联样式);
 - 所有变更动作都走统一变更引擎:计划不可变、执行要 digest 确认、先备份、失败回滚、
   成功失败都写审计;进程内锁 + 文件锁双重防并发;
 - 不把异常 repr、绝对用户路径或客户端配置内容返回浏览器。
@@ -183,8 +184,6 @@ def _handle_apply(ctx, body):
 
 
 def _build_handler(ctx, token):
-    origin_ok = "http://127.0.0.1:%d" % 0  # 占位,真正端口在请求时取 self.server.server_port
-
     class Handler(BaseHTTPRequestHandler):
         server_version = SERVER_VERSION
 
@@ -303,7 +302,9 @@ def _build_handler(ctx, token):
                         return self._send(200, {"ok": True, "message": "已重扫并刷新报告"})
                     return self._send(500, {"ok": False, "error": "重扫失败,请手动跑 scan.py"})
                 if u.path == "/api/ignore":
-                    return self._send(200, _handle_ignore(ctx, body))
+                    # 写入口一致拿进程内锁(ignore.json 是读改写,且随后触发重扫)
+                    with ctx.process_lock:
+                        return self._send(200, _handle_ignore(ctx, body))
                 return self._send(404, {"ok": False, "error": "not found"})
             except LockBusy as e:
                 append_audit({"action": "web-rejected", "reason": str(e)[:120],
