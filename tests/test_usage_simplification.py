@@ -98,6 +98,49 @@ class IncrementalReviewTests(unittest.TestCase):
             inv["logical_skills"][0]["tree_hash"] = "b" * 64
             self.assertEqual(_need_vet(inv, data), ["inst-1"])
 
+    def test_need_vet_alias_instances_follow_representative_review(self):
+        """别名实例(符号链接副本)跟随代表实例的审查结论,不产生幻影待办。
+
+        队列按逻辑技能审一次(代表实例记账);need_vet 若按实例各查各的记录,
+        已审结逻辑技能的别名会永远挂在待办里,且队列不再列出它,流程上无法清掉。"""
+        from scripts.core.review_state import REVIEW_POLICY_VERSION
+        from scripts.scan import _need_vet
+        insts = [{"instance_id": "inst-real", "tree_hash": "a" * 64,
+                  "logical_name": "demo", "directory_name": "demo",
+                  "is_skill": True, "mutable": True, "is_symlink": False,
+                  "real_path": "/x/demo", "path": "/x/demo",
+                  "kind": "user", "client": "shared"},
+                 {"instance_id": "inst-alias", "tree_hash": "a" * 64,
+                  "logical_name": "demo", "directory_name": "demo",
+                  "is_skill": True, "mutable": True, "is_symlink": True,
+                  "real_path": "/x/demo", "path": "/y/demo",
+                  "kind": "user", "client": "claude-code"}]
+        inv = {"instances": insts,
+               "logical_skills": [{"logical_id": "lg-1", "name": "demo",
+                                   "tree_hash": "a" * 64,
+                                   "instance_ids": ["inst-real", "inst-alias"]}]}
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td)
+            (data / "known-sources.json").write_text(json.dumps(
+                {"demo": {"type": "github", "repo": "example/demo"}}), encoding="utf-8")
+            self.assertEqual(_need_vet(inv, data), ["inst-alias", "inst-real"])
+            self._write_reviews(data, [{
+                "review_id": "rv-1", "instance_id": "inst-real", "logical_id": "lg-1",
+                "verdict": "保留", "reason": "维护活跃", "alternatives": [],
+                "alternatives_state": {}, "confidence": "高",
+                "evidence": ["source: example/demo", "coverage: 独立"],
+                "skill_tree_hash": "a" * 64, "review_snapshot_id": "rs-" + "1" * 12,
+                "review_policy_version": REVIEW_POLICY_VERSION,
+                "reviewed_at": "2026-09-06 00:00:00", "reviewer_model": "m",
+                "safety": "safe"}])
+            self.assertEqual(_need_vet(inv, data), [],
+                             "代表实例结论有效时,同内容别名实例不得再进 need_vet")
+            # 内容变化 → 整个逻辑技能回到待安检(两个实例都在列)
+            for i in inv["instances"]:
+                i["tree_hash"] = "b" * 64
+            inv["logical_skills"][0]["tree_hash"] = "b" * 64
+            self.assertEqual(_need_vet(inv, data), ["inst-alias", "inst-real"])
+
     def test_queue_default_incremental_all_for_full_review(self):
         from scripts.value_review import cmd_queue
         import argparse

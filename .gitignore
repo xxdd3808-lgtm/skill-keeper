@@ -16,6 +16,7 @@ data/client-locations.json
 data/updates-last.json
 data/staging/
 data/.change.lock
+data/.reviews.lock
 data/audit-v2.jsonl
 data/migrations/
 

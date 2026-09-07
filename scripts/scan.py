@@ -663,10 +663,15 @@ def _build_logical_skills(instances):
 def _need_vet(inventory, data_dir):
     """需要安检的第三方实例 ID:来源核实为 third-party 且 review_required,
     且没有当前生效的审查记录(任务4:默认体检只复核新增/内容或依赖变化项——
-    结论有效 = 目标内容未变、替代关系完好、政策版本一致,经 evaluate_review 判定)。"""
+    结论有效 = 目标内容未变、替代关系完好、政策版本一致,经 evaluate_review 判定)。
+
+    与审查队列同口径:队列按逻辑技能审一次(代表实例记账)。同一逻辑技能的
+    别名实例(如指向同一实体的符号链接副本)内容同一份,跟随代表实例的结论;
+    否则别名会在队列审结后仍挂在 need_vet 里,成为流程上永远清不掉的幻影待办。"""
     from scripts.core.provenance import classify_provenance, load_user_config
     from scripts.core.review_state import evaluate_review
     from scripts.core.reviews import normalize_reviews
+    from scripts.core.overlap import logical_status_map
     known = load_user_config(data_dir)
     receipts = {}
     for inst in inventory.get("instances", []):
@@ -674,6 +679,12 @@ def _need_vet(inventory, data_dir):
             receipts[str(inst.get("instance_id"))] = {"type": inst["kind"]}
     store, _ = load_json_checked(Path(data_dir) / "value-reviews.json", {})
     reviews = normalize_reviews(store.get("reviews") if isinstance(store, dict) else [])
+    rep_review_by_iid = {}
+    for st in logical_status_map(inventory).values():
+        rec = reviews.get(str(st["representative"].get("instance_id")))
+        if rec is not None:
+            for i in st["instances"]:
+                rep_review_by_iid[str(i.get("instance_id"))] = rec
     out = []
     for inst in inventory.get("instances", []):
         if not inst.get("is_skill") or not inst.get("mutable"):
@@ -681,7 +692,8 @@ def _need_vet(inventory, data_dir):
         prov = classify_provenance(inst, receipts, known)
         if not prov.get("review_required"):
             continue
-        rec = reviews.get(str(inst.get("instance_id")))
+        iid = str(inst.get("instance_id"))
+        rec = reviews.get(iid) or rep_review_by_iid.get(iid)
         if rec is not None and evaluate_review(rec, inventory, {}, {}).get("status") == "current":
             continue
         out.append(inst["instance_id"])
